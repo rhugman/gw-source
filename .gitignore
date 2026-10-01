@@ -1,0 +1,28 @@
+# MODFLOW 6 executables (downloaded by scripts/setup_env.sh)
+bin/
+
+# Python build artefacts and caches
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.eggs/
+.pytest_cache/
+
+# Model output and scratch workspaces
+model_ws/
+output/
+*_ws/
+tests/_output/
+
+# OS / editor
+.DS_Store
+
+# Reference papers: copyrighted, large; kept locally only
+references/docs/*.pdf
+references/docs/text/
+
+# Local Claude Code settings
+.claude/settings.local.json
+.claude/.cc-writes

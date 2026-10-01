@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gw-source"
+dynamic = ["version"]
+description = "Cell-mixing flow tracing (capture and source fractions) for MODFLOW 6 output."
+readme = "README.md"
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+authors = [{ name = "gw-source contributors" }]
+dependencies = [
+    "numpy",
+    "scipy",
+    "flopy",
+]
+
+[project.optional-dependencies]
+export = ["xarray", "netcdf4", "geopandas"]
+dev = ["pytest"]
+
+[tool.setuptools.dynamic]
+version = { attr = "gwsource.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tests"]
+addopts = "-ra"

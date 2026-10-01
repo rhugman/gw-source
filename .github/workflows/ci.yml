@@ -1,0 +1,49 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1"  # weekly, Monday 06:00 UTC, to catch upstream FloPy/MF6 changes
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    defaults:
+      run:
+        shell: bash -el {0}
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # avoids API rate limits in get-modflow
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up the gw-source environment
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: environment.yml
+          environment-name: gw-source
+          cache-environment: false
+          init-shell: bash
+
+      - name: Regenerate FloPy MF6 classes from MF6 develop DFNs
+        run: python -m flopy.mf6.utils.generate_classes --ref develop
+
+      - name: Download MODFLOW 6 nightly build and triangle
+        run: |
+          mkdir -p bin
+          get-modflow --repo modflow6-nightly-build --downloads-dir "${RUNNER_TEMP}" bin
+          get-modflow --repo executables --subset triangle --downloads-dir "${RUNNER_TEMP}" bin
+
+      - name: Record versions
+        run: |
+          python -c "import json, flopy; from importlib.metadata import distribution; d = json.loads(distribution('flopy').read_text('direct_url.json') or '{}'); print('FloPy', flopy.__version__, d.get('vcs_info', {}).get('commit_id', 'unknown'))"
+          bin/mf6 --version
+
+      - name: Run tests
+        run: pytest -v
