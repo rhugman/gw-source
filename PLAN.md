@@ -317,7 +317,7 @@ Defaults adopted on 2026-10-02 so implementation can start. Any of them can be r
 - **D3. Versions:** development on FloPy `develop` and the MF6 nightly build. The oldest supported releases are fixed at the first package release.
 - **D4. Output formats:** npz in Phase 1; netCDF (xarray) and GeoPackage in Phase 2.
 - **D5. Numba:** not used; scipy only unless the Phase 2 benchmark shows a need.
-- **D6. Real-world test model:** the USGS Neversink/Rondout MF6 model (public domain), against its published MODPATH 7 contributing areas for eight priority wells [COR22]; stage 1 (calibrated model) in `docs/neversink_study.md`, the 358-realisation ensemble next.
+- **D6. Real-world test model:** the USGS Neversink/Rondout MF6 model (public domain), against its published MODPATH 7 contributing areas for eight priority wells [COR22]; calibrated model, 358-realisation ensemble and five pumping scenarios in `docs/neversink_study.md`.
 
 Original options considered:
 

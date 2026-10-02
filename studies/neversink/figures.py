@@ -148,3 +148,76 @@ def jaccard_table(out: Path) -> pd.DataFrame:
         rows.append({"method": f"PRT z={r['release_z']:g}, {thin}, P > 0.5",
                      "jaccard": r["jaccard_mp7_prt>0.5"]})
     return pd.DataFrame(rows)
+
+
+SERIES = {"published": "#0b0b0b", "cells": "#2a78d6", "network": "#1baf7a", "pumping": "#9a9994"}
+SERIES_LABELS = {
+    "published": "published MODPATH 7 (all masks)",
+    "cells": "full mixing, streams as cells",
+    "network": "full mixing, stream network",
+    "pumping": "pumping of the priority wells",
+}
+QRAT_FRACTION = {"baserat": 0.0, "0.25rat": 0.25, "0.5rat": 0.5, "0.75rat": 0.75, "maxrat": 1.0}
+
+
+def probability_maps(maps: dict, fig_dir: Path, idomain: np.ndarray, wells: dict) -> Path:
+    """Map the published probability against gwsource's ensemble mean F (base pumping)."""
+    _style()
+    shape = idomain.shape[1:]
+    ncol = shape[1]
+    fields = {
+        "published probability": maps["mp7"],
+        "mean F, streams as cells": maps["cells:mean_F"],
+        "mean F, stream network": maps["network:mean_F"],
+    }
+    outline = maps["mp7"] > 0.5
+    wells_ij = [((n % outline.size) // ncol, n % ncol) for n in wells.values()]
+    extent = np.any([f > 0.1 for f in fields.values()], axis=0)
+    windows = cluster_windows(wells, ncol, extent)
+    fig, axes = plt.subplots(len(fields), len(windows), figsize=(10, 9.6), constrained_layout=True)
+    for row, (label, field) in enumerate(fields.items()):
+        for col, (name, window) in enumerate(windows.items()):
+            image = _panel(axes[row, col], field, outline, wells_ij, window, f"{name} wells: {label}")
+    for ax in axes[-1]:
+        ax.set_xlabel("x from grid origin [km]")
+    for ax in axes[:, 0]:
+        ax.set_ylabel("y from grid origin [km]")
+    bar = fig.colorbar(image, ax=axes, shrink=0.5, label="probability or mean F")
+    bar.outline.set_visible(False)
+    fig.suptitle("Base pumping, 357 published masks and 358 realisations; outline: published "
+                 "probability 0.5", x=0.01, ha="left", fontsize=10)
+    path = fig_dir / "neversink_probability_maps.png"
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
+    return path
+
+
+def area_growth(table: pd.DataFrame, fig_dir: Path) -> Path:
+    """Plot the median contributing area against the pumping scenario, relative to base."""
+    _style()
+    plt.rcParams.update({"axes.grid": True, "grid.color": GRID, "grid.linewidth": 0.6})
+    fixed = table[table["qrat"].isin(QRAT_FRACTION)].copy()
+    fixed["f"] = fixed["qrat"].map(QRAT_FRACTION)
+    fixed = fixed.sort_values("f")
+    columns = {
+        "published": "published_cells_growth",
+        "cells": "cells_expected_growth",
+        "network": "network_expected_growth",
+        "pumping": "inflow_growth",
+    }
+    fig, ax = plt.subplots(figsize=(6.4, 4.2), constrained_layout=True)
+    for key, col in columns.items():
+        style = {"ls": "--", "lw": 1.5} if key == "pumping" else {"lw": 2, "marker": "o", "ms": 6}
+        ax.plot(fixed["f"], fixed[col], color=SERIES[key], label=SERIES_LABELS[key], **style)
+        if key != "pumping":  # the reference line is read off the legend
+            ax.annotate(f"{fixed[col].iloc[-1]:.2f}", (1.0, fixed[col].iloc[-1]), xytext=(6, 0),
+                        textcoords="offset points", va="center", fontsize=8, color=INK)
+    ax.set_xlabel("pumping scenario f  (q = q_base + f (q_max - q_base))")
+    ax.set_ylabel("median contributing area / base")
+    ax.set_xlim(-0.03, 1.12)
+    ax.legend(loc="upper left", fontsize=8)
+    ax.set_title("Contributing area of the eight priority wells against pumping", loc="left")
+    path = fig_dir / "neversink_area_growth.png"
+    fig.savefig(path, dpi=160)
+    plt.close(fig)
+    return path
