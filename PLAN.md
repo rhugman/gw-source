@@ -312,7 +312,7 @@ Following house style: small functions with explicit arguments, type hints, `ass
 Defaults adopted on 2026-10-02 so implementation can start. Any of them can be revisited.
 
 - **D1. Package name:** `gwsource` (import name), distribution name `gw-source`.
-- **D2. Licence:** BSD-3-Clause.
+- **D2. Licence:** MIT (changed from BSD-3-Clause on 2026-10-02).
 - **D3. Versions:** development on FloPy `develop` and the MF6 nightly build. The oldest supported releases are fixed at the first package release.
 - **D4. Output formats:** npz in Phase 1; netCDF (xarray) and GeoPackage in Phase 2.
 - **D5. Numba:** not used; scipy only unless the Phase 2 benchmark shows a need.

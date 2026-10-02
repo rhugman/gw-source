@@ -7,7 +7,7 @@ name = "gw-source"
 dynamic = ["version"]
 description = "Cell-mixing flow tracing (capture and source fractions) for MODFLOW 6 output."
 readme = "README.md"
-license = "BSD-3-Clause"
+license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.11"
 authors = [{ name = "Rui Hugman" }]

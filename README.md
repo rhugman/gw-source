@@ -39,4 +39,4 @@ The pytest header records the FloPy commit and MF6 version used. The tests build
 
 ## Licence
 
-BSD-3-Clause; see [`LICENSE`](LICENSE).
+MIT; see [`LICENSE`](LICENSE).
