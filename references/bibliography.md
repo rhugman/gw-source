@@ -142,6 +142,16 @@ Compiled 2026-10-01.
 - **[C]** Paywalled.
 - Relevance: **an independently developed method with the same core assumption** (fully mixed cells, flow-weighted fractions computed from the flow solution only, no transport run). It was implemented in HydroGeoSphere and is solved forward in time, so it is transient-capable.
 
+**[COR22] Corson-Dosch, N.T., Fienen, M.N., Finkelstein, J.S., Leaf, A.T., White, J.T., Woda, J. & Williams, J.H. (2022).** *Areas contributing recharge to priority wells in valley-fill aquifers in the Neversink River and Rondout Creek drainage basins, New York*. USGS Scientific Investigations Report 2021–5112.
+- DOI: https://doi.org/10.3133/sir20215112
+- **[C]** Citation only; open access (USGS), not downloaded.
+- Relevance: the published MODPATH 7 Monte Carlo contributing areas used as the benchmark in `docs/neversink_study.md`; model and workflow at github.com/usgs/neversink_workflow (public domain), data release doi 10.5066/P9HWSOHP.
+
+**[FIE21] Fienen, M.N., Corson-Dosch, N.T., White, J.T., Leaf, A.T. & Hunt, R.J. (2021).** "Risk-based wellhead protection decision support: a repeatable workflow approach." *Groundwater*.
+- DOI: https://doi.org/10.1111/gwat.13129
+- **[C]** Citation only, not downloaded.
+- Relevance: the ensemble workflow (PEST++ IES, rejection sampling, MODPATH Monte Carlo) behind the Neversink benchmark.
+
 **[POL88] Pollock, D.W. (1988).** "Semianalytical computation of path lines for finite-difference models." *Ground Water* 26(6), 743–750.
 - DOI: https://doi.org/10.1111/j.1745-6584.1988.tb00425.x
 - **[C]** Paywalled.
