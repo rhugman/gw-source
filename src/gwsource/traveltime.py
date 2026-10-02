@@ -8,6 +8,9 @@ gwsource.mf6io). A fully mixed cell is a well-mixed reservoir: the time a parcel
 exponentially distributed with mean tau_i = V_i / O_i (backward; O_i = gross outflow) or
 tau_i = V_i / I_i (forward; I_i = gross inflow); the two are equal when the cell budget closes.
 Cells with O_i = 0 (or I_i = 0) have no residence time (NaN) and take no part.
+Package nodes of a network step (gwsource.network) have their own water volume
+(FlowStep.fixed_volume: SFR reach, lake, MAW well or UZF cell volume from the package budget's
+STORAGE VOLUME), so the identities below hold over cells and package nodes alike.
 
 Backward: mean travel time to a destination group
 -------------------------------------------------
@@ -73,6 +76,7 @@ from .assemble import (
 from .diagnostics import Check
 from .flowstep import FlowStep
 from .metrics import BackwardResult, ForwardResult
+from .network import global_values
 from .solve import Factor, factorize, isolate_closed_loops
 
 DEFAULT_FRACTION_THRESHOLD = 1e-10
@@ -122,7 +126,11 @@ def cell_porosity(porosity, n_cells: int) -> np.ndarray:
 
 
 def water_volume(step: FlowStep, porosity) -> np.ndarray:
-    """Return V = porosity x area x saturated thickness per cell (0 in inactive cells)."""
+    """Return V = porosity x area x saturated thickness per cell (0 in inactive cells).
+
+    Nodes with a fixed volume (package nodes of a network step) take it instead. porosity may
+    also be a dict {model: per-cell porosity} for a network step.
+    """
     assert step.area is not None, (
         "travel times need cell areas: DIS/DISV give them; for DISU without vertices pass area= "
         "or read the step with open_model/read_step (AREA from the DISU input)"
@@ -131,8 +139,12 @@ def water_volume(step: FlowStep, porosity) -> np.ndarray:
         "travel times need the saturated thickness: save DATA-SAT (NPF SAVE_SATURATION) or heads, "
         "or set FlowStep.saturated_thickness"
     )
+    if isinstance(porosity, dict):
+        porosity = global_values(step, porosity, fill=1.0)
     pore = cell_porosity(porosity, step.n_cells)
     volume = pore * step.area * step.saturated_thickness
+    if step.fixed_volume is not None:
+        volume = np.where(np.isfinite(step.fixed_volume), step.fixed_volume, volume)
     return np.where(step.active, volume, 0.0)
 
 

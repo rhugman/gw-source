@@ -45,6 +45,12 @@ TravelTimeResult.mean_time_to_exit_cell (the time until the water enters the cel
 whose sink it leaves); mean_time also includes the residence in that cell.
 
 PRT supports DIS and DISV only; for DISU the Eulerian travel time is the only option.
+
+Network steps (gwsource.network: several models, or package nodes) are not supported: the stop
+zone and the particle weights assume that the destination sinks and every node of the graph are
+cells of the one GWF model PRT tracks in, and particles do not follow package networks (an SFR
+reach, a MAW well bore) or cross into other models. track_particles() raises NotImplementedError
+for them.
 """
 
 import os
@@ -481,6 +487,24 @@ def arrival_statistics(
     )
 
 
+def check_cells_only(step: FlowStep, destination: Selection) -> None:
+    """Raise NotImplementedError for network steps (package-node destinations, several models)."""
+    if not step.is_network:
+        return
+    on_packages = [
+        b.label for b in step.blocks if b.kind == "package" and destination.cells[b.nodes].any()
+    ]
+    if on_packages:
+        raise NotImplementedError(
+            f"the destination lies on package nodes ({', '.join(on_packages)}); the PRT helper "
+            "stops particles in cells only"
+        )
+    raise NotImplementedError(
+        "the PRT helper needs a single-model step without package nodes (particles do not "
+        "follow package networks or cross models); read the model with read_step()"
+    )
+
+
 def track_particles(
     gwf_ws: str | Path,
     step: FlowStep,
@@ -498,6 +522,7 @@ def track_particles(
     from the source terms (all, or those in source) of cells with F > fraction_threshold.
     """
     assert result.accounting == "gross", "use a gross-accounting backward result"
+    check_cells_only(step, result.selections[group])
     files = find_model_files(gwf_ws, model)
     grid = load_prt_grid(gwf_ws, files.model, files.dis_type)
     contributing = result.fraction_through[group] > config.fraction_threshold

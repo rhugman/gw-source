@@ -17,6 +17,12 @@ Boundnames need a FlowStep read with boundnames=True (they are not in the budget
 boundname that is absent in a step (e.g. a well listed only in some stress periods) selects
 nothing in that step rather than failing, so groups can be re-selected on every time step.
 
+Network steps (gwsource.network): cells are global nodes (gwsource.network.global_nodes() maps
+a model's cells or a package's nodes to them). model= keeps only the terms on the nodes of one
+model (its cells and its package nodes); term= keeps only records with the given budget text,
+e.g. select(step, package="MAW", bounds=[1], term="RATE") is the pumping of MAW well 1 and
+select(step, package="SFR", bounds=[20], term="EXT-OUTFLOW") the outflow of reach 20.
+
 Groups are plain dicts {group name: Selection}.
 """
 
@@ -59,6 +65,25 @@ def _cell_mask(step: FlowStep, cells) -> np.ndarray:
     return mask
 
 
+def _term_mask(step: FlowStep, term: str | Iterable[str]) -> np.ndarray:
+    """Return entries whose record text matches (any case), e.g. 'RATE' or 'EXT-OUTFLOW'."""
+    wanted = {term.upper()} if isinstance(term, str) else {t.upper() for t in term}
+    hits = [p.text.upper() in wanted for p in step.packages]
+    assert any(hits), f"no record text matches {sorted(wanted)}"
+    return np.asarray(hits, dtype=bool)[step.term_package]
+
+
+def _model_mask(step: FlowStep, model: str) -> np.ndarray:
+    """Return entries located on the nodes of one model (its cells and package nodes)."""
+    assert step.is_network, "model= needs a network step (gwsource.network)"
+    blocks = [b for b in step.blocks if b.model.upper() == model.upper()]
+    assert blocks, f"model {model!r} not in this step; have {step.model_names}"
+    nodes = np.zeros(step.n_cells, dtype=bool)
+    for b in blocks:
+        nodes[b.nodes] = True
+    return nodes[step.term_cell]
+
+
 def _boundname_mask(step: FlowStep, boundnames: Iterable[str]) -> np.ndarray:
     """Return entries whose boundname is in the list (case-insensitive)."""
     assert step.term_boundname is not None, "this FlowStep has no boundnames"
@@ -73,11 +98,17 @@ def select(
     boundnames: Iterable[str] | None = None,
     cells=None,
     term_mask: np.ndarray | None = None,
+    term: str | Iterable[str] | None = None,
+    model: str | None = None,
 ) -> Selection:
     """Return the Selection of external terms (and cells) matching all of the given criteria."""
     terms = np.ones(step.n_terms, dtype=bool)
     if package is not None:
         terms &= _package_mask(step, package)
+    if term is not None:
+        terms &= _term_mask(step, term)
+    if model is not None:
+        terms &= _model_mask(step, model)
     if bounds is not None:
         terms &= np.isin(step.term_bound, np.asarray(list(bounds)))
     if boundnames is not None:

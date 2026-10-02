@@ -19,6 +19,13 @@ Conventions
 - ``packages`` is the term table: ``term_package`` indexes into it.
 - ``saturated_thickness`` (optional, per cell) is the saturated thickness of the cell for this
   step; with ``area`` it gives the water volume that travel times need (gwsource.traveltime).
+
+Networks (Phase 4, gwsource.network): the "cells" may be the global nodes of a whole
+simulation: the cells of every GWF model, then optional package nodes (SFR reaches, LAK lakes,
+MAW wells, UZF cells). ``blocks`` lists the contiguous node ranges (NodeBlock) in order;
+an empty list means a plain single-model step whose nodes are its cells. Package nodes have no
+area or saturated thickness (NaN); ``fixed_volume`` holds their water volume from the package
+output (NaN on cells, whose volume comes from porosity x area x saturated thickness).
 """
 
 from dataclasses import dataclass, field
@@ -26,6 +33,9 @@ from dataclasses import dataclass, field
 import numpy as np
 
 MOVER_SUFFIX = "-TO-MVR"
+MOVER_TEXT = "TO-MVR"  # every mover record ends so ('UZF-GWD TO-MVR' has a space, not a dash)
+MODEL_SEP = "/"
+BLOCK_KINDS = ("model", "package")
 
 
 @dataclass(frozen=True)
@@ -34,22 +44,70 @@ class Package:
 
     parent is the MF6 package that wrote the record when one package writes several records
     (e.g. 'DRN' writes DRN and DRN-TO-MVR); empty means the record name itself.
+    model is the GWF model that owns the record in a multi-model step (the name is then
+    '<model>/<record name>'); partner is the other model of a GWF-GWF exchange record.
     """
 
     name: str
     text: str
     parent: str = ""
+    model: str = ""
+    partner: str = ""
+
+    @property
+    def local_name(self) -> str:
+        """Name without the '<model>/' prefix of a multi-model step."""
+        return self.name.split(MODEL_SEP, 1)[-1] if self.model else self.name
 
     @property
     def aliases(self) -> set[str]:
-        """Upper-case names a selector can use: name, text, parent, and text without -TO-MVR."""
-        names = {self.name, self.text, self.parent, self.text.removesuffix(MOVER_SUFFIX)}
+        """Upper-case names a selector can use: name, local name, text, parent, text w/o -TO-MVR."""
+        names = {
+            self.name,
+            self.local_name,
+            self.text,
+            self.parent,
+            self.text.removesuffix(MOVER_SUFFIX),
+        }
         return {n.upper() for n in names if n}
 
     @property
     def is_mover(self) -> bool:
-        """True for a *-TO-MVR record (aquifer water handed to the water mover)."""
-        return self.text.upper().endswith(MOVER_SUFFIX)
+        """True for a *-TO-MVR record (water handed to the water mover)."""
+        return self.text.upper().endswith(MOVER_TEXT)
+
+
+@dataclass(frozen=True)
+class NodeBlock:
+    """A contiguous range of global nodes: the cells of one GWF model or one package's nodes.
+
+    kind is 'model' or 'package'; model is the owning GWF model; name is the model name or the
+    package name (e.g. 'SFR'); package_type the package type ('SFR', 'LAK', 'MAW', 'UZF').
+    grid_shape and grid_type describe a model's grid; a package block is (n,) 'package'.
+    """
+
+    name: str
+    kind: str
+    model: str
+    offset: int
+    n: int
+    grid_shape: tuple[int, ...]
+    grid_type: str
+    package_type: str = ""
+
+    def __post_init__(self) -> None:
+        """Validate the block kind."""
+        assert self.kind in BLOCK_KINDS, f"block kind must be one of {BLOCK_KINDS}"
+
+    @property
+    def nodes(self) -> np.ndarray:
+        """Global node indices of the block."""
+        return np.arange(self.offset, self.offset + self.n)
+
+    @property
+    def label(self) -> str:
+        """'<model>' for a model block, '<model>/<package>' for a package block."""
+        return self.model if self.kind == "model" else f"{self.model}{MODEL_SEP}{self.name}"
 
 
 @dataclass
@@ -73,6 +131,8 @@ class FlowStep:
     kstpkper: tuple[int, int] | None = None
     totim: float | None = None
     notes: dict = field(default_factory=dict)
+    blocks: list[NodeBlock] = field(default_factory=list)
+    fixed_volume: np.ndarray | None = None
 
     def __post_init__(self) -> None:
         """Coerce array types, fill defaults and validate shapes."""
@@ -105,6 +165,23 @@ class FlowStep:
         """Package names in term-table order."""
         return [p.name for p in self.packages]
 
+    @property
+    def is_network(self) -> bool:
+        """True if the nodes are split into blocks (several models and/or package nodes)."""
+        return bool(self.blocks)
+
+    @property
+    def model_names(self) -> list[str]:
+        """Names of the GWF models whose cells are nodes of this step (empty if not a network)."""
+        return [b.name for b in self.blocks if b.kind == "model"]
+
+    def block(self, label: str) -> NodeBlock:
+        """Return the block with the given label ('<model>' or '<model>/<package>') or name."""
+        found = [b for b in self.blocks if label.upper() in (b.label.upper(), b.name.upper())]
+        labels = [b.label for b in self.blocks]
+        assert len(found) == 1, f"block {label!r} not found once in {labels}"
+        return found[0]
+
 
 def validate_step(step: FlowStep) -> None:
     """Assert that a FlowStep's arrays are mutually consistent."""
@@ -125,6 +202,14 @@ def validate_step(step: FlowStep) -> None:
         assert len(step.saturated_thickness) == n, "saturated_thickness: one value per cell"
     assert len(step.active) == n, "active must have one value per cell"
     assert int(np.prod(step.grid_shape)) == n, "grid_shape must hold n_cells values"
+    if step.fixed_volume is not None:
+        assert len(step.fixed_volume) == n, "fixed_volume must have one value per node"
+    if step.blocks:
+        ends = [b.offset + b.n for b in step.blocks]
+        starts = [b.offset for b in step.blocks]
+        assert starts[0] == 0 and starts[1:] == ends[:-1] and ends[-1] == n, (
+            "blocks must tile the nodes 0..n-1 in order"
+        )
 
 
 def connection_rows(ia: np.ndarray) -> np.ndarray:

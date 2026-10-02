@@ -2,6 +2,7 @@
 
 from .common import BaseSpec, ModelRun
 from .mover import build_mover_dis
+from .networks import build_lak_uzf_dis, build_maw_dis
 from .structured import build_base_dis, build_layered_dis, build_transient_dis, build_xt3d_dis
 from .unstructured import build_base_disu, build_voronoi_disv
 
@@ -14,6 +15,8 @@ MODEL_KEYS = (
     "m5_xt3d",
     "m6_transient",
     "m7_mover",
+    "m8_maw",
+    "m9_lak_uzf",
 )
 
 
@@ -28,6 +31,8 @@ def build_model(key: str, ws, mf6_exe, triangle_exe) -> ModelRun:
         "m5_xt3d": lambda: build_xt3d_dis(ws, mf6_exe),
         "m6_transient": lambda: build_transient_dis(ws, mf6_exe),
         "m7_mover": lambda: build_mover_dis(ws, mf6_exe),
+        "m8_maw": lambda: build_maw_dis(ws, mf6_exe),
+        "m9_lak_uzf": lambda: build_lak_uzf_dis(ws, mf6_exe),
     }
     assert key in builders, f"unknown test model {key!r}"
     return builders[key]()
@@ -38,7 +43,9 @@ __all__ = [
     "ModelRun",
     "build_base_dis",
     "build_base_disu",
+    "build_lak_uzf_dis",
     "build_layered_dis",
+    "build_maw_dis",
     "build_model",
     "build_mover_dis",
     "build_transient_dis",

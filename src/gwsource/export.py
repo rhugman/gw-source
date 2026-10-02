@@ -20,6 +20,14 @@ GeoPackage (FloPy modelgrid -> geopandas; optional): one polygon layer per model
 ('layer_1', ...) for DIS and DISV, one layer 'nodes' for DISU, with one column per output and
 group. DISU needs cell vertices in the binary grid file; without them export fails with a
 clear message.
+
+Network steps (gwsource.network): to_grid() reshapes one model's part (model=, optional when
+the step has one model). The single-result exports above take a network step with one model
+directly (its cells only); with several models use save_network(), which writes one npz per
+model ('<prefix>_<model>.npz'), the package-node results as CSV ('<prefix>_packages.csv', one row
+per reach, lake, well or UZF cell) and, optionally, a GeoPackage with one polygon layer per
+model layer ('<model>_layer_<k>') and a point layer 'package_nodes' (each package node placed at
+the mean centre of the cells it exchanges water with).
 """
 
 import json
@@ -31,6 +39,14 @@ import numpy as np
 from .diagnostics import cycle_ids, cycle_table
 from .flowstep import FlowStep
 from .metrics import BackwardResult, ForwardResult
+from .network import (
+    model_block,
+    model_view,
+    package_cells,
+    package_rows,
+    result_view,
+    transient_view,
+)
 from .solve import Cycle
 
 KEY_SEP = "__"
@@ -75,12 +91,37 @@ STAT_INFO = {
 # ---------------------------------------------------------------- arrays and npz
 
 
-def to_grid(step: FlowStep, values: np.ndarray) -> np.ndarray:
-    """Return per-cell values reshaped to the grid, with inactive cells set to NaN."""
+def to_grid(step: FlowStep, values: np.ndarray, model: str | None = None) -> np.ndarray:
+    """Return per-cell values reshaped to the grid, with inactive cells set to NaN.
+
+    For a network step, the part of one model (model= may be omitted if there is only one).
+    """
     values = np.asarray(values, dtype=float)
     assert values.shape == (step.n_cells,), "expected one value per cell"
+    if step.is_network:
+        block = model_block(step, model)
+        sl = slice(block.offset, block.offset + block.n)
+        return np.where(step.active[sl], values[sl], np.nan).reshape(block.grid_shape)
     out = np.where(step.active, values, np.nan)
     return out.reshape(step.grid_shape)
+
+
+def single_model(step: FlowStep, result):
+    """Return (step, result) cut to the only model of a network step; unchanged otherwise."""
+    if not step.is_network:
+        return step, result
+    assert len(step.model_names) == 1, (
+        "several models: use save_network(), or model_view()/result_view() per model"
+    )
+    return model_view(step), result_view(result, step)
+
+
+def single_model_transient(result):
+    """Return a TransientResult cut to the only model of its network template."""
+    if not result.template.is_network:
+        return result
+    assert len(result.template.model_names) == 1, "several models: use network.transient_view()"
+    return transient_view(result)
 
 
 def _output_names(result: BackwardResult | ForwardResult) -> tuple[tuple, tuple]:
@@ -127,6 +168,7 @@ def _grid_extras(step: FlowStep) -> dict[str, np.ndarray]:
 def save_npz(path: str | Path, step: FlowStep, result: BackwardResult | ForwardResult) -> Path:
     """Save a result's gridded arrays, the active mask, cell area and cycle ids to a .npz."""
     path = Path(path)
+    step, result = single_model(step, result)
     arrays = result_arrays(step, result)
     arrays.update(_grid_extras(step))
     arrays["cycle_id"] = cycle_ids(step.n_cells, result.cycles).reshape(step.grid_shape)
@@ -137,6 +179,7 @@ def save_npz(path: str | Path, step: FlowStep, result: BackwardResult | ForwardR
 def save_transient_npz(path: str | Path, result) -> Path:
     """Save a transient result's statistics, step table, active mask and area to a .npz."""
     path = Path(path)
+    result = single_model_transient(result)
     arrays = transient_arrays(result)
     arrays.update(_grid_extras(result.template))
     arrays["kstpkper"] = np.asarray(result.steps, dtype=np.int64)
@@ -251,6 +294,7 @@ def _base_dataset(step: FlowStep, groups: list[str]):
 
 def to_dataset(step: FlowStep, result: BackwardResult | ForwardResult):
     """Return an xarray Dataset of every output of a single-step result."""
+    step, result = single_model(step, result)
     groups = result.groups
     dims = grid_dims(step)
     ds = _base_dataset(step, groups)
@@ -325,6 +369,7 @@ def _add_time(ds, result):
 
 def transient_dataset(result):
     """Return an xarray Dataset of a transient result's statistics (and series, if kept)."""
+    result = single_model_transient(result)
     step, groups = result.template, result.groups
     dims = grid_dims(step)
     ds = _add_time(_base_dataset(step, groups), result)
@@ -433,9 +478,11 @@ def to_geopackage(path: str | Path, step_or_result, result=None, grb_file=None, 
     """
     path = Path(path)
     if result is None:
-        step, arrays = step_or_result.template, transient_arrays(step_or_result)
+        transient = single_model_transient(step_or_result)
+        step, arrays = transient.template, transient_arrays(transient)
     else:
-        step, arrays = step_or_result, result_arrays(step_or_result, result)
+        step, result = single_model(step_or_result, result)
+        arrays = result_arrays(step, result)
     grb_file = grb_file or step.notes.get("grb_file")
     assert grb_file is not None, "pass grb_file= (the step was not read from a model)"
     polygons = cell_polygons(grb_file)
@@ -459,3 +506,96 @@ def plot_map(
     pmv = flopy.plot.PlotMapView(modelgrid=modelgrid, layer=layer, ax=ax)
     gridded = to_grid(step, values)
     return pmv.plot_array(np.ma.masked_invalid(gridded), **kwargs)
+
+
+# ---------------------------------------------------------------- networks
+
+
+def cell_centres(grb_file: str | Path) -> np.ndarray:
+    """Return the (x, y) centre of every user node from a binary grid file, shape (nodes, 2)."""
+    import flopy
+
+    grb = flopy.mf6.utils.MfGrdFile(str(grb_file), verbose=False)
+    grid = grb.modelgrid
+    x, y = np.ravel(grid.xcellcenters), np.ravel(grid.ycellcenters)
+    reps = int(grb.nodes) // x.size  # DIS and DISV: the same centres in every layer
+    return np.column_stack([np.tile(x, reps), np.tile(y, reps)])
+
+
+def package_points(step: FlowStep) -> dict[int, tuple[float, float]]:
+    """Return {global package node: (x, y)}, the mean centre of the cells it exchanges with."""
+    points = {}
+    for block in step.blocks:
+        if block.kind != "package":
+            continue
+        model = step.block(block.model)
+        grb_file = step.notes.get("model_notes", {}).get(block.model, {}).get("grb_file")
+        if grb_file is None:
+            continue
+        centres = cell_centres(grb_file)
+        for node, cells in zip(block.nodes, package_cells(step, block)):
+            if cells.size:
+                points[int(node)] = tuple(centres[cells - model.offset].mean(axis=0))
+    return points
+
+
+def save_package_csv(path: str | Path, step: FlowStep, result, points=None) -> Path:
+    """Write the package-node results (network.package_rows) to CSV, with x, y if known."""
+    import csv
+
+    path = Path(path)
+    rows = package_rows(step, result)
+    points = package_points(step) if points is None else points
+    for row in rows:
+        row["x"], row["y"] = points.get(row["node"], (np.nan, np.nan))
+    fields = list(rows[0]) if rows else ["model", "package", "id", "node"]
+    with path.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fields)
+        writer.writeheader()
+        writer.writerows(rows)
+    return path
+
+
+def _package_frame(step: FlowStep, result, points, crs=None):
+    """Return a GeoDataFrame of the package nodes that have a location (points)."""
+    import geopandas as gpd
+    from shapely.geometry import Point
+
+    rows = [r for r in package_rows(step, result) if r["node"] in points]
+    geometry = [Point(points[r["node"]]) for r in rows]
+    return gpd.GeoDataFrame(rows, geometry=geometry, crs=crs)
+
+
+def save_network(
+    directory: str | Path,
+    step: FlowStep,
+    result: BackwardResult | ForwardResult,
+    prefix: str = "trace",
+    geopackage: bool = False,
+    crs=None,
+) -> list[Path]:
+    """Write a network result: one npz per model, package nodes as CSV, optional GeoPackage."""
+    directory = Path(directory)
+    directory.mkdir(parents=True, exist_ok=True)
+    written = []
+    gpkg = directory / f"{prefix}.gpkg"
+    if geopackage and gpkg.exists():
+        gpkg.unlink()
+    for model in step.model_names if step.is_network else [None]:
+        view, view_result = model_view(step, model), result_view(result, step, model)
+        written.append(save_npz(directory / f"{prefix}_{model or 'model'}.npz", view, view_result))
+        if geopackage:
+            polygons = cell_polygons(view.notes["grb_file"])
+            frames = _layer_frames(view, polygons, result_arrays(view, view_result), crs)
+            for layer, frame in frames:
+                frame.to_file(gpkg, layer=f"{model}_{layer}", driver="GPKG")
+    if any(b.kind == "package" for b in step.blocks):
+        points = package_points(step)
+        written.append(save_package_csv(directory / f"{prefix}_packages.csv", step, result, points))
+        if geopackage and points:
+            _package_frame(step, result, points, crs).to_file(
+                gpkg, layer="package_nodes", driver="GPKG"
+            )
+    if geopackage:
+        written.append(gpkg)
+    return written

@@ -32,10 +32,19 @@ the SFR record) is a package-network question left to Phase 4. Records of one pa
 name (paknam2); the second and later records of a package in a step are named
 '<package>:<text>' (e.g. 'DRN:DRN-TO-MVR') and keep the package as their parent.
 
+GWF-GWF exchanges (checked with models split by FloPy's Mf6Splitter): with SAVE_FLOWS in the
+exchange file, each model's budget has one FLOW-JA-FACE record with IMETH = 6 per exchange,
+PAKNAM2 = the exchange name (e.g. 'GWF-GWF_1'), MODELNAM2 = the other model, ID1 = the cell
+here, ID2 = the cell in the other model, q positive into the cell here; the other model's record
+is its exact negative. Read for one model alone, these are boundary terms: a package with text
+'GWF-GWF', the exchange name, partner = the other model and bound = the cell over there.
+gwsource.network turns them into edges when both models are read together.
+
 Boundnames are not in the budget file. ID2 of a list record is the bound's position (1-based)
 in the package's list for the current stress period, so read_boundnames() loads the list input
 of every package with BOUNDNAMES through FloPy, per stress period (a period without a PERIOD
-block reuses the last list, as in MF6). SFR boundnames come from its PACKAGEDATA (ID2 = reach).
+block reuses the last list, as in MF6). SFR, LAK, MAW and UZF boundnames come from their
+PACKAGEDATA (ID2 = reach, lake, well or UZF cell; also the bound of their package-node terms).
 """
 
 from dataclasses import dataclass
@@ -48,6 +57,8 @@ from .flowstep import FlowStep, Package
 
 COMMENT_CHARS = ("#", "!", "//")
 DRY_HEAD = 1.0e29
+EXCHANGE_TEXT = "GWF-GWF"
+PACKAGEDATA_TYPES = ("sfr", "lak", "maw", "uzf")  # boundnames by reach, lake, well or UZF cell
 
 
 @dataclass
@@ -307,8 +318,8 @@ def _names_array(records) -> np.ndarray:
 
 
 def _package_boundnames(package) -> dict[int, np.ndarray]:
-    """Return {first kper: names} for a FloPy package with list or SFR package data."""
-    if package.package_type == "sfr":
+    """Return {first kper: names} for a FloPy package with list data or advanced package data."""
+    if package.package_type in PACKAGEDATA_TYPES:
         return {0: _names_array(package.packagedata.get_data())}
     spd = getattr(package, "stress_period_data", None)
     assert spd is not None, (
@@ -388,9 +399,18 @@ def _read_terms(cbc, indices: list[int], active: np.ndarray) -> dict:
         header = cbc.recordarray[idx]
         text, imeth = _decode(header["text"]), int(header["imeth"])
         data = cbc.get_record(idx, full3D=False)
-        if text == "FLOW-JA-FACE":
-            assert imeth == 1, "FLOW-JA-FACE exchange records (multi-model) are not supported yet"
+        if text == "FLOW-JA-FACE" and imeth == 1:
             out["flowja"] = np.asarray(data, dtype=float).ravel()
+            continue
+        if text == "FLOW-JA-FACE":  # GWF-GWF exchange: ID1 = node here, ID2 = node in partner
+            package = Package(
+                name=_decode(header["paknam2"]),
+                text=EXCHANGE_TEXT,
+                partner=_decode(header["modelnam2"]),
+            )
+            assert package.name not in used, f"duplicate exchange record {package.name}"
+            used.add(package.name)
+            _append_terms(out, package, data["node"] - 1, data["q"], data["node2"])
             continue
         if text == "DATA-SAT":
             out["saturation"] = _saturation_record(data, active.size)
@@ -404,13 +424,18 @@ def _read_terms(cbc, indices: list[int], active: np.ndarray) -> dict:
             parent = text
             cells, flow = _array_term(data, active)
             bound = cells + 1
-        out["packages"].append(_record_package(parent, text, used))
-        out["cell"].append(np.asarray(cells, dtype=np.int64))
-        out["flow"].append(np.asarray(flow, dtype=float))
-        out["bound"].append(np.asarray(bound, dtype=np.int64))
-        out["package"].append(np.full(len(cells), len(out["packages"]) - 1, dtype=np.int64))
+        _append_terms(out, _record_package(parent, text, used), cells, flow, bound)
     assert out["flowja"] is not None, "FLOW-JA-FACE not saved for this time step"
     return out
+
+
+def _append_terms(out: dict, package: Package, cells, flow, bound) -> None:
+    """Append one record's term entries (0-based cells, flows, bound numbers) to out."""
+    out["packages"].append(package)
+    out["cell"].append(np.asarray(cells, dtype=np.int64))
+    out["flow"].append(np.asarray(flow, dtype=float))
+    out["bound"].append(np.asarray(bound, dtype=np.int64))
+    out["package"].append(np.full(len(out["cell"][-1]), len(out["packages"]) - 1, dtype=np.int64))
 
 
 def _concat(parts: list[np.ndarray], dtype) -> np.ndarray:

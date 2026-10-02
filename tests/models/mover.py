@@ -2,7 +2,10 @@
 
 The river line of model 1 is replaced by an SFR stream along the same column, flowing north to
 south. Two drains sit upstream of the well; MVR moves 70 % of drain A's outflow and all of drain
-B's outflow into the first stream reach. Drains and wells carry boundnames. The model has two
+B's outflow into the first stream reach. Drains and wells carry boundnames. The upper stream reaches
+lose water to the aquifer, so drained water re-enters the aquifer downstream and part of it
+reaches the wells (the package-network routing test of Phase 4). SFR and MVR save their own
+budget files (used only when tracing with package nodes). The model has two
 steady stress periods; the well list changes between them (different order, different wells),
 so the budget's bound number (ID2) of a named well differs by stress period.
 """
@@ -70,6 +73,7 @@ def _add_mover_packages(gwf, spec: BaseSpec) -> None:
         boundnames=True,
         mover=True,
         save_flows=True,
+        budget_filerecord=f"{gwf.name}.sfr.bud",
         pname="sfr",
     )
     perioddata = [("drn", i, "sfr", 0, kind, value) for i, kind, value in DRN_TO_SFR]
@@ -79,6 +83,7 @@ def _add_mover_packages(gwf, spec: BaseSpec) -> None:
         maxpackages=2,
         packages=[("drn",), ("sfr",)],
         perioddata={0: perioddata},
+        budget_filerecord=f"{gwf.name}.mvr.bud",
     )
 
 
