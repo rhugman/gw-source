@@ -4,7 +4,7 @@ The random networks change their edges, sources, sinks and storage from step to 
 flow cycles), so the sparsity pattern and term table differ between steps, as in MF6 output.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 import pytest
@@ -232,3 +232,92 @@ def test_negative_flow_volume_is_rejected():
     config = tr.TrackingConfig(porosity=1.0, volume_mode="flow", flow_error_correction=False)
     with pytest.raises(AssertionError, match="negative"):
         tr.track_forward(reader, {"in": {"package": "IN"}}, config)
+
+
+# ---------------------------------------------------------------- transport sub-steps
+
+
+def test_substeps_single_reservoir():
+    """m sub-steps per flow step are m implicit-Euler steps of dt/m, forward and adjoint."""
+    volume, q, deltas, m = 50.0, 2.0, [1.0, 5.0, 10.0, 3.0], 4
+    reader = reservoir_reader(volume, q, deltas)
+    config = tr.TrackingConfig(porosity=1.0, initial_water={"old": "all"}, substeps=m)
+    sinks = {"out": {"package": "OUT"}}
+    fwd = tr.track_forward(reader, {"in": {"package": "IN"}}, config, sinks=sinks)
+    c, out = 0.0, 0.0
+    for n, delt in enumerate(deltas):
+        dt, out = delt / m, 0.0
+        for _ in range(m):
+            c = (volume * c + dt * q) / (volume + dt * q)
+            out += dt * q * c
+        assert np.isclose(fwd.source_fraction["in"][n, 0], c, rtol=RTOL)
+        assert np.isclose(fwd.outflow_to["out"]["in"][n], out, rtol=RTOL)
+    bwd = tr.track_backward(reader, {"out": {"package": "OUT"}}, config)
+    w = 0.0
+    for n in range(len(deltas) - 1, -1, -1):
+        dt = deltas[n] / m
+        for _ in range(m):
+            w = (dt * q + volume * w) / (volume + dt * q)
+        assert np.isclose(bwd.fraction_through["out"][n, 0], w, rtol=RTOL)
+    assert np.isclose(tr.backward_closure(bwd, "out").lhs, q * sum(deltas), rtol=RTOL)
+
+
+@pytest.mark.parametrize("mode", tr.VOLUME_MODES)
+@pytest.mark.parametrize("correction", [True, False])
+def test_substeps_duality_closure_and_balance(mode, correction):
+    """With sub-steps the duality, closure and tagged balances stay exact (storage changes)."""
+    reader = random_reader(seed=7, residual=0.05)
+    config = tr.TrackingConfig(
+        porosity=1.0, volume_mode=mode, flow_error_correction=correction,
+        initial_water=INITIAL, substeps=3,
+    )
+    fwd = tr.track_forward(reader, SOURCES, config, sinks=DESTINATIONS)
+    bwd = tr.track_backward(reader, DESTINATIONS, config, sources=SOURCES)
+    plain = tr.track_forward(reader, SOURCES, tr.TrackingConfig(porosity=1.0, volume_mode=mode))
+    assert not np.allclose(fwd.source_fraction["a"], plain.source_fraction["a"], atol=1e-6)
+    for d in DESTINATIONS:
+        for s in [*SOURCES, *INITIAL]:
+            assert tr.tracking_duality(fwd, s, bwd, d).relative_error < 1e-12, (s, d)
+        assert tr.backward_closure(bwd, d).relative_error < 1e-12
+    for g in fwd.groups:
+        assert tr.forward_balance_error(fwd, g) < 1e-13
+
+
+def steady_reader(seed: int, repeat: int) -> ListReader:
+    """Return random steps without storage (closure term relabelled), each repeated `repeat`
+    times with 1/repeat of its length, so the flows are constant within each original step."""
+    base = random_reader(seed, residual=0.0)
+    packages = PACKAGES[:4] + [gs.Package("GHB", "GHB")]
+    steps, deltas, time = [], [], 0.0
+    for step, delt in zip(base.step_list, base.deltas):
+        for _ in range(repeat):
+            time += delt / repeat
+            steps.append(replace(step, packages=packages, totim=time))
+            deltas.append(delt / repeat)
+    return ListReader(steps, deltas)
+
+
+def test_substeps_equal_refined_flow_steps():
+    """Sub-steps give the same result as a flow model with m times more steps of equal flows."""
+    m = 3
+    coarse, fine = steady_reader(9, 1), steady_reader(9, m)
+    config = tr.TrackingConfig(porosity=1.0, initial_water={"init": "all"}, substeps=m)
+    plain = tr.TrackingConfig(porosity=1.0, initial_water={"init": "all"})
+    fwd_c = tr.track_forward(coarse, SOURCES, config, sinks=DESTINATIONS)
+    fwd_f = tr.track_forward(fine, SOURCES, plain, sinks=DESTINATIONS)
+    for g in fwd_c.groups:
+        np.testing.assert_allclose(
+            fwd_c.source_fraction[g], fwd_f.source_fraction[g][m - 1 :: m], rtol=1e-12, atol=1e-14
+        )
+        for d in DESTINATIONS:
+            per_step = fwd_f.outflow_to[d][g].reshape(-1, m).sum(axis=1)
+            np.testing.assert_allclose(fwd_c.outflow_to[d][g], per_step, rtol=1e-12)
+    bwd_c = tr.track_backward(coarse, DESTINATIONS, config, sources=SOURCES)
+    bwd_f = tr.track_backward(fine, DESTINATIONS, plain, sources=SOURCES)
+    for d in DESTINATIONS:
+        np.testing.assert_allclose(
+            bwd_c.fraction_through[d], bwd_f.fraction_through[d][::m], rtol=1e-12, atol=1e-14
+        )
+        for s in SOURCES:
+            per_step = bwd_f.volume_from_group[d][s].reshape(-1, m).sum(axis=1)
+            np.testing.assert_allclose(bwd_c.volume_from_group[d][s], per_step, rtol=1e-12)

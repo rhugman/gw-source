@@ -143,7 +143,7 @@ def test_flow_mode_exact_balances_package_network(model_run):
     check_flow_mode(reader, NETWORK_SOURCES, NETWORK_DESTINATIONS)
 
 
-def check_duality(reader, sources: dict, destinations: dict) -> None:
+def check_duality(reader, sources: dict, destinations: dict, substeps: int = 1) -> None:
     """Assert the forward/adjoint duality and the backward closure in both volume modes.
 
     The closure needs volumes consistent with the storage flows, which the SFT rule of gwt
@@ -152,7 +152,7 @@ def check_duality(reader, sources: dict, destinations: dict) -> None:
     has_sfr = tr.sfr_nodes(reader.read(reader.steps[0])).any()
     for mode in tr.VOLUME_MODES:
         config = tr.TrackingConfig(porosity=POROSITY, volume_mode=mode,
-                                   initial_water={"init": "all"})
+                                   initial_water={"init": "all"}, substeps=substeps)
         fwd = tr.track_forward(reader, sources, config, sinks=destinations)
         bwd = tr.track_backward(reader, destinations, config, sources=sources)
         for d in destinations:
@@ -168,6 +168,12 @@ def test_duality_model6(model_run):
     """Model 6: forward tagged outflow equals the adjoint inner product."""
     reader = gs.open_model(model_run("m6_transient").ws)
     check_duality(reader, MODEL6_SOURCES, MODEL6_DESTINATIONS)
+
+
+def test_duality_model6_substeps(model_run):
+    """Model 6 with 5 transport sub-steps per flow step: duality and closure still exact."""
+    reader = gs.open_model(model_run("m6_transient").ws)
+    check_duality(reader, MODEL6_SOURCES, MODEL6_DESTINATIONS, substeps=5)
 
 
 @pytest.fixture(scope="module")

@@ -266,6 +266,16 @@ Following house style: small functions with explicit arguments, type hints, `ass
 ### Phase 5: research (optional)
 - Quantify the grid-dependent numerical dispersion against flux-weighted particles.
 - Prototype Chowdhury-style face-to-face routing within cells on DIS grids [CHO16].
+- *Status (2026-10-02): done.* Write-up in [`docs/dispersion_study.md`](docs/dispersion_study.md); study in `studies/dispersion/workflow.py` (about 3 minutes end to end). Notes:
+  - **References:** the analytical capture zone of uniform flow plus a well (Javandel & Tsang 1986; CHD perimeter at the analytical heads, flow along the rows and at 30°) and MF6 PRT on the finest DIS grid of a model-1-like problem. DIS 200 to 12.5 m and Voronoi DISV of matching size.
+  - **Findings:** the F = 0.1 to 0.9 edge band of full mixing narrows only as about h^0.5 (1.2 to 12 cells wide). F = 0.5 is within 5 % in area of the reference for h ≤ 50 m. F ≥ 0.1 always covered the reference zone but is 8 to 90 % too large. Shares by source package and mean travel time are insensitive (≤ 2 to 4 %). Voronoi grids are not less dispersive.
+  - **Face routing** (`gwsource.experimental.face_routing`, outside the stable API):
+    - Pollock-field partition of each inflow face among the outflow faces (closed form; reproduces Chowdhury's case formulas and his 3×3 example exactly). Recharge enters through the top face (IFACE 6). Cells with internal sources or sinks, or with flow through both vertical faces, stay fully mixed.
+    - Graph on connections, solved with the existing solvers; closure exact.
+    - Removes 35 to 70 % of the excess spreading but keeps the h^0.5 rate (water is still mixed across each face).
+    - Recommendation: keep it experimental until it has a 3D partition, a vectorised plan and forward mode.
+  - **Tracking:** new `TrackingConfig.substeps` (equal transport sub-steps per flow step, volumes interpolated). substeps = 1 reproduces the previous results bit for bit; duality and closure stay exact. With 2000 d flow steps, one step per flow step doubles the early arrival at the well; 16 sub-steps remove this.
+  - Optional 3-layer partially penetrating case not run (the prototype is 2D; in test model 2 only bottom-layer cells are routed).
 
 ## 6. Validation plan
 

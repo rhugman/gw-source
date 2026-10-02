@@ -90,6 +90,16 @@ fraction_through[D] + fraction_to_other_sinks + fraction_in_storage_at_end + fra
 = 1, where the unaccounted part is the water removed by the flow-error correction and, in gwt
 mode, by the volume adjustments (zero up to the flow residual in flow mode).
 
+Sub-steps (TrackingConfig.substeps = m, default 1): every flow step is split into m equal
+transport sub-steps of length dt/m. The flows are constant within a flow step, so this changes
+only the time discretisation of the transport, not the flows; the volumes are interpolated
+linearly between V^old and V^new (exactly what the constant storage flow gives within the step).
+Implicit upstream stepping adds numerical dispersion in time of order dt; sub-steps reduce it
+without touching the flow model. Per-step outputs are reported at flow-step boundaries: c at the
+end of the step, w at its start, and the step's flow-weighted totals (outflow, volume from,
+residual terms) summed over its sub-steps. The duality and closure identities hold unchanged
+(the adjoint is that of the sub-stepped scheme). m = 1 reproduces the unsplit scheme exactly.
+
 Limit: with flows held constant for long enough, c^n tends to the steady source_fraction of
 gwsource.trace.forward and w^1 to the steady fraction_through of gwsource.trace.backward
 (storage terms are zero then, so the snapshot and the tracked systems have the same flows).
@@ -149,6 +159,7 @@ class TrackingConfig:
     solver: "auto", "topological", "block" or "lu" (gwsource.solve).
     storage_texts: budget texts of the storage terms (taken out of the term table).
     keep_series: keep every step's per-node outputs (else only the last step's state).
+    substeps: number of equal transport sub-steps per flow step (1 = the flow model's steps).
     """
 
     porosity: float | np.ndarray | dict
@@ -158,12 +169,14 @@ class TrackingConfig:
     solver: str = "auto"
     storage_texts: tuple[str, ...] = STORAGE_TEXTS
     keep_series: bool = True
+    substeps: int = 1
 
     def __post_init__(self) -> None:
         """Validate option values."""
         assert self.volume_mode in VOLUME_MODES, f"volume_mode must be one of {VOLUME_MODES}"
         assert self.solver in SOLVERS, f"solver must be one of {SOLVERS}"
         assert self.porosity is not None, "porosity is required"
+        assert int(self.substeps) == self.substeps >= 1, "substeps must be an integer >= 1"
 
 
 @dataclass
@@ -345,6 +358,21 @@ def carried_volumes(old: np.ndarray, flows: StepFlows, delt: float) -> StepVolum
         "volume; use a larger porosity or volume_mode='gwt')"
     )
     return StepVolumes(old=old, new=np.maximum(new, 0.0))
+
+
+def substep_volumes(volumes: StepVolumes, index: int, n_sub: int) -> StepVolumes:
+    """Return the volumes of sub-step index (0-based) of n_sub, linear between V^old and V^new.
+
+    The first sub-step starts at V^old and the last ends at V^new exactly, so n_sub = 1 returns
+    the step's own volumes.
+    """
+    if n_sub == 1:
+        return volumes
+    change = volumes.new - volumes.old
+    old = volumes.old if index == 0 else volumes.old + change * (index / n_sub)
+    last = index == n_sub - 1
+    new = volumes.new if last else volumes.old + change * ((index + 1) / n_sub)
+    return StepVolumes(old=old, new=new)
 
 
 def empty_rows(flows: StepFlows, volumes: StepVolumes) -> np.ndarray:
@@ -562,29 +590,53 @@ def _forward_step(
     assert list(groups) == state.names[: state.n_sources], f"groups changed at {step.kstpkper}"
     flows = step_flows(step, config.storage_texts)
     volumes = step_volumes(step, flows, config, delt, state.v_new)
-    matrix = step_matrix(flows, volumes, delt, config.flow_error_correction)
-    empty = empty_rows(flows, volumes)
     s = np.zeros_like(state.c)
     s[:, : state.n_sources] = group_flows(step, groups, flows.tracked, +1)
-    rhs = volumes.old[:, None] * state.c + delt * s
-    rhs[empty] = 0.0
-    factor = factorize(matrix, config.solver)
-    c = factor.solve(rhs).reshape(state.c.shape)
-    _forward_records(state, step, index, delt, flows, volumes, s, c, config)
+    c, c_mean, kind = _forward_substeps(state.c, flows, volumes, delt, s, config)
+    _forward_records(state, step, index, delt, flows, volumes, s, c, c_mean, config)
     sink_groups = _resolve(step, sinks)
     state.sink_names = _check_names(state.sink_names, sink_groups, step.kstpkper)
     sink_flow = group_flows(step, sink_groups, flows.tracked, -1)
     for k, sink in enumerate(sink_groups):
         for i, g in enumerate(state.names):
-            out = delt * float(sink_flow[:, k] @ c[:, i])
+            out = delt * float(sink_flow[:, k] @ c_mean[:, i])
             _add_series(state.outflow_to.setdefault(sink, {}), g, index, out, state.n_steps)
     jump = 0.0 if state.v_new is None else float(np.abs(volumes.old - state.v_new).max())
     state.jump.append(jump)
     state.wb_error.append(water_balance_error(flows, volumes, delt, config.flow_error_correction))
-    state.solvers.append(factor.kind)
+    state.solvers.append(kind)
     state.totim.append(step.totim)
     state.delt.append(delt)
     state.c, state.v_new = c, volumes.new
+
+
+def _forward_substeps(
+    c0: np.ndarray,
+    flows: StepFlows,
+    volumes: StepVolumes,
+    delt: float,
+    s: np.ndarray,
+    config: TrackingConfig,
+) -> tuple[np.ndarray, np.ndarray, str]:
+    """Advance c over one flow step in config.substeps sub-steps.
+
+    Return (c at the end, mean of the sub-step values (the step's outflow weighting), solver).
+    """
+    n_sub = config.substeps
+    dt = delt / n_sub
+    c, c_mean, factor = c0, None, None
+    steady = np.array_equal(volumes.old, volumes.new)
+    for m in range(n_sub):
+        sub = substep_volumes(volumes, m, n_sub)
+        empty = empty_rows(flows, sub)
+        if factor is None or not steady:
+            matrix = step_matrix(flows, sub, dt, config.flow_error_correction)
+            factor = factorize(matrix, config.solver)
+        rhs = sub.old[:, None] * c + dt * s
+        rhs[empty] = 0.0
+        c = factor.solve(rhs).reshape(c0.shape)
+        c_mean = c / n_sub if c_mean is None else c_mean + c / n_sub
+    return c, c_mean, factor.kind
 
 
 def _forward_records(
@@ -596,17 +648,22 @@ def _forward_records(
     volumes: StepVolumes,
     s: np.ndarray,
     c: np.ndarray,
+    c_mean: np.ndarray,
     config: TrackingConfig,
 ) -> None:
-    """Record one step's fractions, balance and outflow by package for every group."""
+    """Record one step's fractions, balance and outflow by package for every group.
+
+    c is the fraction at the end of the step, c_mean its mean over the step's sub-steps (equal
+    to c without sub-steps), which weights the outflows.
+    """
     correction = 1.0 if config.flow_error_correction else 0.0
     sink_terms = np.where(flows.tracked, np.maximum(-step.term_flow, 0.0), 0.0)
     for i, g in enumerate(state.names):
         start = float(volumes.old @ state.c[:, i])
         end = float(volumes.new @ c[:, i])
         inflow = delt * float(s[:, i].sum())
-        outflow = delt * float(flows.sink @ c[:, i])
-        error_flow = delt * correction * float(flows.residual @ c[:, i])
+        outflow = delt * float(flows.sink @ c_mean[:, i])
+        error_flow = delt * correction * float(flows.residual @ c_mean[:, i])
         previous = start if state.v_new is None else float(state.v_new @ state.c[:, i])
         record = {
             "storage_start": start,
@@ -619,7 +676,7 @@ def _forward_records(
         }
         for key, value in record.items():
             _add_series(state.balance.setdefault(g, {}), key, index, value, state.n_steps)
-        out_terms = delt * sink_terms * c[step.term_cell, i]
+        out_terms = delt * sink_terms * c_mean[step.term_cell, i]
         for package, value in by_package(step, out_terms, flows.tracked).items():
             _add_series(state.by_package.setdefault(g, {}), package, index, value, state.n_steps)
         _keep(state.series, g, c[:, i], index, state.n_steps, state.keep)
@@ -732,7 +789,7 @@ class _BackwardState:
 
 
 def _backward_rhs(
-    state: "_BackwardState",
+    carry: np.ndarray | None,
     step: FlowStep,
     flows: StepFlows,
     volumes: StepVolumes,
@@ -742,12 +799,44 @@ def _backward_rhs(
 ) -> np.ndarray:
     """Return dt d^n + B^(n+1) w^(n+1) (+ V^new,N for the storage column at the last step)."""
     rhs = np.column_stack([delt * d, delt * flows.sink, np.zeros(step.n_cells)])
-    if state.carry is None:
+    if carry is None:
         rhs[:, -1] = volumes.new
     else:
-        rhs += state.carry
+        rhs += carry
     rhs[empty] = 0.0
     return rhs
+
+
+def _backward_substeps(
+    carry: np.ndarray | None,
+    step: FlowStep,
+    flows: StepFlows,
+    volumes: StepVolumes,
+    d: np.ndarray,
+    delt: float,
+    config: TrackingConfig,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, str]:
+    """Solve the adjoint of one flow step over its sub-steps, last to first.
+
+    carry is B w of the following step (None at the end of the simulation). Return (w at the
+    start of the step, mean of the sub-step values (weights the step's inflows), carry for the
+    preceding step, empty rows of the first sub-step, solver).
+    """
+    n_sub = config.substeps
+    dt = delt / n_sub
+    w_mean, factor = None, None
+    steady = np.array_equal(volumes.old, volumes.new)
+    for m in range(n_sub - 1, -1, -1):
+        sub = substep_volumes(volumes, m, n_sub)
+        empty = empty_rows(flows, sub)
+        if factor is None or not steady:
+            matrix = step_matrix(flows, sub, dt, config.flow_error_correction)
+            factor = factorize(matrix.T.tocsr(), config.solver)
+        rhs = _backward_rhs(carry, step, flows, sub, d, dt, empty)
+        w = factor.solve(rhs).reshape(rhs.shape)
+        w_mean = w / n_sub if w_mean is None else w_mean + w / n_sub
+        carry = sub.old[:, None] * w
+    return w, w_mean, carry, empty, factor.kind
 
 
 def _backward_step(
@@ -767,19 +856,17 @@ def _backward_step(
         assert reserved not in groups, f"group name {reserved} is reserved"
     flows = step_flows(step, config.storage_texts)
     volumes = _backward_volumes(state, step, flows, config, delt, previous)
-    matrix = step_matrix(flows, volumes, delt, config.flow_error_correction)
-    empty = empty_rows(flows, volumes)
     d = group_flows(step, groups, flows.tracked, -1)
-    rhs = _backward_rhs(state, step, flows, volumes, d, delt, empty)
-    factor = factorize(matrix.T.tocsr(), config.solver)
-    w = factor.solve(rhs).reshape(rhs.shape)
+    w, w_mean, carry, empty, kind = _backward_substeps(
+        state.carry, step, flows, volumes, d, delt, config
+    )
     _keep(state.series, ACTIVE, (~empty).astype(float), index, state.n_steps, state.keep)
-    _backward_records(state, step, index, delt, flows, w, d, groups, sources)
+    _backward_records(state, step, index, delt, flows, w, w_mean, d, groups, sources)
     if index == 0:
         _initial_records(state, step, volumes, w, config)
     _time_record(state, index, step.totim, delt)
-    state.solvers.append(factor.kind)
-    state.carry = volumes.old[:, None] * w
+    state.solvers.append(kind)
+    state.carry = carry
     state.v_new_next = volumes.old
 
 
@@ -805,11 +892,16 @@ def _backward_records(
     delt: float,
     flows: StepFlows,
     w: np.ndarray,
+    w_mean: np.ndarray,
     d: np.ndarray,
     groups: dict[str, Selection],
     sources: GroupSpec | None,
 ) -> None:
-    """Record one step's adjoint fractions and volumes from sources for every group."""
+    """Record one step's adjoint fractions and volumes from sources for every group.
+
+    w is the adjoint at the start of the step, w_mean its mean over the step's sub-steps (equal
+    to w without sub-steps), which weights the inflows during the step.
+    """
     n_steps = state.n_steps
     source_terms = np.where(flows.tracked, np.maximum(step.term_flow, 0.0), 0.0)
     src_groups = _resolve(step, sources)
@@ -819,7 +911,7 @@ def _backward_records(
     for i, g in enumerate(names):
         _keep(state.series, g, w[:, i], index, n_steps, state.keep)
     for i, g in enumerate(groups):
-        wi = w[:, i]
+        wi = w_mean[:, i]
         _keep(state.volume_from, g, delt * flows.source * wi, index, n_steps, state.keep)
         from_terms = delt * source_terms * wi[step.term_cell]
         for package, value in by_package(step, from_terms, flows.tracked).items():
