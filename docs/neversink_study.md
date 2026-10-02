@@ -109,7 +109,7 @@ With the SFR reaches as nodes of the graph (`package_nodes=("SFR",)` in `gwsourc
 
 ## 6. Limitations and open points
 
-- `baserat.zip` in the published Monte Carlo output contains 357 masks, against 358 realisations reported. This has not been followed up.
+- `baserat.zip` in the published Monte Carlo output contains 357 masks, against 358 realisations reported. The rebuilt ensemble (`studies/neversink/pest_rebuild.py`) explains it: masks 0 to 356 are positions 0 to 356 of the 358-row parameter table, and the last row, the base realisation, has no mask.
 - 4,470 of the 122,021 MODPATH particles end with status 5. By the MODPATH 7 status convention this is a stop in a cell with no exit face; 514 of the 980 contributing particles are among them. This was not investigated.
 - Only the calibrated (base-parameter) model has been run so far. The published probability raster is from 358 parameter realisations.
 - The thinned PRT runs capture less water than enters the wells (Section 3), and the cause was not isolated.
@@ -117,8 +117,8 @@ With the SFR reaches as nodes of the graph (`package_nodes=("SFR",)` in `gwsourc
 
 ## 7. Next stages
 
-1. **Stage 2, ensemble.** 358 realisations at base pumping, compared with the published per-realisation masks and the probability raster (the share of realisations in which a cell contributes) using the `gwsource` ensemble driver. This needs the PEST interface rebuilt: `run_data/` is not archived on GitHub.
-2. **Stage 3.** The other five pumping scenarios.
+1. **Stage 2, ensemble.** 358 realisations at base pumping, compared with the published per-realisation masks and the probability raster (the share of realisations in which a cell contributes) using the `gwsource` ensemble driver. The PEST interface (`run_data/`, not archived on GitHub) has been rebuilt in `studies/neversink/pest_rebuild.py` without PEST++ or pyemu: the rebuilt base realisation equals the published calibrated input, and three realisations reproduce the stored iES heads to within 2 cm (median 0.3 mm), the same spread as the 2021 runs among themselves. A realisation costs about 40 to 65 s (input, MF6, trace).
+2. **Stage 3.** The other five pumping scenarios. The scripts that built their parameter ensembles are not in the source repository, so the pumping scaling rule has to be inferred.
 
 ## Reproducing
 
