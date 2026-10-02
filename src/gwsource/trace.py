@@ -24,11 +24,12 @@ from .metrics import (
 )
 from .selectors import Selection
 from .solve import (
+    Factor,
     dependency_graph,
+    factorize,
     find_cycles,
     isolate_closed_loops,
     remove_cycle_edges,
-    solve_system,
 )
 
 
@@ -71,13 +72,15 @@ def forward(
     return result
 
 
-def _solve(matrix, rhs: np.ndarray, config: TraceConfig) -> tuple[np.ndarray, str, list]:
-    """Isolate closed recirculation loops, then solve; return (X, solver used, loops)."""
+def _solve(matrix, rhs: np.ndarray, config: TraceConfig) -> tuple[np.ndarray, Factor, list]:
+    """Isolate closed recirculation loops, factorise and solve; return (X, factor, loops)."""
     graph = None if config.solver == "lu" else dependency_graph(matrix)
     matrix, rhs, loops = isolate_closed_loops(matrix, rhs, config.closed_loop_tol, graph)
     graph = None if loops else graph  # isolating loops changes the components
-    fraction, solver = solve_system(matrix, rhs, config.solver, graph)
-    return fraction, solver, loops
+    factor = factorize(matrix, config.solver, graph)
+    if loops:
+        factor.zero_rows = np.concatenate(loops)
+    return factor.solve(rhs), factor, loops
 
 
 def _gross_backward(
@@ -86,14 +89,15 @@ def _gross_backward(
     """Gross-accounting backward trace: one solve with a column per group."""
     budget = cell_budget(step, edges)
     matrix, rhs = gross_backward_system(step, edges, budget, groups)
-    fraction, solver, loops = _solve(matrix, rhs, config)
+    fraction, factor, loops = _solve(matrix, rhs, config)
     destination = group_term_flows(step, groups, sign=-1).sum(axis=0)
     by_package = per_cell_by_package(step, sign=+1)
     result = backward_metrics(
         step, groups, fraction, budget.outflow, budget.source, by_package, destination, "gross"
     )
-    result.solver_used = [solver]
+    result.solver_used = [factor.kind]
     result.closed_loops = loops
+    result.factor = factor
     return result
 
 
@@ -103,14 +107,15 @@ def _gross_forward(
     """Gross-accounting forward trace: one solve with a column per group."""
     budget = cell_budget(step, edges)
     matrix, rhs = gross_forward_system(step, edges, budget, groups)
-    fraction, solver, loops = _solve(matrix, rhs, config)
+    fraction, factor, loops = _solve(matrix, rhs, config)
     source = group_term_flows(step, groups, sign=+1).sum(axis=0)
     by_package = per_cell_by_package(step, sign=-1)
     result = forward_metrics(
         step, groups, fraction, budget.inflow, budget.sink, by_package, source, "gross"
     )
-    result.solver_used = [solver]
+    result.solver_used = [factor.kind]
     result.closed_loops = loops
+    result.factor = factor
     return result
 
 
@@ -143,9 +148,9 @@ def _net_solve(
         used = _net_edges(n, edges, sel.cells, backward, config.remove_cycles)
         s, throughflow = net_balance(n, used)
         matrix, rhs = net_system(n, used, sel.cells, throughflow, backward)
-        fraction[:, g], solver, loops = _solve(matrix, rhs, config)
+        fraction[:, g], factor, loops = _solve(matrix, rhs, config)
         s_all[:, g], t_all[:, g] = s, throughflow
-        solvers.append(solver)
+        solvers.append(factor.kind)
         for cells in loops:
             closed[cells] = True
     return fraction, s_all, t_all, solvers, _loops_from_mask(n, edges, closed)

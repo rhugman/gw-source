@@ -1,10 +1,12 @@
 """Shared pieces for the small MF6 test models: run record, base problem spec and package helpers.
 
 Every model writes the binary grid file, a budget file with SAVE_FLOWS on NPF, STO and every
-stress package, heads, and DATA-SAT (SAVE_SATURATION). The base problem ("model 1") is a single
-unconfined layer with recharge, one pumping well, a river line and a constant-head west edge.
-Its stresses are defined on (row, col) so the DIS, DISU and transient variants share them. The
-well draws the river down so that some river reaches gain and others lose water.
+stress package, heads, DATA-SAT (SAVE_SATURATION) and, except on DISU without vertices,
+DATA-SPDIS (SAVE_SPECIFIC_DISCHARGE, which MF6 PRT needs to track particles). The base problem
+("model 1") is a single unconfined layer with recharge, one pumping well, a river line and a
+constant-head west edge. Its stresses are defined on (row, col) so the DIS, DISU and transient
+variants share them. The well draws the river down so that some river reaches gain and others
+lose water.
 """
 
 from dataclasses import dataclass, field
@@ -106,14 +108,21 @@ def make_sim(
     return sim, gwf
 
 
-def add_npf_ic_oc(gwf, name: str, k, icelltype, strt, **npf_kwargs) -> None:
-    """Add NPF (flows and saturation saved), IC, and OC saving heads and budget every step."""
+def add_npf_ic_oc(
+    gwf, name: str, k, icelltype, strt, save_specific_discharge: bool = True, **npf_kwargs
+) -> None:
+    """Add NPF (flows, saturation and specific discharge saved), IC, and OC (heads, budget).
+
+    MF6 cannot compute specific discharge on a DISU grid without vertices, so that model passes
+    save_specific_discharge=False.
+    """
     flopy.mf6.ModflowGwfnpf(
         gwf,
         icelltype=icelltype,
         k=k,
         save_flows=True,
         save_saturation=True,
+        save_specific_discharge=save_specific_discharge,
         **npf_kwargs,
     )
     flopy.mf6.ModflowGwfic(gwf, strt=strt)

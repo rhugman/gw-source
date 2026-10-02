@@ -23,6 +23,13 @@ Statistics per group and per requested output, cell by cell (TransientConfig):
 NaN values (e.g. fraction_from_cell_input where a cell has no inflow term in a step) are left
 out cell by cell: means and probabilities are then over the steps where the value is defined,
 and a cell defined in no step gets NaN.
+
+Travel time (optional): with TransientConfig.porosity set, every step also gets the Eulerian
+mean travel time (backward) or mean age (forward) of gwsource.traveltime, computed on that
+step's flows and water volume as a snapshot (as if the step's flow field were steady). Its
+per-cell outputs ("mean_time", "weighted_time", and backward "mean_time_to_exit_cell") can then
+be named in outputs like any other, and each group's mean transit time (sum V F / Q) is logged
+per step in TransientResult.group_mean_transit_time.
 """
 
 from collections.abc import Callable
@@ -35,6 +42,7 @@ from .flowstep import FlowStep
 from .mf6io import StepReader
 from .selectors import Selection, select
 from .trace import backward, forward
+from .traveltime import DEFAULT_FRACTION_THRESHOLD, TravelTimeResult, travel_time
 
 MODES = ("backward", "forward")
 WEIGHTINGS = ("time", "equal")
@@ -59,6 +67,9 @@ class TransientConfig:
     value_range: (low, high) of probability_in_range (inclusive), or None.
     test_output: output the threshold and range apply to (default: the first of outputs).
     keep_series: also keep every step's outputs in memory (for export with a time dimension).
+    porosity: scalar or per-cell porosity; if set, travel times are computed on every step and
+        their outputs ("mean_time", "weighted_time", "mean_time_to_exit_cell") can be named.
+    fraction_threshold: travel times are NaN where the fraction is at or below this.
     """
 
     steps: str | list = "all"
@@ -68,6 +79,8 @@ class TransientConfig:
     value_range: tuple[float, float] | None = None
     test_output: str | None = None
     keep_series: bool = False
+    porosity: float | np.ndarray | None = None
+    fraction_threshold: float = DEFAULT_FRACTION_THRESHOLD
 
     def __post_init__(self) -> None:
         """Validate option values."""
@@ -118,6 +131,7 @@ class TransientResult:
     n_closed_loops: np.ndarray
     template: FlowStep
     series: dict[str, dict[str, np.ndarray]] | None = None
+    group_mean_transit_time: dict[str, np.ndarray] | None = None
     notes: dict = field(default_factory=dict)
 
 
@@ -213,13 +227,15 @@ def step_weight(reader: StepReader, kstpkper: tuple[int, int], weighting: str) -
     return reader.step_length(kstpkper) if weighting == "time" else 1.0
 
 
-def _output_values(result, output: str) -> dict[str, np.ndarray]:
-    """Return {group: per-cell values} of one output of a trace result."""
-    values = getattr(result, output, None)
-    assert isinstance(values, dict), (
-        f"output {output!r} is not available (unknown name, or flux outputs without cell areas)"
+def _output_values(results: tuple, output: str) -> dict[str, np.ndarray]:
+    """Return {group: per-cell values} of one output of a trace (or travel-time) result."""
+    found = [getattr(r, output, None) for r in results]
+    found = [v for v in found if isinstance(v, dict)]
+    assert found, (
+        f"output {output!r} is not available (unknown name, flux outputs without cell areas, "
+        "or travel-time outputs without porosity)"
     )
-    return values
+    return found[0]
 
 
 def _inflow(result, mode: str) -> dict[str, float]:
@@ -246,6 +262,7 @@ class StepLog:
     n_cycles: list[int] = field(default_factory=list)
     n_closed: list[int] = field(default_factory=list)
     inflow: dict[str, list[float]] = field(default_factory=dict)
+    transit: dict[str, list[float]] = field(default_factory=dict)
 
 
 def _log_step(log: StepLog, step: FlowStep, result, mode: str, weight: float) -> None:
@@ -259,9 +276,17 @@ def _log_step(log: StepLog, step: FlowStep, result, mode: str, weight: float) ->
         log.inflow.setdefault(group, []).append(value)
 
 
+def _log_travel_time(log: StepLog, tt: TravelTimeResult | None) -> None:
+    """Append each group's mean transit time of one step to the log."""
+    if tt is None:
+        return
+    for group, value in tt.mean_transit_time.items():
+        log.transit.setdefault(group, []).append(value)
+
+
 def _fold_outputs(
     acc: dict[str, dict[str, RunningStats]],
-    result,
+    results: tuple,
     outputs: list[str],
     test_output: str,
     config: TransientConfig,
@@ -272,15 +297,17 @@ def _fold_outputs(
         is_test = output == test_output
         threshold = config.threshold if is_test else None
         value_range = config.value_range if is_test else None
-        for group, values in _output_values(result, output).items():
+        for group, values in _output_values(results, output).items():
             stats = acc.setdefault(output, {}).setdefault(group, new_stats(values.size))
             update_stats(stats, values, weight, threshold, value_range)
 
 
-def _store_series(series: dict, result, outputs: list[str], index: int, n_steps: int) -> None:
+def _store_series(
+    series: dict, results: tuple, outputs: list[str], index: int, n_steps: int
+) -> None:
     """Copy one step's outputs into the kept series (output -> group -> (steps, cells))."""
     for output in outputs:
-        for group, values in _output_values(result, output).items():
+        for group, values in _output_values(results, output).items():
             stack = series.setdefault(output, {}).setdefault(
                 group, np.empty((n_steps, values.size))
             )
@@ -310,11 +337,14 @@ def trace_transient(
         names = list(step_groups) if names is None else names
         assert list(step_groups) == names, f"group names changed at step {kstpkper}"
         result = trace(step, step_groups, trace_config)
+        tt = _step_travel_time(step, result, config)
+        results = (result,) if tt is None else (result, tt)
         weight = step_weight(reader, kstpkper, config.weighting)
-        _fold_outputs(acc, result, outputs, test_output, config, weight)
+        _fold_outputs(acc, results, outputs, test_output, config, weight)
         if series is not None:
-            _store_series(series, result, outputs, index, len(steps))
+            _store_series(series, results, outputs, index, len(steps))
         _log_step(log, step, result, mode, weight)
+        _log_travel_time(log, tt)
     return TransientResult(
         mode=mode,
         config=config,
@@ -332,8 +362,18 @@ def trace_transient(
         n_closed_loops=np.asarray(log.n_closed),
         template=step,
         series=series,
+        group_mean_transit_time={g: np.asarray(v) for g, v in log.transit.items()} or None,
         notes=dict(reader.notes or {}),
     )
+
+
+def _step_travel_time(
+    step: FlowStep, result, config: TransientConfig
+) -> TravelTimeResult | None:
+    """Return the step's travel times if porosity is configured, else None."""
+    if config.porosity is None:
+        return None
+    return travel_time(step, result, config.porosity, config.fraction_threshold)
 
 
 def _collect_stats(

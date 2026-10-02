@@ -14,6 +14,9 @@ Solvers (PLAN §2.5):
   about 1e5 cells of a 3D grid.
 - auto: topological if the graph is acyclic, otherwise block.
 
+factorize() returns the factorisation (a Factor) so that further right-hand sides that depend on
+the first solution (the travel-time systems of gwsource.traveltime) reuse it.
+
 Pivoting is not needed: I - P is a (weakly) row-diagonally dominant M-matrix. It is singular only
 on a closed recirculation loop, a strongly connected set with no exit: no dependency leaves it
 and no row in it has an exit share 1 - sum_j P_ij (a sink, or in forward mode a source) above a
@@ -221,29 +224,90 @@ def isolate_closed_loops(
     return fixed, rhs, _split_by_label(np.flatnonzero(closed), graph.labels)
 
 
+@dataclass
+class Factor:
+    """A factorised system matrix, reusable for further right-hand sides (e.g. travel times).
+
+    kind is the solver used; order the cell order of the permuted matrix (None for "lu");
+    triangular the permuted lower-triangular matrix ("topological"); lu the SuperLU object
+    ("block" and "lu"). zero_rows marks closed-loop cells whose rows were made identity rows:
+    their right-hand side is forced to 0 by solve(), as isolate_closed_loops() did for the first
+    solve. Not picklable (SuperLU objects are not); keep it within one process.
+    """
+
+    kind: str
+    order: np.ndarray | None = None
+    triangular: sp.csr_matrix | None = None
+    lu: object | None = None
+    zero_rows: np.ndarray | None = None
+
+    def solve(self, rhs: np.ndarray) -> np.ndarray:
+        """Return X with matrix @ X = rhs (rows of closed loops forced to 0)."""
+        rhs = np.array(rhs, dtype=float)
+        if self.zero_rows is not None:
+            rhs[self.zero_rows] = 0.0
+        if self.kind == "lu":
+            return self.lu.solve(rhs)
+        if self.kind == "topological":
+            x_perm = spsolve_triangular(self.triangular, rhs[self.order], lower=True)
+        else:
+            x_perm = self.lu.solve(rhs[self.order])
+        x = np.empty_like(x_perm)
+        x[self.order] = x_perm
+        return x
+
+
+def factor_topological(matrix: sp.csr_matrix, order: np.ndarray) -> Factor:
+    """Permute the matrix to lower-triangular form for substitution."""
+    return Factor("topological", order=order, triangular=matrix[order][:, order].tocsr())
+
+
+def factor_lu(matrix: sp.csr_matrix) -> Factor:
+    """Factorise with SuperLU and its default COLAMD ordering."""
+    return Factor("lu", lu=splu(matrix.tocsc()))
+
+
+def factor_block(matrix: sp.csr_matrix, order: np.ndarray) -> Factor:
+    """Factorise with SuperLU in block lower-triangular (component) order, without reordering."""
+    permuted = matrix[order][:, order].tocsc()
+    lu = splu(permuted, permc_spec="NATURAL", diag_pivot_thresh=0.0)
+    return Factor("block", order=order, lu=lu)
+
+
+def factorize(
+    matrix: sp.csr_matrix, solver: str = "auto", graph: DependencyGraph | None = None
+) -> Factor:
+    """Return a reusable factorisation of matrix with the chosen solver (see module docstring).
+
+    graph, if given, must be dependency_graph(matrix) (it saves recomputing the components).
+    """
+    if solver == "lu":
+        return factor_lu(matrix)
+    n = matrix.shape[0]
+    graph = dependency_graph(matrix) if graph is None else graph
+    acyclic = graph.n_components == n
+    assert acyclic or solver != "topological", (
+        "the flow graph has cycles; the topological solver cannot be used (use 'auto' or 'block')"
+    )
+    order = component_order(n, graph.before, graph.after, graph.labels)
+    if acyclic and solver != "block":
+        return factor_topological(matrix, order)
+    return factor_block(matrix, order)
+
+
 def solve_topological(matrix: sp.csr_matrix, rhs: np.ndarray, order: np.ndarray) -> np.ndarray:
     """Solve by substitution after permuting the matrix to lower-triangular form."""
-    permuted = matrix[order][:, order].tocsr()
-    x_perm = spsolve_triangular(permuted, rhs[order], lower=True)
-    x = np.empty_like(x_perm)
-    x[order] = x_perm
-    return x
+    return factor_topological(matrix, order).solve(rhs)
 
 
 def solve_lu(matrix: sp.csr_matrix, rhs: np.ndarray) -> np.ndarray:
     """Solve with one sparse LU factorisation reused for every right-hand-side column."""
-    lu = splu(matrix.tocsc())
-    return lu.solve(np.asarray(rhs, dtype=float))
+    return factor_lu(matrix).solve(rhs)
 
 
 def solve_block(matrix: sp.csr_matrix, rhs: np.ndarray, order: np.ndarray) -> np.ndarray:
     """Solve by SuperLU in block lower-triangular (component) order, without reordering."""
-    permuted = matrix[order][:, order].tocsc()
-    lu = splu(permuted, permc_spec="NATURAL", diag_pivot_thresh=0.0)
-    x_perm = lu.solve(np.asarray(rhs, dtype=float)[order])
-    x = np.empty_like(x_perm)
-    x[order] = x_perm
-    return x
+    return factor_block(matrix, order).solve(rhs)
 
 
 def solve_system(
@@ -256,16 +320,5 @@ def solve_system(
 
     graph, if given, must be dependency_graph(matrix) (it saves recomputing the components).
     """
-    rhs = np.asarray(rhs, dtype=float)
-    if solver == "lu":
-        return solve_lu(matrix, rhs), "lu"
-    n = matrix.shape[0]
-    graph = dependency_graph(matrix) if graph is None else graph
-    acyclic = graph.n_components == n
-    assert acyclic or solver != "topological", (
-        "the flow graph has cycles; the topological solver cannot be used (use 'auto' or 'block')"
-    )
-    order = component_order(n, graph.before, graph.after, graph.labels)
-    if acyclic and solver != "block":
-        return solve_topological(matrix, rhs, order), "topological"
-    return solve_block(matrix, rhs, order), "block"
+    factor = factorize(matrix, solver, graph)
+    return factor.solve(rhs), factor.kind

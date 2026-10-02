@@ -16,6 +16,12 @@ DATA-SAT) are not flows and are skipped.
 Cell area: DELR x DELC (DIS); vertex polygons (DISV, and DISU when vertices were written);
 otherwise AREA from the DISU input file read with FloPy, or None if that is not available.
 
+Saturated thickness (for travel times): cell top and bottom and ICELLTYPE come from the .grb
+file (DIS/DISV: the top of layer k > 0 is the bottom of layer k - 1). Confined cells
+(ICELLTYPE = 0) are fully saturated. Convertible cells use DATA-SAT x (top - bot) when the step
+saved DATA-SAT (NPF SAVE_SATURATION); otherwise, if a head file is open, clip(head, bot, top) -
+bot, with dry cells (head <= bot, or |head| >= 1e29 for HDRY/HNOFLO) at 0; otherwise None.
+
 Water mover (checked on test model 7, DRN -> MVR -> SFR): a provider package with MOVER writes
 two disjoint aquifer-side records, e.g. DRN (the part of the drain outflow that leaves the model)
 and DRN-TO-MVR (the part handed to the mover). Both are outflows from the cell and together they
@@ -41,6 +47,7 @@ import numpy as np
 from .flowstep import FlowStep, Package
 
 COMMENT_CHARS = ("#", "!", "//")
+DRY_HEAD = 1.0e29
 
 
 @dataclass
@@ -54,6 +61,7 @@ class ModelFiles:
     dis_type: str
     nam_file: Path | None = None
     tdis_file: Path | None = None
+    head_file: Path | None = None
 
 
 @dataclass
@@ -66,6 +74,9 @@ class GridData:
     idomain: np.ndarray
     shape: tuple[int, ...]
     area: np.ndarray | None
+    top: np.ndarray | None = None
+    bot: np.ndarray | None = None
+    icelltype: np.ndarray | None = None
 
 
 # ---------------------------------------------------------------- name-file parsing
@@ -121,7 +132,11 @@ def find_model_files(ws: str | Path, model: str | None = None) -> ModelFiles:
     grb = _fileout(dis_file, "GRB6") or f"{packages[dis_type]}.grb"
     timing = {t[0].upper(): t[1] for t in _block_lines(ws / "mfsim.nam", "TIMING")}
     tdis = ws / timing["TDIS6"] if "TDIS6" in timing else None
-    return ModelFiles(name, ws / grb, ws / budget, dis_file, dis_type[:-1], nam_file, tdis)
+    head = _fileout(ws / packages["OC6"], "HEAD")
+    head_file = ws / head if head is not None else None
+    return ModelFiles(
+        name, ws / grb, ws / budget, dis_file, dis_type[:-1], nam_file, tdis, head_file
+    )
 
 
 def _option_value(path: Path | None, keyword: str) -> str | None:
@@ -182,11 +197,22 @@ def _grid_shape(grb: flopy.mf6.utils.MfGrdFile) -> tuple[int, ...]:
     return (int(grb.nodes),)
 
 
+def _cell_top_bot(grb: flopy.mf6.utils.MfGrdFile) -> tuple[np.ndarray, np.ndarray]:
+    """Return the top and bottom elevation of every user node."""
+    bot = np.asarray(grb.bot, dtype=float).ravel()
+    top = np.asarray(grb.top, dtype=float).ravel()
+    if top.size < bot.size:  # DIS/DISV: model top, then each layer's top is the bottom above
+        top = np.concatenate([top, bot[: bot.size - top.size]])
+    return top, bot
+
+
 def read_grid(grb_file: str | Path) -> GridData:
-    """Read connectivity, IDOMAIN, shape and (if available) cell areas from a binary grid file."""
+    """Read connectivity, IDOMAIN, shape, geometry and ICELLTYPE from a binary grid file."""
     grb = flopy.mf6.utils.MfGrdFile(str(grb_file), verbose=False)
     assert grb.grid_type in ("DIS", "DISV", "DISU"), f"unsupported grid type {grb.grid_type}"
     idomain = np.ravel(grb.idomain) if grb.idomain is not None else np.ones(grb.nodes, int)
+    top, bot = _cell_top_bot(grb)
+    icelltype = grb._datadict.get("ICELLTYPE")  # no public attribute in FloPy
     return GridData(
         grid_type=grb.grid_type,
         ia=np.asarray(grb.ia, dtype=np.int64),
@@ -194,7 +220,33 @@ def read_grid(grb_file: str | Path) -> GridData:
         idomain=np.asarray(idomain, dtype=int),
         shape=_grid_shape(grb),
         area=_grid_area(grb),
+        top=top,
+        bot=bot,
+        icelltype=None if icelltype is None else np.asarray(icelltype, dtype=int).ravel(),
     )
+
+
+def saturated_thickness(
+    top: np.ndarray,
+    bot: np.ndarray,
+    icelltype: np.ndarray | None,
+    active: np.ndarray,
+    saturation: np.ndarray | None = None,
+    head: np.ndarray | None = None,
+) -> np.ndarray:
+    """Return per-cell saturated thickness from DATA-SAT (preferred) or heads; 0 if inactive.
+
+    Cells with ICELLTYPE = 0 are fully saturated; without ICELLTYPE every cell is convertible.
+    """
+    assert saturation is not None or head is not None, "need saturation or head"
+    full = np.maximum(top - bot, 0.0)
+    if saturation is not None:
+        partial = np.clip(saturation, 0.0, 1.0) * full
+    else:
+        dry = (np.abs(head) >= DRY_HEAD) | (head <= bot)
+        partial = np.where(dry, 0.0, np.clip(head, bot, top) - bot)
+    confined = np.zeros(top.size, bool) if icelltype is None else icelltype == 0
+    return np.where(active, np.where(confined, full, partial), 0.0)
 
 
 def read_disu_area(ws: str | Path, model: str) -> np.ndarray:
@@ -312,6 +364,13 @@ def _array_term(data: np.ndarray, active: np.ndarray) -> tuple[np.ndarray, np.nd
     return cells, flow[cells]
 
 
+def _saturation_record(data: np.ndarray, n_nodes: int) -> np.ndarray:
+    """Return per-node saturation from a DATA-SAT list record (0 where not listed)."""
+    saturation = np.zeros(n_nodes)
+    saturation[np.asarray(data["node"]) - 1] = np.asarray(data["sat"], dtype=float)
+    return saturation
+
+
 def _record_package(parent: str, text: str, used: set[str]) -> Package:
     """Return the Package of a record; a second record of the same package gets '<pkg>:<text>'."""
     name = parent if parent not in used else f"{parent}:{text}"
@@ -323,6 +382,7 @@ def _record_package(parent: str, text: str, used: set[str]) -> Package:
 def _read_terms(cbc, indices: list[int], active: np.ndarray) -> dict:
     """Collect external term entries and the FLOW-JA-FACE array from one step's records."""
     out = {"cell": [], "flow": [], "package": [], "bound": [], "packages": [], "flowja": None}
+    out["saturation"] = None
     used: set[str] = set()
     for idx in indices:
         header = cbc.recordarray[idx]
@@ -331,6 +391,9 @@ def _read_terms(cbc, indices: list[int], active: np.ndarray) -> dict:
         if text == "FLOW-JA-FACE":
             assert imeth == 1, "FLOW-JA-FACE exchange records (multi-model) are not supported yet"
             out["flowja"] = np.asarray(data, dtype=float).ravel()
+            continue
+        if text == "DATA-SAT":
+            out["saturation"] = _saturation_record(data, active.size)
             continue
         if text.startswith("DATA-"):
             continue
@@ -378,6 +441,7 @@ class StepReader:
     area: np.ndarray | None = None
     boundnames: BoundnameTable | None = None
     notes: dict | None = None
+    heads: flopy.utils.HeadFile | None = None
 
     @property
     def steps(self) -> list[tuple[int, int]]:
@@ -387,6 +451,19 @@ class StepReader:
     def step_length(self, kstpkper: tuple[int, int]) -> float:
         """Return the length (DELT) of a saved time step, from the budget record header."""
         return float(self.cbc.recordarray[_step_record_indices(self.cbc, kstpkper)[0]]["delt"])
+
+    def thickness(
+        self, kstpkper: tuple[int, int], saturation: np.ndarray | None, active: np.ndarray
+    ) -> tuple[np.ndarray | None, str]:
+        """Return (saturated thickness, its source) from DATA-SAT, else heads, else (None, '')."""
+        grid = self.grid
+        if grid.top is None or (saturation is None and self.heads is None):
+            return None, ""
+        head = None
+        if saturation is None:
+            head = np.asarray(self.heads.get_data(kstpkper=tuple(kstpkper)), float).ravel()
+        thick = saturated_thickness(grid.top, grid.bot, grid.icelltype, active, saturation, head)
+        return thick, "DATA-SAT" if saturation is not None else "heads"
 
     def read(self, kstpkper: tuple[int, int] = (0, 0)) -> FlowStep:
         """Read one time step into a FlowStep."""
@@ -402,6 +479,7 @@ class StepReader:
                 self.boundnames, terms["packages"], term_package, term_bound, kstpkper[1]
             )
         header = self.cbc.recordarray[indices[0]]
+        thickness, thickness_source = self.thickness(kstpkper, terms["saturation"], active)
         return FlowStep(
             ia=self.grid.ia,
             ja=self.grid.ja,
@@ -413,25 +491,42 @@ class StepReader:
             packages=terms["packages"],
             term_boundname=names,
             area=self.area if self.area is not None else self.grid.area,
+            saturated_thickness=thickness,
             active=active,
             grid_shape=self.grid.shape,
             grid_type=self.grid.grid_type,
             kstpkper=tuple(int(k) for k in kstpkper),
             totim=float(header["totim"]),
-            notes={**(self.notes or {}), "delt": float(header["delt"])},
+            notes={
+                **(self.notes or {}),
+                "delt": float(header["delt"]),
+                "thickness_from": thickness_source,
+            },
         )
 
 
 def open_files(
-    grb_file: str | Path, budget_file: str | Path, area: np.ndarray | None = None
+    grb_file: str | Path,
+    budget_file: str | Path,
+    area: np.ndarray | None = None,
+    head_file: str | Path | None = None,
 ) -> StepReader:
-    """Open a binary grid file and a budget file once for reading many time steps."""
+    """Open a binary grid file and a budget file (and optionally a head file) once.
+
+    The head file is only used for the saturated thickness when a step has no DATA-SAT.
+    """
     notes = {"grb_file": str(grb_file), "budget_file": str(budget_file)}
+    heads = None
+    head_file = Path(head_file) if head_file is not None else None
+    if head_file is not None and head_file.is_file() and head_file.stat().st_size > 0:
+        heads = flopy.utils.HeadFile(str(head_file))
+        notes["head_file"] = str(head_file)
     return StepReader(
         grid=read_grid(grb_file),
         cbc=flopy.utils.CellBudgetFile(str(budget_file)),
         area=None if area is None else np.asarray(area, dtype=float),
         notes=notes,
+        heads=heads,
     )
 
 
@@ -446,7 +541,7 @@ def open_model(
     For DISU grids without vertices the cell area is read from the DISU input (AREA).
     """
     files = find_model_files(ws, model)
-    reader = open_files(files.grb_file, files.budget_file, area=area)
+    reader = open_files(files.grb_file, files.budget_file, area=area, head_file=files.head_file)
     if reader.area is None and reader.grid.area is None and files.dis_type == "DISU":
         reader.area = read_disu_area(ws, files.model)
     if boundnames:

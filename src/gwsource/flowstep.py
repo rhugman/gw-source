@@ -17,6 +17,8 @@ Conventions
   of an array record such as STO-SS). ``term_flow`` is positive INTO the cell: a positive entry
   is a source term, a negative entry is a sink term. Entries with zero flow are neither.
 - ``packages`` is the term table: ``term_package`` indexes into it.
+- ``saturated_thickness`` (optional, per cell) is the saturated thickness of the cell for this
+  step; with ``area`` it gives the water volume that travel times need (gwsource.traveltime).
 """
 
 from dataclasses import dataclass, field
@@ -64,6 +66,7 @@ class FlowStep:
     packages: list[Package]
     term_boundname: np.ndarray | None = None
     area: np.ndarray | None = None
+    saturated_thickness: np.ndarray | None = None
     active: np.ndarray | None = None
     grid_shape: tuple[int, ...] | None = None
     grid_type: str = "graph"
@@ -118,6 +121,8 @@ def validate_step(step: FlowStep) -> None:
         assert len(step.term_boundname) == m, "term_boundname must have one entry per term"
     if step.area is not None:
         assert len(step.area) == n, "area must have one value per cell"
+    if step.saturated_thickness is not None:
+        assert len(step.saturated_thickness) == n, "saturated_thickness: one value per cell"
     assert len(step.active) == n, "active must have one value per cell"
     assert int(np.prod(step.grid_shape)) == n, "grid_shape must hold n_cells values"
 

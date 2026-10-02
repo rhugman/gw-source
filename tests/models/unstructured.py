@@ -115,7 +115,9 @@ def build_base_disu(ws: Path, exe: Path, with_vertices: bool, spec: BaseSpec | N
     flopy.mf6.ModflowGwfdisu(
         gwf, idomain=base_idomain(spec).ravel(), filename=dis_filename, **disu_kwargs
     )
-    add_npf_ic_oc(gwf, name, k=spec.k, icelltype=1, strt=spec.strt)
+    add_npf_ic_oc(
+        gwf, name, k=spec.k, icelltype=1, strt=spec.strt, save_specific_discharge=with_vertices
+    )
     add_base_stresses(gwf, spec, _disu_cellid(spec), [spec.wel_rate], [1.0])
     notes = {"spec": spec, "inactive_cells": spec.inactive_cells, "with_vertices": with_vertices}
     return run_model(sim, gwf, name, ws, dis_filename, notes)

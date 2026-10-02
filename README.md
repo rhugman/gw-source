@@ -2,7 +2,7 @@
 
 `gwsource` post-processes MODFLOW 6 groundwater-flow output to work out, for every cell, what fraction and volume of its water reaches a chosen destination (capture) or came from a chosen source (fate). It builds on the cell-mixing flow-tracing method of Foley & Black (2013) and Black & Foley (2013), solved as a sparse linear system so that cycles, weak sinks and many destinations are handled exactly.
 
-Status: early development (Phases 0–2: steady and transient snapshot tracing, netCDF/GeoPackage export). See [`PLAN.md`](PLAN.md) for the design.
+Status: early development (Phases 0–3: steady and transient snapshot tracing, netCDF/GeoPackage export, Eulerian mean travel time, an MF6 PRT comparison helper and an ensemble driver). See [`PLAN.md`](PLAN.md) for the design.
 
 ## Setup
 

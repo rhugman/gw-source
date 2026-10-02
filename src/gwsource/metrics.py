@@ -23,6 +23,9 @@ Forward (fate) outputs per source group g:
 - volume_to: G x (sink terms of the cell) (gross) or G x max(-s, 0) (net).
 - volume_to_by_term: volume_to split by package (gross only).
 - source_inflow: sum of the group's source terms (gross) or of the source cells' T (net).
+
+Gross results also keep the factorised system matrix (factor; not picklable) so that the travel
+times of gwsource.traveltime reuse it.
 """
 
 from dataclasses import dataclass, field
@@ -31,7 +34,7 @@ import numpy as np
 
 from .flowstep import FlowStep
 from .selectors import Selection
-from .solve import Cycle
+from .solve import Cycle, Factor
 
 
 @dataclass
@@ -52,6 +55,7 @@ class BackwardResult:
     solver_used: list[str] = field(default_factory=list)
     cycles: list[Cycle] = field(default_factory=list)
     closed_loops: list[np.ndarray] = field(default_factory=list)
+    factor: Factor | None = field(default=None, repr=False, compare=False)
 
     @property
     def groups(self) -> list[str]:
@@ -73,6 +77,7 @@ class ForwardResult:
     solver_used: list[str] = field(default_factory=list)
     cycles: list[Cycle] = field(default_factory=list)
     closed_loops: list[np.ndarray] = field(default_factory=list)
+    factor: Factor | None = field(default=None, repr=False, compare=False)
 
     @property
     def groups(self) -> list[str]:
