@@ -18,6 +18,9 @@ tests/_output/
 tutorials/_work/
 .ipynb_checkpoints/
 
+# Third-party models downloaded for case studies
+studies/*/external/
+
 # OS / editor
 .DS_Store
 
