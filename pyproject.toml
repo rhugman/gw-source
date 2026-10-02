@@ -20,6 +20,7 @@ dependencies = [
 [project.optional-dependencies]
 export = ["xarray", "netcdf4", "geopandas"]
 dev = ["pytest"]
+notebooks = ["jupyterlab", "ipykernel", "nbclient", "nbformat", "nbconvert", "matplotlib", "pandas"]
 
 [tool.setuptools.dynamic]
 version = { attr = "gwsource.__version__" }
@@ -29,6 +30,9 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["tests", "benchmarks"]
-addopts = "-ra -m 'not slow'"
-markers = ["slow: large benchmark-sized checks, deselected by default (run with -m slow)"]
+pythonpath = ["tests", "benchmarks", "tutorials"]
+addopts = "-ra -m 'not slow and not tutorials'"
+markers = [
+    "slow: large benchmark-sized checks, deselected by default (run with -m slow)",
+    "tutorials: execute the tutorial notebooks, deselected by default (run with -m tutorials)",
+]

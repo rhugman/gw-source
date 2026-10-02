@@ -21,13 +21,17 @@ This script:
 
 Rerun it whenever you want to pick up new FloPy or MODFLOW 6 changes.
 
+## Tutorials
+
+Jupyter notebooks in [`tutorials/`](tutorials/README.md), starting with a quickstart capture-zone example: `jupyter lab tutorials/`.
+
 ## Tests
 
 ```bash
 mamba run -n gw-source pytest
 ```
 
-The pytest header records the FloPy commit and MF6 version used. The tests build and run small MF6 models in temporary folders, so `bin/mf6` must exist. Large checks are marked `slow` and skipped by default (`pytest -m slow` runs them).
+The pytest header records the FloPy commit and MF6 version used. The tests build and run small MF6 models in temporary folders, so `bin/mf6` must exist. Large checks are marked `slow` and skipped by default (`pytest -m slow` runs them); so is the execution of the tutorial notebooks (`pytest -m tutorials`).
 
 ## Benchmarks
 

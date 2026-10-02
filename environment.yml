@@ -12,6 +12,11 @@ dependencies:
   - netcdf4
   - geopandas
   - shapely
+  - jupyterlab
+  - ipykernel
+  - nbclient
+  - nbformat
+  - nbconvert
   - pip
   - pip:
       - flopy[codegen] @ git+https://github.com/modflowpy/flopy.git@develop

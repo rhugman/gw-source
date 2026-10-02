@@ -1,0 +1,939 @@
+"""Shared helpers for the gwsource tutorials: paths, small MF6 model builders and map plots.
+
+The notebooks are the narrative; everything reusable lives here. Every builder writes and runs
+one small MODFLOW 6 model in the workspace it is given and returns a ModelRun. All models save
+what gwsource needs: the binary grid file, a budget file (SAVE_FLOWS on NPF, STO and every
+package; BUDGET FILEOUT on SFR, MAW and MVR), heads, DATA-SAT (SAVE_SATURATION) and DATA-SPDIS
+(SAVE_SPECIFIC_DISCHARGE, which MF6 PRT needs).
+
+The tutorial aquifer (AquiferSpec) is a single unconfined layer, 2 km x 2 km in 50 m cells.
+Recharge falls everywhere; a constant head on the west edge (10 m) brings regional inflow from
+upland, and a river along a north-south column (stage 6 m) drains the aquifer. A supply well
+just west of the river draws it down, so the well captures recharge, regional inflow from the
+west edge and some river water. The variants keep this plan so results compare across
+tutorials: three layers (with a weak-sink well), Voronoi DISV, DISU, XT3D anisotropy, transient
+seasons, an SFR stream fed by drains through the water mover, a multi-aquifer well, and random
+log-K realisations.
+
+Stresses are given on (row, col) of the tutorial grid; the river reaches carry the boundnames
+'river_north' and 'river_south', and wells carry their own names.
+"""
+
+import shutil
+import sys
+from dataclasses import dataclass, field, replace
+from pathlib import Path
+
+import flopy
+import matplotlib.pyplot as plt
+import numpy as np
+
+import gwsource as gs
+
+WORK_DIR_NAME = "_work"
+STEADY = ((1.0, 1, 1.0),)
+IMS_SETTINGS = {
+    "complexity": "simple",
+    "outer_dvclose": 1.0e-9,
+    "outer_maximum": 200,
+    "inner_maximum": 300,
+    "inner_dvclose": 1.0e-10,
+    "rcloserecord": 1.0e-8,
+    "linear_acceleration": "bicgstab",
+}
+SEASONS = ("winter", "spring", "summer", "autumn")
+SEASON_RECHARGE = (1.8, 1.0, 0.1, 1.1)  # multipliers of AquiferSpec.rech
+SEASON_PUMPING = (0.8, 1.0, 1.4, 0.8)  # multipliers of the well rates
+FEATURE_STYLES = {  # package: scatter style for overlay_features()
+    "CHD": {"marker": "s", "s": 6, "color": "0.45", "label": "constant head"},
+    "RIV": {"marker": "s", "s": 10, "color": "tab:blue", "label": "river"},
+    "SFR": {"marker": "s", "s": 10, "color": "tab:blue", "label": "stream"},
+    "DRN": {"marker": "v", "s": 50, "color": "tab:green", "edgecolor": "k", "label": "drain"},
+    "WEL": {"marker": "*", "s": 160, "color": "tab:red", "edgecolor": "k", "label": "well"},
+    "MAW": {"marker": "*", "s": 160, "color": "tab:orange", "edgecolor": "k", "label": "MAW well"},
+}
+
+
+# ---------------------------------------------------------------- paths
+
+
+def repo_root() -> Path:
+    """Return the repository root (the parent of tutorials/)."""
+    return Path(__file__).resolve().parents[1]
+
+
+def exe_path(name: str, bin_dir: Path | None = None) -> Path:
+    """Return the path of an executable in <repo>/bin, failing with a setup hint if missing."""
+    bin_dir = repo_root() / "bin" if bin_dir is None else Path(bin_dir)
+    suffix = ".exe" if sys.platform.startswith("win") else ""
+    exe = bin_dir / f"{name}{suffix}"
+    assert exe.is_file(), f"{exe} not found; run scripts/setup_env.sh to download it into bin/"
+    return exe
+
+
+def mf6_exe() -> Path:
+    """Return the MODFLOW 6 executable in <repo>/bin."""
+    return exe_path("mf6")
+
+
+def triangle_exe() -> Path:
+    """Return the triangle executable in <repo>/bin (Voronoi grids)."""
+    return exe_path("triangle")
+
+
+def work_dir(name: str, clean: bool = False) -> Path:
+    """Return tutorials/_work/<name> (git-ignored), created; clean=True empties it first."""
+    path = Path(__file__).resolve().parent / WORK_DIR_NAME / name
+    if clean and path.exists():
+        shutil.rmtree(path)
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+# ---------------------------------------------------------------- model description
+
+
+@dataclass
+class AquiferSpec:
+    """Plan geometry, properties and stresses of the tutorial aquifer (stresses on (row, col)).
+
+    k may be a scalar or a (nrow, ncol) array. wells: (boundname, (row, col), rate [m3/d]).
+    """
+
+    nrow: int = 40
+    ncol: int = 40
+    delr: float = 50.0
+    delc: float = 50.0
+    top: float = 20.0
+    botm: float = -30.0
+    k: float | np.ndarray = 5.0
+    strt: float = 10.0
+    rech: float = 5.0e-4
+    chd_head: float = 10.0
+    riv_col: int = 30
+    riv_stage: float = 6.0
+    riv_cond: float = 500.0
+    riv_rbot: float = 4.0
+    wells: tuple[tuple[str, tuple[int, int], float], ...] = (
+        ("supply_well", (20, 28), -800.0),
+    )
+
+    @property
+    def lx(self) -> float:
+        """Domain length west-east [m]."""
+        return self.ncol * self.delr
+
+    @property
+    def ly(self) -> float:
+        """Domain length south-north [m]."""
+        return self.nrow * self.delc
+
+    def xy(self, rc: tuple[int, int]) -> tuple[float, float]:
+        """Return the model (x, y) of the centre of cell (row, col); row 0 is the north edge."""
+        return (rc[1] + 0.5) * self.delr, self.ly - (rc[0] + 0.5) * self.delc
+
+    def node(self, rc: tuple[int, int], layer: int = 0) -> int:
+        """Return the 0-based node number of (row, col) in a DIS/DISU layer."""
+        return (layer * self.nrow + rc[0]) * self.ncol + rc[1]
+
+
+@dataclass
+class ModelRun:
+    """What a notebook needs from a built and run model: paths, FloPy objects and notes."""
+
+    name: str
+    ws: Path
+    sim: flopy.mf6.MFSimulation
+    gwf: flopy.mf6.ModflowGwf
+    grb_file: Path
+    budget_file: Path
+    head_file: Path
+    spec: AquiferSpec
+    info: dict = field(default_factory=dict)
+
+
+def riv_boundname(row: int, spec: AquiferSpec) -> str:
+    """Return the boundname of the river reach in a row ('river_north' or 'river_south')."""
+    return "river_north" if row < spec.nrow // 2 else "river_south"
+
+
+def chd_cells(spec: AquiferSpec) -> list[tuple[int, int]]:
+    """Return the (row, col) of the constant-head west edge."""
+    return [(row, 0) for row in range(spec.nrow)]
+
+
+def riv_cells(spec: AquiferSpec) -> list[tuple[int, int]]:
+    """Return the (row, col) of the river column."""
+    return [(row, spec.riv_col) for row in range(spec.nrow)]
+
+
+def all_cells(spec: AquiferSpec) -> list[tuple[int, int]]:
+    """Return the (row, col) of every cell of one layer."""
+    return [(row, col) for row in range(spec.nrow) for col in range(spec.ncol)]
+
+
+def k_layer(spec: AquiferSpec) -> np.ndarray:
+    """Return the (nrow, ncol) hydraulic conductivity of the spec."""
+    return np.broadcast_to(np.asarray(spec.k, dtype=float), (spec.nrow, spec.ncol)).copy()
+
+
+# ---------------------------------------------------------------- shared FloPy pieces
+
+
+def make_sim(
+    name: str, ws: Path, exe: Path, perioddata, ims_kwargs: dict | None = None
+) -> tuple[flopy.mf6.MFSimulation, flopy.mf6.ModflowGwf]:
+    """Create the simulation, TDIS, IMS (settings overridable) and an empty GWF model."""
+    ws = Path(ws)
+    ws.mkdir(parents=True, exist_ok=True)
+    sim = flopy.mf6.MFSimulation(sim_name=name, sim_ws=str(ws), exe_name=str(exe))
+    flopy.mf6.ModflowTdis(
+        sim, nper=len(perioddata), perioddata=list(perioddata), time_units="days"
+    )
+    flopy.mf6.ModflowIms(sim, **{**IMS_SETTINGS, **(ims_kwargs or {})})
+    gwf = flopy.mf6.ModflowGwf(sim, modelname=name, save_flows=True)
+    return sim, gwf
+
+
+def add_dis(gwf, spec: AquiferSpec, name: str, botm=None) -> str:
+    """Add a DIS package of the tutorial plan (one layer, or len(botm) layers); return its file."""
+    botm = [spec.botm] if botm is None else list(botm)
+    filename = f"{name}.dis"
+    flopy.mf6.ModflowGwfdis(
+        gwf, nlay=len(botm), nrow=spec.nrow, ncol=spec.ncol, delr=spec.delr, delc=spec.delc,
+        top=spec.top, botm=botm, length_units="meters", filename=filename,
+    )
+    return filename
+
+
+def add_npf_ic_oc(
+    gwf, name: str, k, icelltype, strt, save_specific_discharge: bool = True, **npf_kwargs
+) -> None:
+    """Add NPF (flows, saturation and specific discharge saved), IC, and OC (all heads, budgets)."""
+    flopy.mf6.ModflowGwfnpf(
+        gwf, icelltype=icelltype, k=k, save_flows=True, save_saturation=True,
+        save_specific_discharge=save_specific_discharge, **npf_kwargs,
+    )
+    flopy.mf6.ModflowGwfic(gwf, strt=strt)
+    flopy.mf6.ModflowGwfoc(
+        gwf, budget_filerecord=f"{name}.cbc", head_filerecord=f"{name}.hds",
+        saverecord=[("HEAD", "ALL"), ("BUDGET", "ALL")],
+    )
+
+
+def add_stresses(
+    gwf,
+    spec: AquiferSpec,
+    to_cellid,
+    pumping: tuple[float, ...] = (1.0,),
+    recharge: tuple[float, ...] = (1.0,),
+    river: bool = True,
+    wells: bool = True,
+    nlay: int = 1,
+) -> None:
+    """Add CHD (every layer), RIV, WEL and RCH (top layer); WEL and RCH scaled per period.
+
+    Layers below the first (nlay > 1) are addressed as DIS (layer, row, col).
+    """
+    assert len(pumping) == len(recharge), "one pumping and one recharge factor per period"
+    chd = [(to_cellid(rc), spec.chd_head) for rc in chd_cells(spec)]
+    chd += [((lay, *rc), spec.chd_head) for lay in range(1, nlay) for rc in chd_cells(spec)]
+    flopy.mf6.ModflowGwfchd(gwf, stress_period_data={0: chd}, save_flows=True, pname="chd")
+    if river:
+        riv = [
+            (to_cellid(rc), spec.riv_stage, spec.riv_cond, spec.riv_rbot,
+             riv_boundname(rc[0], spec))
+            for rc in riv_cells(spec)
+        ]
+        flopy.mf6.ModflowGwfriv(
+            gwf, stress_period_data={0: riv}, boundnames=True, save_flows=True, pname="riv"
+        )
+    if wells:
+        wel = {
+            kper: [(to_cellid(rc), rate * factor, bname) for bname, rc, rate in spec.wells]
+            for kper, factor in enumerate(pumping)
+        }
+        flopy.mf6.ModflowGwfwel(
+            gwf, stress_period_data=wel, boundnames=True, save_flows=True, pname="wel"
+        )
+    rch = {
+        kper: [(to_cellid(rc), spec.rech * factor) for rc in all_cells(spec)]
+        for kper, factor in enumerate(recharge)
+    }
+    flopy.mf6.ModflowGwfrch(gwf, stress_period_data=rch, save_flows=True, pname="rch")
+
+
+def run_model(
+    sim, gwf, name: str, ws: Path, dis_filename: str, spec: AquiferSpec, info: dict
+) -> ModelRun:
+    """Write and run the simulation, assert normal termination, and return a ModelRun."""
+    ws = Path(ws)
+    sim.write_simulation(silent=True)
+    success, buff = sim.run_simulation(silent=True, report=True)
+    assert success, f"MF6 run of {name} failed:\n" + "\n".join(buff[-20:])
+    assert "Normal termination" in (ws / "mfsim.lst").read_text(), f"{name}: no normal termination"
+    return ModelRun(
+        name=name, ws=ws, sim=sim, gwf=gwf, grb_file=ws / f"{dis_filename}.grb",
+        budget_file=ws / f"{name}.cbc", head_file=ws / f"{name}.hds", spec=spec, info=info,
+    )
+
+
+def _dis_cellid(layer: int = 0):
+    """Return a function mapping (row, col) to a DIS cellid in the given layer."""
+    return lambda rc: (layer, rc[0], rc[1])
+
+
+def _well_nodes(spec: AquiferSpec, layer: int = 0) -> dict[str, int]:
+    """Return {well boundname: 0-based node} on a DIS/DISU grid."""
+    return {bname: spec.node(rc, layer) for bname, rc, _ in spec.wells}
+
+
+# ---------------------------------------------------------------- (a) quickstart model
+
+
+def build_quickstart(ws: Path, exe: Path, spec: AquiferSpec | None = None) -> ModelRun:
+    """Steady 1-layer DIS model: recharge, a supply well, a river and a constant-head west edge."""
+    spec = AquiferSpec() if spec is None else spec
+    name = "quickstart"
+    sim, gwf = make_sim(name, ws, exe, STEADY)
+    dis_filename = add_dis(gwf, spec, name)
+    add_npf_ic_oc(gwf, name, k=k_layer(spec), icelltype=1, strt=spec.strt)
+    add_stresses(gwf, spec, _dis_cellid())
+    info = {"well_nodes": _well_nodes(spec)}
+    return run_model(sim, gwf, name, ws, dis_filename, spec, info)
+
+
+# ---------------------------------------------------------------- (b) three layers, weak sink
+
+LAYER_BOTM = (0.0, -12.0, -30.0)
+LAYER_K = (10.0, 1.0, 15.0)
+LAYERED_WELLS = (  # (boundname, (layer, row, col), rate)
+    ("supply_well", (2, 20, 28), -800.0),
+    ("weak_well", (2, 16, 12), -5.0),
+)
+
+
+def build_layered(
+    ws: Path,
+    exe: Path,
+    spec: AquiferSpec | None = None,
+    botm: tuple[float, ...] = LAYER_BOTM,
+    layer_k: tuple[float, ...] = LAYER_K,
+    k33_ratio: float = 0.1,
+    wells: tuple = LAYERED_WELLS,
+) -> ModelRun:
+    """Steady 3-layer DIS model; the supply well and a small weak-sink well screen layer 3 only.
+
+    The river and recharge act on layer 1, the constant heads on every layer. spec.wells is
+    ignored; wells are (boundname, (layer, row, col), rate). info['weak_well_node'] is the
+    0-based node of 'weak_well' when present.
+    """
+    spec = AquiferSpec() if spec is None else spec
+    assert len(botm) == len(layer_k), "one conductivity per layer"
+    name = "layered"
+    nlay = len(botm)
+    sim, gwf = make_sim(name, ws, exe, STEADY)
+    dis_filename = add_dis(gwf, spec, name, botm=botm)
+    k = np.asarray(layer_k)[:, None, None] * k_layer(spec) / float(np.mean(k_layer(spec)))
+    add_npf_ic_oc(
+        gwf, name, k=k, icelltype=[1] + [0] * (nlay - 1), strt=spec.strt, k33=k33_ratio * k
+    )
+    add_stresses(gwf, spec, _dis_cellid(), wells=False, nlay=nlay)
+    wel = [(cellid, rate, bname) for bname, cellid, rate in wells]
+    flopy.mf6.ModflowGwfwel(
+        gwf, stress_period_data={0: wel}, boundnames=True, save_flows=True, pname="wel"
+    )
+    nodes = {b: int(np.ravel_multi_index(c, (nlay, spec.nrow, spec.ncol))) for b, c, _ in wells}
+    info = {"well_nodes": nodes, "weak_well_node": nodes.get("weak_well"), "wells": wells}
+    return run_model(sim, gwf, name, ws, dis_filename, spec, info)
+
+
+# ---------------------------------------------------------------- (c) DISV Voronoi and DISU
+
+
+def voronoi_gridprops(ws: Path, exe: Path, spec: AquiferSpec, max_area: float) -> dict:
+    """Build a Voronoi grid over the tutorial domain with Triangle; return DISV properties."""
+    from flopy.utils.triangle import Triangle
+    from flopy.utils.voronoi import VoronoiGrid
+
+    tri_ws = Path(ws) / "triangle"
+    tri_ws.mkdir(parents=True, exist_ok=True)
+    tri = Triangle(model_ws=str(tri_ws), exe_name=str(exe), maximum_area=max_area, angle=30.0)
+    tri.add_polygon([(0.0, 0.0), (spec.lx, 0.0), (spec.lx, spec.ly), (0.0, spec.ly)])
+    tri.build(verbose=False)
+    return VoronoiGrid(tri).get_disv_gridprops()
+
+
+def voronoi_stress_cells(gridprops: dict, spec: AquiferSpec) -> dict[str, list[int]]:
+    """Place the stresses on Voronoi cells by geometry: west edge, river line, well points."""
+    from flopy.utils.gridintersect import GridIntersect
+    from shapely.geometry import LineString, Point
+
+    mg = flopy.discretization.VertexGrid(
+        vertices=gridprops["vertices"], cell2d=gridprops["cell2d"],
+        top=np.full(gridprops["ncpl"], spec.top),
+        botm=np.full((1, gridprops["ncpl"]), spec.botm),
+    )
+    gi = GridIntersect(mg)
+    riv_x = (spec.riv_col + 0.5) * spec.delr
+    river = LineString([(riv_x, 0.0), (riv_x, spec.ly)])
+    riv = sorted(int(i) for i in gi.intersects(river, dataframe=False).cellids)
+    xv = np.array([v[1] for v in gridprops["vertices"]])
+    chd = [i for i, c in enumerate(gridprops["cell2d"]) if xv[np.array(c[4:], int)].min() < 1e-6]
+    wells = [int(gi.intersects(Point(spec.xy(rc)), dataframe=False).cellids[0])
+             for _, rc, _ in spec.wells]
+    return {"chd": chd, "riv": riv, "wells": wells, "cell_y": list(mg.ycellcenters)}
+
+
+def build_voronoi(
+    ws: Path,
+    exe: Path,
+    triangle: Path,
+    spec: AquiferSpec | None = None,
+    max_area: float = 2500.0,
+) -> ModelRun:
+    """Steady 1-layer DISV Voronoi version of the quickstart model (same physical problem).
+
+    max_area is Triangle's largest triangle area [m2]; the Voronoi cells are about that size.
+    The river conductance is shared so that its total matches the DIS model.
+    """
+    spec = AquiferSpec() if spec is None else spec
+    name = "voronoi"
+    ws = Path(ws)
+    gridprops = voronoi_gridprops(ws, triangle, spec, max_area)
+    cells = voronoi_stress_cells(gridprops, spec)
+    ncpl = gridprops["ncpl"]
+    sim, gwf = make_sim(name, ws, exe, STEADY)
+    dis_filename = f"{name}.disv"
+    flopy.mf6.ModflowGwfdisv(
+        gwf, nlay=1, top=spec.top, botm=spec.botm, length_units="meters",
+        filename=dis_filename, **gridprops,
+    )
+    add_npf_ic_oc(gwf, name, k=float(np.mean(k_layer(spec))), icelltype=1, strt=spec.strt)
+    chd = [((0, i), spec.chd_head) for i in cells["chd"]]
+    cond = spec.riv_cond * spec.nrow / len(cells["riv"])
+    north = spec.ly / 2.0
+    riv = [
+        ((0, i), spec.riv_stage, cond, spec.riv_rbot,
+         "river_north" if cells["cell_y"][i] > north else "river_south")
+        for i in cells["riv"]
+    ]
+    wel = [((0, i), rate, bname) for (bname, _, rate), i in zip(spec.wells, cells["wells"])]
+    rch = [((0, i), spec.rech) for i in range(ncpl)]
+    flopy.mf6.ModflowGwfchd(gwf, stress_period_data={0: chd}, save_flows=True, pname="chd")
+    flopy.mf6.ModflowGwfriv(
+        gwf, stress_period_data={0: riv}, boundnames=True, save_flows=True, pname="riv"
+    )
+    flopy.mf6.ModflowGwfwel(
+        gwf, stress_period_data={0: wel}, boundnames=True, save_flows=True, pname="wel"
+    )
+    flopy.mf6.ModflowGwfrch(gwf, stress_period_data={0: rch}, save_flows=True, pname="rch")
+    info = {
+        "ncpl": ncpl,
+        "well_nodes": {b: i for (b, _, _), i in zip(spec.wells, cells["wells"])},
+        "riv_cells": cells["riv"],
+        "chd_cells": cells["chd"],
+    }
+    return run_model(sim, gwf, name, ws, dis_filename, spec, info)
+
+
+def build_disu(
+    ws: Path, exe: Path, spec: AquiferSpec | None = None, with_vertices: bool = True
+) -> ModelRun:
+    """Steady DISU copy of the quickstart model (same cells and connections), vertices optional.
+
+    Without vertices the model has no geometry for maps or specific discharge; gwsource then
+    reads the cell area from the DISU input.
+    """
+    from flopy.utils.gridutil import get_disu_kwargs
+
+    spec = AquiferSpec() if spec is None else spec
+    name = "disu"
+    disu_kwargs = get_disu_kwargs(
+        1, spec.nrow, spec.ncol, np.full(spec.ncol, spec.delr), np.full(spec.nrow, spec.delc),
+        spec.top, np.array([spec.botm]), return_vertices=with_vertices,
+    )
+    if not with_vertices:
+        disu_kwargs.pop("nvert", None)
+    sim, gwf = make_sim(name, ws, exe, STEADY)
+    dis_filename = f"{name}.disu"
+    flopy.mf6.ModflowGwfdisu(gwf, length_units="meters", filename=dis_filename, **disu_kwargs)
+    add_npf_ic_oc(
+        gwf, name, k=k_layer(spec).ravel(), icelltype=1, strt=spec.strt,
+        save_specific_discharge=with_vertices,
+    )
+    add_stresses(gwf, spec, lambda rc: (spec.node(rc),))
+    info = {"well_nodes": _well_nodes(spec), "with_vertices": with_vertices}
+    return run_model(sim, gwf, name, ws, dis_filename, spec, info)
+
+
+# ---------------------------------------------------------------- (d) XT3D anisotropy
+
+
+def xt3d_k_field(
+    spec: AquiferSpec, seed: int = 20131, anisotropy: float = 0.05, sigma_lnk: float = 1.0
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Return heterogeneous k, k22 = anisotropy x k and a spatially varying angle1 [degrees]."""
+    rng = np.random.default_rng(seed)
+    shape = (spec.nrow, spec.ncol)
+    k = float(np.mean(k_layer(spec))) * np.exp(rng.normal(0.0, sigma_lnk, size=shape))
+    rows, cols = np.indices(shape)
+    angle1 = 45.0 * np.sin(2.0 * np.pi * cols / 12.0) * np.cos(2.0 * np.pi * rows / 10.0)
+    return k, anisotropy * k, angle1
+
+
+def build_xt3d(
+    ws: Path, exe: Path, spec: AquiferSpec | None = None, seed: int = 20131
+) -> ModelRun:
+    """Steady quickstart model with XT3D, heterogeneous anisotropic K and rotated axes (cycles)."""
+    spec = AquiferSpec() if spec is None else spec
+    name = "xt3d"
+    sim, gwf = make_sim(name, ws, exe, STEADY)
+    dis_filename = add_dis(gwf, spec, name)
+    k, k22, angle1 = xt3d_k_field(spec, seed)
+    add_npf_ic_oc(
+        gwf, name, k=k, icelltype=1, strt=spec.strt, k22=k22, angle1=angle1, xt3doptions=True
+    )
+    add_stresses(gwf, spec, _dis_cellid())
+    info = {"well_nodes": _well_nodes(spec), "k": k, "k22": k22, "angle1": angle1}
+    return run_model(sim, gwf, name, ws, dis_filename, spec, info)
+
+
+# ---------------------------------------------------------------- (e) transient seasons
+
+
+def seasonal_periods(
+    n_years: int, steps_per_season: int, season_length: float = 365.25 / 4.0
+) -> list[tuple[float, int, float]]:
+    """Return TDIS periods: a 1-day steady start, then four seasons per year."""
+    return [(1.0, 1, 1.0)] + [(season_length, steps_per_season, 1.0)] * (4 * n_years)
+
+
+def build_transient(
+    ws: Path,
+    exe: Path,
+    spec: AquiferSpec | None = None,
+    n_years: int = 3,
+    steps_per_season: int = 3,
+    sy: float = 0.2,
+    ss: float = 1.0e-5,
+    recharge: tuple[float, ...] = SEASON_RECHARGE,
+    pumping: tuple[float, ...] = SEASON_PUMPING,
+) -> ModelRun:
+    """Quickstart model with STO: a steady first period, then seasonal recharge and pumping.
+
+    recharge and pumping are the four seasonal multipliers (winter, spring, summer, autumn).
+    Every time step is saved. info holds the per-period multipliers and season names.
+    """
+    spec = AquiferSpec() if spec is None else spec
+    assert len(recharge) == len(pumping) == 4, "four seasonal multipliers each"
+    name = "transient"
+    periods = seasonal_periods(n_years, steps_per_season)
+    rch_factors = (1.0, *(recharge * n_years))
+    wel_factors = (1.0, *(pumping * n_years))
+    sim, gwf = make_sim(name, ws, exe, periods)
+    dis_filename = add_dis(gwf, spec, name)
+    add_npf_ic_oc(gwf, name, k=k_layer(spec), icelltype=1, strt=spec.strt)
+    flopy.mf6.ModflowGwfsto(
+        gwf, iconvert=1, ss=ss, sy=sy, steady_state={0: True}, transient={1: True},
+        save_flows=True,
+    )
+    add_stresses(gwf, spec, _dis_cellid(), pumping=wel_factors, recharge=rch_factors)
+    info = {
+        "well_nodes": _well_nodes(spec),
+        "periods": periods,
+        "season": ("steady", *(SEASONS * n_years)),
+        "recharge_factor": rch_factors,
+        "pumping_factor": wel_factors,
+        "sy": sy,
+    }
+    return run_model(sim, gwf, name, ws, dis_filename, spec, info)
+
+
+# ---------------------------------------------------------------- (f) stream, mover, MAW
+
+STREAM_DRAINS = (("drain_a", (8, 14), 6.2, 50.0), ("drain_b", (22, 14), 6.0, 50.0))
+DRAIN_TO_STREAM = ((0, "FACTOR", 0.8), (1, "FACTOR", 1.0))  # (drain index, type, value)
+
+
+def _sfr_reaches(spec: AquiferSpec, top_drop: float) -> tuple[list, list]:
+    """Return SFR packagedata and connectiondata for a stream down the river column (N to S)."""
+    rwid, rgrd, rbth, rhk, man, ustrf, ndv = 5.0, 1.0e-3, 1.0, 0.5, 0.03, 1.0, 0
+    packagedata, connections = [], []
+    for rno in range(spec.nrow):
+        rtp = spec.riv_rbot + 2.0 - top_drop * rno
+        ncon = int(rno > 0) + int(rno < spec.nrow - 1)
+        row = (rno, (0, rno, spec.riv_col), spec.delc, rwid, rgrd, rtp, rbth, rhk, man, ncon,
+               ustrf, ndv, riv_boundname(rno, spec))
+        packagedata.append(row)
+        conn = [rno]
+        if rno > 0:
+            conn.append(rno - 1)
+        if rno < spec.nrow - 1:
+            conn.append(-(rno + 1))
+        connections.append(conn)
+    return packagedata, connections
+
+
+def build_stream_mover(
+    ws: Path,
+    exe: Path,
+    spec: AquiferSpec | None = None,
+    stream_inflow: float = 300.0,
+    drains: tuple = STREAM_DRAINS,
+    top_drop: float = 0.08,
+) -> ModelRun:
+    """Steady model with an SFR stream for the river and drains feeding it through MVR.
+
+    The stream flows north to south down the river column; its bed falls by top_drop per reach,
+    so the upper reaches lose water to the aquifer and the lower ones gain. Two drains west of
+    the stream hand their outflow (80 % and 100 %) to the first reach through the water mover;
+    part of that water leaks back into the aquifer and reaches the well. drains: (boundname,
+    (row, col), elevation, conductance). SFR and MVR write their own budget files (needed to
+    trace with package nodes: gs.open_simulation(ws, package_nodes=("SFR",))).
+    """
+    spec = AquiferSpec() if spec is None else spec
+    name = "stream"
+    sim, gwf = make_sim(name, ws, exe, STEADY, {"complexity": "moderate", "outer_maximum": 500})
+    dis_filename = add_dis(gwf, spec, name)
+    add_npf_ic_oc(gwf, name, k=k_layer(spec), icelltype=1, strt=spec.strt)
+    add_stresses(gwf, spec, _dis_cellid(), river=False)
+    drn = [((0, *rc), elev, cond, bname) for bname, rc, elev, cond in drains]
+    flopy.mf6.ModflowGwfdrn(
+        gwf, stress_period_data={0: drn}, boundnames=True, mover=True, save_flows=True, pname="drn"
+    )
+    packagedata, connections = _sfr_reaches(spec, top_drop)
+    flopy.mf6.ModflowGwfsfr(
+        gwf, nreaches=spec.nrow, packagedata=packagedata, connectiondata=connections,
+        perioddata={0: [(0, "INFLOW", stream_inflow)]}, boundnames=True, mover=True,
+        save_flows=True, budget_filerecord=f"{name}.sfr.bud", pname="sfr",
+    )
+    movers = [
+        ("drn", i, "sfr", 0, kind, value) for i, kind, value in DRAIN_TO_STREAM[: len(drains)]
+    ]
+    flopy.mf6.ModflowGwfmvr(
+        gwf, maxmvr=len(movers), maxpackages=2, packages=[("drn",), ("sfr",)],
+        perioddata={0: movers}, budget_filerecord=f"{name}.mvr.bud",
+    )
+    info = {
+        "well_nodes": _well_nodes(spec),
+        "drain_nodes": {b: spec.node(rc) for b, rc, _, _ in drains},
+        "sfr_budget_file": Path(ws) / f"{name}.sfr.bud",
+        "mvr_budget_file": Path(ws) / f"{name}.mvr.bud",
+    }
+    return run_model(sim, gwf, name, ws, dis_filename, spec, info)
+
+
+def build_maw(
+    ws: Path,
+    exe: Path,
+    spec: AquiferSpec | None = None,
+    maw_cell: tuple[int, int] = (20, 18),
+    maw_rate: float = -10.0,
+    botm: tuple[float, ...] = LAYER_BOTM,
+    layer_k: tuple[float, ...] = LAYER_K,
+    k33_ratio: float = 0.01,
+) -> ModelRun:
+    """Steady 3-layer model with a multi-aquifer well (MAW) screened in every layer.
+
+    The layered model's supply well stays (layer 3); the MAW pumps little, so it takes water
+    from layer 1 (higher head) and loses part of it into the deeper layers: the well moves water
+    between layers. MAW writes its own budget file (package nodes: package_nodes=("MAW",)).
+    """
+    spec = AquiferSpec() if spec is None else spec
+    name = "maw"
+    nlay = len(botm)
+    sim, gwf = make_sim(name, ws, exe, STEADY)
+    dis_filename = add_dis(gwf, spec, name, botm=botm)
+    k = np.asarray(layer_k)[:, None, None] * k_layer(spec) / float(np.mean(k_layer(spec)))
+    add_npf_ic_oc(
+        gwf, name, k=k, icelltype=[1] + [0] * (nlay - 1), strt=spec.strt, k33=k33_ratio * k
+    )
+    add_stresses(gwf, spec, _dis_cellid(), wells=False, nlay=nlay)
+    supply = LAYERED_WELLS[0]
+    flopy.mf6.ModflowGwfwel(
+        gwf, stress_period_data={0: [(supply[1], supply[2], supply[0])]}, boundnames=True,
+        save_flows=True, pname="wel",
+    )
+    z = [spec.top, *botm]
+    connections = [(0, lay, (lay, *maw_cell), z[lay], z[lay + 1], 0.0, 0.0) for lay in range(nlay)]
+    flopy.mf6.ModflowGwfmaw(
+        gwf, nmawwells=1, packagedata=[(0, 0.15, z[-1], spec.strt, "THIEM", nlay, "maw_well")],
+        connectiondata=connections, perioddata={0: [(0, "RATE", maw_rate)]}, boundnames=True,
+        save_flows=True, budget_filerecord=f"{name}.maw.bud", pname="maw",
+    )
+    shape = (nlay, spec.nrow, spec.ncol)
+    info = {
+        "maw_cell": maw_cell,
+        "maw_rate": maw_rate,
+        "maw_nodes": [int(np.ravel_multi_index((lay, *maw_cell), shape)) for lay in range(nlay)],
+        "well_nodes": {supply[0]: int(np.ravel_multi_index(supply[1], shape))},
+        "maw_budget_file": Path(ws) / f"{name}.maw.bud",
+    }
+    return run_model(sim, gwf, name, ws, dis_filename, spec, info)
+
+
+# ---------------------------------------------------------------- (g) random K ensembles
+
+
+def random_k_field(
+    spec: AquiferSpec, seed: int, sigma_lnk: float = 0.8, correlation_cells: float = 4.0
+) -> np.ndarray:
+    """Return a (nrow, ncol) log-normal K field: smoothed Gaussian noise, geometric mean spec.k."""
+    from scipy.ndimage import gaussian_filter
+
+    rng = np.random.default_rng(seed)
+    z = gaussian_filter(rng.standard_normal((spec.nrow, spec.ncol)), correlation_cells,
+                        mode="reflect")
+    z = (z - z.mean()) / z.std()
+    return float(np.mean(k_layer(spec))) * np.exp(sigma_lnk * z)
+
+
+def build_realisation(
+    ws: Path,
+    exe: Path,
+    seed: int,
+    spec: AquiferSpec | None = None,
+    sigma_lnk: float = 0.8,
+    correlation_cells: float = 4.0,
+) -> ModelRun:
+    """Quickstart model with one seeded random K realisation (info['k'] holds the field)."""
+    spec = AquiferSpec() if spec is None else spec
+    k = random_k_field(spec, seed, sigma_lnk, correlation_cells)
+    run = build_quickstart(ws, exe, replace(spec, k=k))
+    run.info.update({"k": k, "seed": seed})
+    return run
+
+
+def build_ensemble(
+    root: Path,
+    exe: Path,
+    n_real: int,
+    seed: int = 1,
+    spec: AquiferSpec | None = None,
+    sigma_lnk: float = 0.8,
+    correlation_cells: float = 4.0,
+) -> list[Path]:
+    """Build and run n_real realisations in root/real_000, ...; return their folders."""
+    seeds = np.random.default_rng(seed).integers(0, 2**31 - 1, size=n_real)
+    folders = []
+    for i, real_seed in enumerate(seeds):
+        ws = Path(root) / f"real_{i:03d}"
+        build_realisation(ws, exe, int(real_seed), spec, sigma_lnk, correlation_cells)
+        folders.append(ws)
+    return folders
+
+
+# ---------------------------------------------------------------- multi-model and GWT
+
+
+def split_model(run: ModelRun, labels: np.ndarray, ws: Path, exe: Path):
+    """Split a model with FloPy's Mf6Splitter (exchange flows saved), run it; return the splitter.
+
+    labels holds one model number per cell of a layer ((nrow, ncol) for DIS, (ncpl,) for DISV).
+    """
+    from flopy.mf6.utils import Mf6Splitter
+
+    sim = flopy.mf6.MFSimulation.load(sim_ws=str(run.ws), verbosity_level=0)
+    splitter = Mf6Splitter(sim)
+    new = splitter.split_model(np.asarray(labels))
+    for exchange in new.exchange_files:
+        exchange.save_flows = True
+    new.set_sim_path(str(ws))
+    new.exe_name = str(exe)
+    new.write_simulation(silent=True)
+    success, buff = new.run_simulation(silent=True, report=True)
+    assert success, "split model run failed:\n" + "\n".join(buff[-20:])
+    return splitter
+
+
+def map_back(splitter, step: gs.FlowStep, values: np.ndarray) -> np.ndarray:
+    """Return per-node values of a split-model network step on the original model's nodes."""
+    per_model = {}
+    for block in step.blocks:
+        if block.kind != "model":
+            continue
+        number = int(block.model.rsplit("_", 1)[-1])
+        per_model[number] = np.asarray(values[block.nodes], float).reshape(block.grid_shape)
+    return np.asarray(splitter.reconstruct_array(per_model), float).ravel()
+
+
+GWT_IMS = {
+    "complexity": "simple",
+    "outer_dvclose": 1.0e-10,
+    "outer_maximum": 50,
+    "inner_maximum": 1000,
+    "inner_dvclose": 1.0e-12,
+    "rcloserecord": 1.0e-10,
+    "linear_acceleration": "bicgstab",
+}
+
+
+def _spc_files(gwf, gwt, tagged: tuple[str, ...]) -> list[tuple[str, str]]:
+    """Add one SPC file per tagged package (concentration 1 on every bound and period)."""
+    fileinput = []
+    for pname in tagged:
+        spd = gwf.get_package(pname).stress_period_data.get_data()
+        perioddata = {
+            kper: [(i, "CONCENTRATION", 1.0) for i in range(len(rows))]
+            for kper, rows in spd.items()
+        }
+        filename = f"{pname}.spc"
+        flopy.mf6.ModflowUtlspc(
+            gwt, maxbound=max(len(r) for r in spd.values()), perioddata=perioddata,
+            filename=filename, pname=f"spc_{pname}",
+        )
+        fileinput.append((pname, filename))
+    return fileinput
+
+
+def run_gwt_tracer(
+    run: ModelRun,
+    ws: Path,
+    exe: Path,
+    porosity: float,
+    tagged: tuple[str, ...] = ("rch",),
+    strt: float | np.ndarray = 0.0,
+) -> Path:
+    """Run an MF6 GWT unit-tracer model on a DIS model's saved flows; return the UCN file.
+
+    Upstream advection, no dispersion, FLOW_IMBALANCE_CORRECTION; every bound of the tagged
+    packages (pnames) has concentration 1, all other inflow 0; strt tags the initial water.
+    """
+    ws = Path(ws)
+    ws.mkdir(parents=True, exist_ok=True)
+    name = "gwt"
+    sim = flopy.mf6.MFSimulation(sim_name=name, sim_ws=str(ws), exe_name=str(exe))
+    tdis = run.sim.tdis
+    flopy.mf6.ModflowTdis(
+        sim, nper=tdis.nper.get_data(), time_units="days",
+        perioddata=[tuple(r) for r in tdis.perioddata.get_data()],
+    )
+    gwt = flopy.mf6.ModflowGwt(sim, modelname=name)
+    flopy.mf6.ModflowIms(sim, **GWT_IMS, filename=f"{name}.ims")
+    dis = run.gwf.dis
+    flopy.mf6.ModflowGwtdis(
+        gwt, nlay=dis.nlay.get_data(), nrow=dis.nrow.get_data(), ncol=dis.ncol.get_data(),
+        delr=dis.delr.get_data(), delc=dis.delc.get_data(), top=dis.top.get_data(),
+        botm=dis.botm.get_data(),
+    )
+    flopy.mf6.ModflowGwtic(gwt, strt=strt)
+    flopy.mf6.ModflowGwtmst(gwt, porosity=porosity)
+    flopy.mf6.ModflowGwtadv(gwt, scheme="UPSTREAM")
+    flopy.mf6.ModflowGwtfmi(
+        gwt, flow_imbalance_correction=True,
+        packagedata=[("GWFHEAD", str(run.head_file.resolve())),
+                     ("GWFBUDGET", str(run.budget_file.resolve()))],
+    )
+    flopy.mf6.ModflowGwtssm(gwt, fileinput=_spc_files(run.gwf, gwt, tagged) or None)
+    flopy.mf6.ModflowGwtoc(
+        gwt, concentration_filerecord=f"{name}.ucn", budget_filerecord=f"{name}.cbc",
+        saverecord=[("CONCENTRATION", "ALL"), ("BUDGET", "ALL")],
+    )
+    sim.write_simulation(silent=True)
+    success, buff = sim.run_simulation(silent=True, report=True)
+    assert success, "GWT run failed:\n" + "\n".join(buff[-20:])
+    return ws / f"{name}.ucn"
+
+
+# ---------------------------------------------------------------- tables
+
+
+def volume_from_table(result: gs.BackwardResult, group: str):
+    """Return a pandas table of the group's inflow by source package: volume [m3/d] and share."""
+    import pandas as pd
+
+    volumes = {k: float(v.sum()) for k, v in result.volume_from_by_term[group].items()}
+    frame = pd.DataFrame({"volume_from": volumes}).rename_axis("source")
+    frame = frame[frame["volume_from"] > 0.0].sort_values("volume_from", ascending=False)
+    frame["share"] = frame["volume_from"] / frame["volume_from"].sum()
+    return frame
+
+
+# ---------------------------------------------------------------- maps
+
+
+def model_grid(grb_file: Path):
+    """Return the FloPy modelgrid stored in a binary grid file."""
+    return flopy.mf6.utils.MfGrdFile(str(grb_file), verbose=False).modelgrid
+
+
+def node_layer(step: gs.FlowStep) -> np.ndarray:
+    """Return the 0-based layer of every node (DIS, DISV; 0 everywhere for DISU)."""
+    nlay = step.grid_shape[0] if step.grid_type in ("DIS", "DISV") else 1
+    return np.arange(step.n_cells) // (step.n_cells // nlay)
+
+
+def feature_cells(step: gs.FlowStep, package: str, layer: int | None = None) -> np.ndarray:
+    """Return the 0-based cells holding terms of a package (optionally in one layer only)."""
+    hits = [package.upper() in p.aliases for p in step.packages]
+    if not any(hits):
+        return np.array([], dtype=int)
+    cells = np.unique(step.term_cell[np.asarray(hits)[step.term_package]])
+    if layer is not None:
+        cells = cells[node_layer(step)[cells] == layer]
+    return cells
+
+
+def overlay_features(
+    ax, grb_file: Path, step: gs.FlowStep, packages: tuple[str, ...] = tuple(FEATURE_STYLES),
+    layer: int | None = None, legend: bool = True,
+) -> None:
+    """Mark the cells of wells, rivers, streams, drains and constant heads at their centres."""
+    centres = gs.export.cell_centres(grb_file)
+    for package in packages:
+        cells = feature_cells(step, package, layer)
+        if cells.size:
+            xy = centres[cells]
+            ax.scatter(xy[:, 0], xy[:, 1], zorder=5, **FEATURE_STYLES[package])
+    if legend:
+        ax.legend(loc="lower left", fontsize=8, framealpha=0.9)
+
+
+def plot_cells(
+    grb_file: Path,
+    step: gs.FlowStep,
+    values: np.ndarray,
+    ax=None,
+    layer: int = 0,
+    title: str = "",
+    label: str = "",
+    overlay: bool = True,
+    colorbar: bool = True,
+    **kwargs,
+):
+    """Map one value per cell (any grid type with vertices), with features and a colour bar."""
+    if ax is None:
+        _, ax = plt.subplots(figsize=(7.0, 5.0))
+    collection = gs.export.plot_map(grb_file, step, values, layer=layer, ax=ax, **kwargs)
+    if overlay:
+        overlay_features(ax, grb_file, step, layer=None)
+    if colorbar:
+        plt.colorbar(collection, ax=ax, shrink=0.85, label=label)
+    ax.set_aspect("equal")
+    ax.set_xlabel("x (m)")
+    ax.set_ylabel("y (m)")
+    ax.set_title(title)
+    return ax
+
+
+def add_contours(
+    ax,
+    grb_file: Path,
+    step: gs.FlowStep,
+    values: np.ndarray,
+    levels: tuple[float, ...],
+    layer: int = 0,
+    colors: str | tuple = "k",
+    linestyles=None,
+    fmt: str = "F = %.1f",
+):
+    """Draw labelled contours of a per-cell array (e.g. F = 0.1 and 0.5 capture thresholds)."""
+    pmv = flopy.plot.PlotMapView(modelgrid=model_grid(grb_file), layer=layer, ax=ax)
+    gridded = gs.export.to_grid(step, values)
+    contours = pmv.contour_array(
+        np.ma.masked_invalid(gridded), levels=list(levels), colors=colors, linestyles=linestyles,
+        linewidths=1.5,
+    )
+    ax.clabel(contours, fmt=fmt, fontsize=8)
+    return contours
