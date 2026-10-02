@@ -176,8 +176,13 @@ class FlowStep:
         return [b.name for b in self.blocks if b.kind == "model"]
 
     def block(self, label: str) -> NodeBlock:
-        """Return the block with the given label ('<model>' or '<model>/<package>') or name."""
-        found = [b for b in self.blocks if label.upper() in (b.label.upper(), b.name.upper())]
+        """Return the block with the given label ('<model>' or '<model>/<package>') or name.
+
+        An exact match wins over a case-insensitive one (a model 'maw' with a 'MAW' package).
+        """
+        found = [b for b in self.blocks if label in (b.label, b.name)]
+        if not found:
+            found = [b for b in self.blocks if label.upper() in (b.label.upper(), b.name.upper())]
         labels = [b.label for b in self.blocks]
         assert len(found) == 1, f"block {label!r} not found once in {labels}"
         return found[0]

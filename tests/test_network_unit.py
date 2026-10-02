@@ -106,3 +106,18 @@ def test_blocks_must_tile_the_nodes():
     bad = gs.NodeBlock("gwf", "model", "gwf", 0, 1, (1,), "graph")
     with pytest.raises(AssertionError, match="tile"):
         gs.FlowStep(**{**step.__dict__, "blocks": [bad]})
+
+
+def test_block_lookup_prefers_exact_match():
+    """A model named like a package type ('maw' and its 'MAW' block) is found by exact name."""
+    step = gwf_step()
+    blocks = [
+        gs.NodeBlock("maw", "model", "maw", 0, 1, (1,), "graph"),
+        gs.NodeBlock("MAW", "package", "maw", 1, 1, (1,), "package", "MAW"),
+    ]
+    net = gs.FlowStep(**{**step.__dict__, "blocks": blocks})
+    assert net.block("maw").kind == "model"
+    assert net.block("MAW").kind == "package"
+    assert net.block("maw/MAW").kind == "package"
+    with pytest.raises(AssertionError, match="not found once"):
+        net.block("Maw")

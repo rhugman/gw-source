@@ -2,7 +2,10 @@
 
 from pathlib import Path
 
-SKIP_DIRS = frozenset({"references", "bin", ".claude", ".git", "__pycache__", ".pytest_cache"})
+SKIP_DIRS = frozenset(
+    {"references", "bin", ".claude", ".git", "__pycache__", ".pytest_cache", ".ruff_cache",
+     ".ipynb_checkpoints", "_work", "output", "large_ws"}
+)  # source, vendored and generated (git-ignored) folders
 
 
 def forbidden_terms() -> tuple[str, ...]:
