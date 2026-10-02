@@ -9,28 +9,13 @@ from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import connected_components
 
 from models import (
-    ModelRun,
+    MODEL_KEYS,
     build_base_dis,
-    build_base_disu,
     build_layered_dis,
+    build_model,
     build_transient_dis,
-    build_voronoi_disv,
     build_xt3d_dis,
 )
-
-
-def _build(key: str, ws: Path, mf6_exe: Path, triangle_exe: Path) -> ModelRun:
-    """Build and run the test model named by key."""
-    builders = {
-        "m1_dis": lambda: build_base_dis(ws, mf6_exe),
-        "m2_dis3lay": lambda: build_layered_dis(ws, mf6_exe),
-        "m3_disv": lambda: build_voronoi_disv(ws, mf6_exe, triangle_exe),
-        "m4_disu_vert": lambda: build_base_disu(ws, mf6_exe, with_vertices=True),
-        "m4_disu_novert": lambda: build_base_disu(ws, mf6_exe, with_vertices=False),
-        "m5_xt3d": lambda: build_xt3d_dis(ws, mf6_exe),
-        "m6_transient": lambda: build_transient_dis(ws, mf6_exe),
-    }
-    return builders[key]()
 
 
 def _record_names(budget_file: Path) -> list[str]:
@@ -39,21 +24,10 @@ def _record_names(budget_file: Path) -> list[str]:
     return [name.strip() for name in cbc.get_unique_record_names(decode=True)]
 
 
-MODEL_KEYS = (
-    "m1_dis",
-    "m2_dis3lay",
-    "m3_disv",
-    "m4_disu_vert",
-    "m4_disu_novert",
-    "m5_xt3d",
-    "m6_transient",
-)
-
-
 @pytest.mark.parametrize("key", MODEL_KEYS)
 def test_model_runs_and_writes_outputs(key, tmp_path, mf6_exe, triangle_exe):
     """Each model terminates normally and writes .grb, budget (with FLOW-JA-FACE) and heads."""
-    run = _build(key, tmp_path, mf6_exe, triangle_exe)
+    run = build_model(key, tmp_path, mf6_exe, triangle_exe)
     assert run.name == key
     for path in (run.grb_file, run.budget_file, run.head_file):
         assert path.is_file(), f"missing output {path.name}"

@@ -220,6 +220,7 @@ Following house style: small functions with explicit arguments, type hints, `ass
 - Diagnostics: residuals, closure ($\sum$ volume from = inflow to the destination sink terms), and forward/backward duality.
 - Export to arrays and npz; quick-look plots with the FloPy PlotMapView.
 - **Done when:** the [FB13] numbers match exactly, the closure and duality tests pass to 1e-10 relative error on all steady test models, and the same model gives identical results to machine precision whether built as DIS or as DISU (same cells and connections, so same answer). DISV is compared with DIS on the same physical problem, within a tolerance tied to the cell size.
+- *Status (2026-10-02): done.* Notes from implementation: the `.grb` IA/JA, FLOW-JA-FACE and all budget terms are already in user node numbering for DIS, DISV and DISU (cells with IDOMAIN ≤ 0 keep empty rows), so no node map is needed; MF6 stores the cell residual in the FLOW-JA-FACE diagonal. The DISU `.grb` does carry vertices when they are given in the input. `backward`/`forward` live in an extra module, `trace.py`. Boundnames are not in the budget file; the selector supports them once a reader fills `FlowStep.term_boundname` (Phase 2).
 
 ### Phase 2: transient snapshots and usability
 - `transient`: loop over selected time steps, with streaming statistics.

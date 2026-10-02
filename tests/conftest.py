@@ -57,3 +57,18 @@ def mf6_exe() -> Path:
 def triangle_exe() -> Path:
     """Path of the triangle executable in <repo>/bin (used by the Voronoi test model)."""
     return find_exe("triangle")
+
+
+@pytest.fixture(scope="session")
+def model_run(tmp_path_factory, mf6_exe, triangle_exe):
+    """Return a function key -> ModelRun that builds and runs each test model once per session."""
+    from models import build_model
+
+    cache = {}
+
+    def get(key: str):
+        if key not in cache:
+            cache[key] = build_model(key, tmp_path_factory.mktemp(key), mf6_exe, triangle_exe)
+        return cache[key]
+
+    return get
