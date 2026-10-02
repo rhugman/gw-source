@@ -87,13 +87,17 @@ def _add_mover_packages(gwf, spec: BaseSpec) -> None:
     )
 
 
-def build_mover_dis(ws: Path, exe: Path, spec: BaseSpec | None = None) -> ModelRun:
-    """Model 7: DIS base problem with DRN -> MVR -> SFR, named bounds and a changing well list."""
+def build_mover_dis(
+    ws: Path, exe: Path, spec: BaseSpec | None = None, ims_kwargs: dict | None = None
+) -> ModelRun:
+    """Model 7: DIS base problem with DRN -> MVR -> SFR, named bounds and a changing well list.
+
+    ims_kwargs override the solver settings (a loose solve for the aquifer tolerance test).
+    """
     spec = BaseSpec() if spec is None else spec
     name = "m7_mover"
-    sim, gwf = make_sim(
-        name, ws, exe, MOVER_PERIODS, {"complexity": "moderate", "outer_maximum": 500}
-    )
+    ims = {"complexity": "moderate", "outer_maximum": 500, **(ims_kwargs or {})}
+    sim, gwf = make_sim(name, ws, exe, MOVER_PERIODS, ims)
     dis_filename = _add_base_dis(gwf, spec, name)
     add_npf_ic_oc(gwf, name, k=spec.k, icelltype=1, strt=spec.strt)
     chd = [(_dis_cellid(rc), head) for rc, head in base_chd_cells(spec)]

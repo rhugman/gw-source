@@ -6,7 +6,9 @@ nodes, up to the solver-level difference between the two sides of an exchange); 
 duality and boundary control hold to 1e-10 with residual terms; so do the travel-time and age
 identities, with package water volumes. The routing test (model 7) shows that, with SFR nodes,
 part of the well's water is attributed to the drained area upstream (DRN -> MVR -> SFR ->
-aquifer -> well), and that without package nodes it is not.
+aquifer -> well), and that without package nodes it is not. A loosely solved model 7 (the
+budgets' two sides of the stream-aquifer exchange differ by about 1e-3) fails the default
+aquifer check and reads with a relaxed aquifer_rtol, the difference then in the reach residuals.
 """
 
 import numpy as np
@@ -22,6 +24,7 @@ NETWORKS = {"m7_mover": ("SFR",), "m8_maw": ("MAW",), "m9_lak_uzf": ("LAK", "UZF
 POROSITY = 0.3
 RTOL = 1e-10
 DRAIN_CELLS = (6 * 30 + 12, 14 * 30 + 12)
+LOOSE_IMS = {"outer_dvclose": 1.0e-2, "inner_dvclose": 1.0e-3, "rcloserecord": 1.0e3}
 
 
 def network_steps(model_run, key: str) -> list[gs.FlowStep]:
@@ -223,3 +226,29 @@ def test_selector_errors(model_run):
     net = gs.read_network(model_run("m8_maw").ws, package_nodes=("MAW",))
     with pytest.raises(AssertionError, match="no record text"):
         gs.select(net, package="MAW", term="NOT-A-RECORD")
+
+
+@pytest.fixture(scope="module")
+def loose_mover_run(tmp_path_factory, mf6_exe):
+    """Model 7 solved with loose closure criteria (outer 1e-2, inner 1e-3)."""
+    from models import build_mover_dis
+
+    return build_mover_dis(tmp_path_factory.mktemp("m7_loose"), mf6_exe, ims_kwargs=LOOSE_IMS)
+
+
+def test_aquifer_rtol_admits_a_loose_solve(loose_mover_run):
+    """A loose solve fails the default aquifer check; with aquifer_rtol the mismatch is residual."""
+    ws = loose_mover_run.ws
+    message = r"disagree by up to .*\(aquifer_rtol=0\.0001\).*OUTER_DVCLOSE"
+    with pytest.raises(AssertionError, match=message):
+        gs.read_network(ws, package_nodes=("SFR",))
+    reader = gs.open_simulation(ws, package_nodes=("SFR",), aquifer_rtol=1e-2)
+    assert reader.aquifer_rtol == 1e-2
+    for ks in reader.steps:
+        step = reader.read(ks)
+        budget = cell_budget(step, flow_edges(step))
+        reaches = step.block("SFR").nodes
+        scale = np.maximum(budget.inflow, budget.outflow)[reaches].max()
+        # the budgets' difference stays in the reach residuals, which closure includes
+        assert np.abs(budget.residual - mf6_diagonal(step))[reaches].max() > 1e-4 * scale
+        check_identities(step)

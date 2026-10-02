@@ -12,9 +12,10 @@ Edges (each water transfer counted once):
   record (IMETH = 6) of the first model that lists it; the second model's record must be its
   exact negative (checked); both models' boundary terms are dropped. An exchange with a model
   that is not read stays a boundary term ('GWF-GWF').
-- cell <-> package node: the package budget's GWF record; the GWF budget's aquifer-side record
-  of that package (SFR, LAK, MAW, UZF-GWRCH) is dropped after checking, cell by cell, that it is
-  the negative of the package side;
+- cell <-> package node: the GWF budget's aquifer-side record of that package (SFR, LAK, MAW,
+  UZF-GWRCH), after checking, cell by cell, that the package budget's GWF record is its negative
+  to aquifer_rtol (default AQUIFER_RTOL) of the package's largest exchange; the record is then
+  an edge, no longer a term;
 - package node <-> package node: the package budget's FLOW-JA-FACE (SFR reach to reach, LAK
   outlet to lake, UZF cell to cell);
 - MVR (see below).
@@ -290,15 +291,18 @@ def aquifer_links(
     blocks: list[NodeBlock],
     model_offset: dict[str, int],
     n_nodes: int,
+    aquifer_rtol: float = AQUIFER_RTOL,
 ) -> dict[str, tuple[np.ndarray, np.ndarray]]:
     """Turn each package's cell exchange into edges and drop the aquifer-side GWF records.
 
     Returns {block label: (global package nodes, global cells)} of the aquifer connections.
 
     The edges take the GWF budget's values (so cell residuals stay MF6's); the package budget's
-    GWF record must have the same connections with opposite flows to AQUIFER_RTOL of the
+    GWF record must have the same connections with opposite flows to aquifer_rtol of the
     package's largest exchange (the two sides differ at solver tolerance: MF6 evaluates them
-    with the head and the package stage of the last iteration).
+    with the head and the package stage of different iterates). A larger tolerance lets a
+    loosely solved model through: the difference stays in the package node's residual (its
+    balance in the package budget), which closure and duality include as the residual term.
     """
     connections = {}
     for pkg, block in zip(pkg_steps, blocks):
@@ -315,8 +319,13 @@ def aquifer_links(
         label = f"{block.label} aquifer exchange"
         assert np.array_equal(keys, keys_p), f"{label}: connections differ between the budgets"
         scale = max(float(np.abs(sums).max(initial=0.0)), 1.0)
-        assert np.abs(sums + sums_p).max(initial=0.0) <= AQUIFER_RTOL * scale, (
-            f"{label}: the GWF and package budgets disagree"
+        rdiff = np.abs(sums + sums_p) / scale
+        assert rdiff.max(initial=0.0) <= aquifer_rtol, (
+            f"{label}: the GWF and package budgets disagree by up to {rdiff.max():.3g} of the "
+            f"largest exchange ({scale:.6g}) on {int((rdiff > aquifer_rtol).sum())} of "
+            f"{len(rdiff)} connections (aquifer_rtol={aquifer_rtol:g}). This is usually solver "
+            "tolerance (MF6 evaluates the two sides with different iterates): tighten the "
+            "solver (OUTER_DVCLOSE / INNER_DVCLOSE) or pass aquifer_rtol=<value>"
         )
         links.add_flows(cell, node, q)
         table.keep[indices] = False
@@ -453,8 +462,12 @@ def build_network(
     pkg_steps: list[PackageStep],
     transfers: dict[str, MoverTransfer],
     names_of=None,
+    aquifer_rtol: float = AQUIFER_RTOL,
 ) -> FlowStep:
-    """Return the global FlowStep of several model steps, package steps and MVR transfers."""
+    """Return the global FlowStep of several model steps, package steps and MVR transfers.
+
+    aquifer_rtol: tolerance of the GWF and package budgets' aquifer exchange (aquifer_links).
+    """
     assert steps, "no model steps"
     multi = len(steps) > 1
     m_blocks = model_blocks(steps)
@@ -470,7 +483,7 @@ def build_network(
     model_links(links, steps, m_blocks)
     exchanges = exchange_links(links, table, m_blocks)
     offsets = {b.model: b.offset for b in m_blocks}
-    connections = aquifer_links(links, table, pkg_steps, p_blocks, offsets, n)
+    connections = aquifer_links(links, table, pkg_steps, p_blocks, offsets, n, aquifer_rtol)
     internal_links(links, pkg_steps, p_blocks)
     routed = mover_links(links, table, transfers, p_blocks)
     package_diagonals(links, pkg_steps, p_blocks)
@@ -551,13 +564,15 @@ class NetworkReader:
     """Every model's grid and budget, and the package and MVR budgets, opened once.
 
     read() returns the global FlowStep of one time step; steps and step_length() follow the first
-    model, so trace_transient() works on a NetworkReader as on a StepReader.
+    model, so trace_transient() works on a NetworkReader as on a StepReader. aquifer_rtol is the
+    tolerance of the GWF and package budgets' aquifer exchange (see aquifer_links).
     """
 
     models: dict[str, StepReader]
     packages: list[tuple[PackageFiles, flopy.utils.CellBudgetFile]]
     movers: dict[str, flopy.utils.CellBudgetFile]
     notes: dict = field(default_factory=dict)
+    aquifer_rtol: float = AQUIFER_RTOL
 
     @property
     def steps(self) -> list[tuple[int, int]]:
@@ -584,7 +599,9 @@ class NetworkReader:
         steps = {m: r.read(kstpkper) for m, r in self.models.items()}
         pkg_steps = [read_package_step(cbc, f, kstpkper) for f, cbc in self.packages]
         transfers = {m: read_mover_step(cbc, kstpkper) for m, cbc in self.movers.items()}
-        step = build_network(steps, pkg_steps, transfers, self._boundnames(kstpkper[1]))
+        step = build_network(
+            steps, pkg_steps, transfers, self._boundnames(kstpkper[1]), self.aquifer_rtol
+        )
         step.notes.update(self.notes)
         return step
 
@@ -594,11 +611,16 @@ def open_simulation(
     models: list[str] | None = None,
     package_nodes: tuple[str, ...] = (),
     boundnames: bool = False,
+    aquifer_rtol: float = AQUIFER_RTOL,
 ) -> NetworkReader:
     """Open the models of a simulation (all GWF models by default) and their package budgets.
 
     package_nodes: package types that get nodes, e.g. ("SFR", "MAW"); each needs BUDGET FILEOUT,
     and MVR (if present in a model with package nodes) needs BUDGET FILEOUT too.
+    aquifer_rtol: largest allowed difference, relative to a package's largest aquifer exchange,
+    between the GWF budget's record of the package and the package budget's GWF record. The two
+    differ at solver tolerance; a loosely solved model may need more than the default, and the
+    difference then shows up in the package nodes' residuals.
     """
     ws = Path(ws)
     if models is None:
@@ -619,7 +641,7 @@ def open_simulation(
     missing = {t.upper() for t in package_nodes} - {f.package_type for f, _ in packages}
     assert not missing, f"no {sorted(missing)} package in models {names}"
     notes = {"models": names, "package_nodes": tuple(t.upper() for t in package_nodes)}
-    return NetworkReader(readers, packages, movers, notes)
+    return NetworkReader(readers, packages, movers, notes, aquifer_rtol)
 
 
 def read_network(
@@ -628,9 +650,13 @@ def read_network(
     models: list[str] | None = None,
     package_nodes: tuple[str, ...] = (),
     boundnames: bool = False,
+    aquifer_rtol: float = AQUIFER_RTOL,
 ) -> FlowStep:
-    """Read one time step of a simulation's models (and package nodes) into one global FlowStep."""
-    return open_simulation(ws, models, package_nodes, boundnames).read(kstpkper)
+    """Read one time step of a simulation's models (and package nodes) into one global FlowStep.
+
+    aquifer_rtol: tolerance of the aquifer exchange check (see open_simulation).
+    """
+    return open_simulation(ws, models, package_nodes, boundnames, aquifer_rtol).read(kstpkper)
 
 
 # ---------------------------------------------------------------- per-model views
