@@ -188,3 +188,12 @@ def test_selectors():
     assert set(gs.groups_by_package(step)) == {"WEL-1", "WEL-2", "RIV"}
     with pytest.raises(AssertionError, match="no package"):
         gs.select(step, package="DRN")
+
+
+def test_public_cell_budget_and_exports(model_run):
+    """cell_budget(step) computes the edges itself; PRT and budget helpers are top-level names."""
+    step = gs.read_step(model_run("m1_dis").ws)
+    budget = gs.cell_budget(step)
+    np.testing.assert_array_equal(budget.outflow, gs.cell_budget(step, gs.flow_edges(step)).outflow)
+    for name in ("PrtConfig", "track_particles", "CellBudget", "Edges"):
+        assert hasattr(gs, name)

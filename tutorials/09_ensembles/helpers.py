@@ -27,7 +27,7 @@ def realisation_summary(
     ws: Path, group: str, select_kwargs: dict, thresholds: tuple[float, ...]
 ) -> dict[str, float]:
     """Return one realisation's source shares of the group and its capture areas [km2]."""
-    step = gs.read_step(ws)
+    step = gs.read_step(ws, boundnames=True)
     res = gs.backward(step, {group: gs.select(step, **select_kwargs)})
     by_term = res.volume_from_by_term[group]
     total = sum(float(v.sum()) for v in by_term.values())

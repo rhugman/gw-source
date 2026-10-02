@@ -62,6 +62,8 @@ class EnsembleConfig:
     porosity: scalar or per-cell; enables travel-time outputs.
     max_workers: 1 (default) runs serially; > 1 uses that many processes.
     model: GWF model name if a simulation has several.
+    boundnames: load each realisation's boundnames from the package input (FloPy), so groups
+        can be selected by boundname; off by default because it reads the model input files.
     """
 
     mode: str = "backward"
@@ -76,6 +78,7 @@ class EnsembleConfig:
     fraction_threshold: float = DEFAULT_FRACTION_THRESHOLD
     max_workers: int = 1
     model: str | None = None
+    boundnames: bool = False
 
     def __post_init__(self) -> None:
         """Validate option values."""
@@ -164,7 +167,7 @@ def trace_realisation(
     ws: Path, groups: GroupSpec, config: EnsembleConfig, trace_config: TraceConfig
 ) -> Realisation:
     """Read, trace and reduce one realisation to the requested per-cell outputs."""
-    reader = open_model(ws, config.model)
+    reader = open_model(ws, config.model, boundnames=config.boundnames)
     step = reader.read(config.kstpkper)
     step_groups = resolve_groups(step, groups)
     trace = backward if config.mode == "backward" else forward

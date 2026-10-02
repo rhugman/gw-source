@@ -9,7 +9,7 @@ package, and the area of a time-of-travel zone.
 import numpy as np
 
 import gwsource as gs
-from gwsource.assemble import cell_budget, flow_edges
+from gwsource import cell_budget
 
 DAYS_PER_YEAR = 365.25
 
@@ -43,7 +43,7 @@ def eulerian_means(
 ) -> dict[str, dict[str, float]]:
     """Return flux-weighted Eulerian mean times (all sources and by package), both end points."""
     fraction = res.fraction_through[group]
-    sources = {"all sources": cell_budget(step, flow_edges(step)).source}
+    sources = {"all sources": cell_budget(step).source}
     sources.update(source_flow_by_package(step))
     to_exit = time_to_exit_cell(tt, group)
     return {

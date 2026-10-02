@@ -82,8 +82,10 @@ def term_totals(step: FlowStep, mask: np.ndarray | None = None) -> tuple[np.ndar
     return source, sink
 
 
-def cell_budget(step: FlowStep, edges: Edges) -> CellBudget:
-    """Return the per-cell gross budget of a FlowStep."""
+def cell_budget(step: FlowStep, edges: Edges | None = None) -> CellBudget:
+    """Return the per-cell gross budget of a FlowStep (edges from flow_edges(step) if not given)."""
+    if edges is None:
+        edges = flow_edges(step)
     n = step.n_cells
     source, sink = term_totals(step)
     return CellBudget(

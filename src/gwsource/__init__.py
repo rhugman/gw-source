@@ -11,6 +11,7 @@ from . import (
     transient,
     traveltime,
 )
+from .assemble import CellBudget, Edges, cell_budget, flow_edges
 from .config import TraceConfig
 from .ensemble import EnsembleConfig, EnsembleResult, list_realisations, run_ensemble
 from .flowstep import FlowStep, NodeBlock, Package, from_edges
@@ -33,6 +34,7 @@ from .network import (
     read_network,
     result_view,
 )
+from .prt import PrtConfig, track_particles
 from .selectors import (
     Selection,
     groups_by_boundname,
@@ -60,6 +62,8 @@ __version__ = "0.0.1"
 __all__ = [
     "BackwardResult",
     "BackwardTracking",
+    "CellBudget",
+    "Edges",
     "EnsembleConfig",
     "EnsembleResult",
     "FlowStep",
@@ -68,6 +72,7 @@ __all__ = [
     "NetworkReader",
     "NodeBlock",
     "Package",
+    "PrtConfig",
     "Selection",
     "StepReader",
     "TraceConfig",
@@ -77,10 +82,12 @@ __all__ = [
     "TravelTimeResult",
     "available_steps",
     "backward",
+    "cell_budget",
     "diagnostics",
     "ensemble",
     "export",
     "find_model_files",
+    "flow_edges",
     "forward",
     "from_edges",
     "global_nodes",
@@ -108,6 +115,7 @@ __all__ = [
     "trace_transient",
     "track_backward",
     "track_forward",
+    "track_particles",
     "tracking",
     "tracking_duality",
     "transient",

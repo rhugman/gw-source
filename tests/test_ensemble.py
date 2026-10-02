@@ -175,3 +175,17 @@ def test_travel_time_outputs_need_porosity():
     """Asking for travel-time outputs without porosity is refused at configuration."""
     with pytest.raises(AssertionError, match="porosity"):
         gs.EnsembleConfig(outputs=("mean_time",)).resolved_outputs()
+
+
+def test_groups_by_boundname(model_run):
+    """With boundnames=True, a realisation's groups can be selected by boundname."""
+    ws = model_run("m7_mover").ws
+    groups = {"east": {"boundnames": ["well_east"]}}
+    config = gs.EnsembleConfig(outputs=("fraction_through",), boundnames=True)
+    result = gs.run_ensemble([ws, ws], groups, config)
+    step = gs.read_step(ws, boundnames=True)
+    direct = gs.backward(step, {"east": gs.select(step, boundnames=["well_east"])})
+    np.testing.assert_allclose(
+        result.stats["mean"]["fraction_through"]["east"], direct.fraction_through["east"], atol=1e-12
+    )
+    assert result.group_inflow["east"][0] == pytest.approx(800.0, rel=1e-6)

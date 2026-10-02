@@ -2,7 +2,7 @@
 
 The shared builders and map helpers live in tutorials/herebedragons.py; this module adds a
 box-and-arrow route diagram, a layered cross-section and a few small tables built from the
-global node graph (gwsource.assemble.flow_edges).
+global node graph (gwsource.flow_edges).
 """
 
 import matplotlib.pyplot as plt
@@ -12,7 +12,7 @@ from matplotlib.collections import LineCollection
 from matplotlib.patches import FancyBboxPatch
 
 import gwsource as gs
-from gwsource.assemble import flow_edges
+from gwsource import flow_edges
 
 
 def edges_between(step: gs.FlowStep, sources, targets) -> pd.DataFrame:
