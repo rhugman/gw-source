@@ -30,7 +30,7 @@ every recirculation loop non-singular).
 Volumes. Both modes satisfy V^old - V^new = dt S within a step, which makes (1) consistent: with
 a = 1, c = 1 everywhere solves it whenever every source and the initial water are tagged
 (row sum of A^n = V^old + dt Src exactly). They differ in how one step's volumes join the next:
-- "gwt" (default): V^new = porosity x area x saturated thickness at the end of the step (package
+- "gwt": V^new = porosity x area x saturated thickness at the end of the step (package
   nodes: the VOLUME of their STORAGE record) and V^old = V^new + dt S, exactly as MF6 GWT's MST
   (mst_fc_sto) and the advanced transport packages (apt_get_volumes) compute them. The volume
   at the start of step n+1 is then not the volume at the end of step n:
@@ -42,7 +42,7 @@ a = 1, c = 1 everywhere solves it whenever every source and the initial water ar
   period) takes the previous step's V^new as V^old (0 at the first step), so its volume is
   carried as in flow mode but its within-step water balance is not closed (reported in
   water_balance_error). This mode reproduces GWT unit-concentration results.
-- "flow": the volume is carried by the storage flows themselves. The start volume is
+- "flow" (default): the volume is carried by the storage flows themselves. The start volume is
   porosity x saturated volume (package volume) at the end of step 1 plus dt S, then
   V^old,n+1 = V^new,n and V^new = V^old - dt S. The water balance of every node is exact by
   construction and tagged water is conserved across step boundaries. Porosity then only sets
@@ -150,8 +150,9 @@ class TrackingConfig:
     """Options of transient tracking (track_forward, track_backward).
 
     porosity: scalar, per-node array or {model: per-cell array} (required).
-    volume_mode: "gwt" (volumes from porosity x saturated volume, as MF6 GWT) or "flow" (volumes
-        carried by the storage flows; exact water balance); see the module docstring.
+    volume_mode: "flow" (default: volumes carried by the storage flows; exact water balance) or
+        "gwt" (volumes from porosity x saturated volume, as MF6 GWT; use it to compare with GWT);
+        see the module docstring.
     flow_error_correction: the node residual leaves or enters at the node's fraction (as GWT's
         FLOW_IMBALANCE_CORRECTION); makes the closure exact.
     initial_water: {name: "all" or a node mask / node indices}: forward columns of tagged
@@ -163,7 +164,7 @@ class TrackingConfig:
     """
 
     porosity: float | np.ndarray | dict
-    volume_mode: str = "gwt"
+    volume_mode: str = "flow"
     flow_error_correction: bool = True
     initial_water: dict | None = None
     solver: str = "auto"

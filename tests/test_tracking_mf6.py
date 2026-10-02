@@ -45,6 +45,7 @@ def test_forward_matches_gwt(case, model_run, tmp_path, mf6_exe):
     sources = {"tagged": {"package": [p.upper() for p in tagged]}} if tagged else None
     config = tr.TrackingConfig(
         porosity=POROSITY,
+        volume_mode="gwt",
         flow_error_correction=correction,
         initial_water={"initial": "all"} if strt else None,
     )
@@ -72,7 +73,8 @@ def test_package_network_matches_gwt_sft_mvt(tag, model_run, tmp_path, mf6_exe):
     ucn = build_gwt_fmi(run, tmp_path, mf6_exe, POROSITY, tagged, sft_inflow=inflow)
     reader = gs.open_simulation(run.ws, package_nodes=("SFR",))
     source = {"package": "RCH"} if tag == "rch" else {"package": "SFR", "term": "EXT-INFLOW"}
-    result = tr.track_forward(reader, {"t": source}, tr.TrackingConfig(porosity=POROSITY))
+    config = tr.TrackingConfig(porosity=POROSITY, volume_mode="gwt")
+    result = tr.track_forward(reader, {"t": source}, config)
     step = reader.read(reader.steps[-1])
     cells, reaches = step.blocks[0], step.block("SFR")
     active = step.active[cells.nodes]

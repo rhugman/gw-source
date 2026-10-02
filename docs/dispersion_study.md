@@ -115,6 +115,8 @@ Here face routing removes 57 % of the band width that full mixing adds over PRT 
 
 ## 3. Results: transient tracking, time steps vs grid
 
+The transient runs use `volume_mode="gwt"` (the package default when the study was run; the default is now `"flow"`). Sub-stepping addresses the time discretisation, which is separate from the choice of volume mode.
+
 Transient tracking (Phase 4B) is implicit and upstream in time. A time step much longer than the residence time of a cell lets tagged water cross many cells within one step, which adds dispersion in time on top of the spatial mixing.
 
 To separate the two effects, problem B's steady flows were held for 30 flow steps of 2000 d. All water entering after t = 0 was tagged (forward tracking from RCH, RIV and CHD). The tracked share of new water leaving through the well, averaged over each step, was compared with the step-averaged flux-weighted PRT arrival-time distribution on the same grid. The comparison used 1, 4, 16 and 64 transport sub-steps per flow step.

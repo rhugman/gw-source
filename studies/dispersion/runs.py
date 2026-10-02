@@ -265,7 +265,7 @@ def run_transient(config: StudyConfig, arrivals: dict) -> pd.DataFrame:
                      for t, v in zip(ends, prt)]
         for n_sub in config.substeps:
             t0 = time.perf_counter()
-            cfg = tr.TrackingConfig(porosity=config.porosity, substeps=n_sub)
+            cfg = tr.TrackingConfig(porosity=config.porosity, substeps=n_sub, volume_mode="gwt")
             fwd = tr.track_forward(
                 reader, {"new": {"package": ["RCH", "RIV", "CHD"]}}, cfg,
                 sinks={"wel": {"package": "WEL"}},

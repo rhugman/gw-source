@@ -10,7 +10,7 @@ readme = "README.md"
 license = "BSD-3-Clause"
 license-files = ["LICENSE"]
 requires-python = ">=3.11"
-authors = [{ name = "gw-source contributors" }]
+authors = [{ name = "Rui Hugman" }]
 dependencies = [
     "numpy",
     "scipy",
