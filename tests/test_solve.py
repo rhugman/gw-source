@@ -73,14 +73,17 @@ def test_cyclic_graph_has_no_topological_order():
     assert _kahn_order(3, before, after) is None
 
 
-def test_auto_solver_switches_to_lu_on_cycles():
-    """The auto solver uses LU when the matrix dependency graph has a cycle."""
+def test_auto_solver_switches_to_block_lu_on_cycles():
+    """The auto solver uses the block-triangular LU when the dependency graph has a cycle."""
     import scipy.sparse as sp
 
     matrix = sp.csr_matrix(np.array([[1.0, -0.5, 0.0], [0.0, 1.0, -0.5], [-0.5, 0.0, 1.0]]))
     x, used = solve_system(matrix, np.ones((3, 2)), "auto")
-    assert used == "lu"
+    assert used == "block"
     np.testing.assert_allclose(matrix @ x, 1.0)
+    x_lu, used = solve_system(matrix, np.ones((3, 2)), "lu")
+    assert used == "lu"
+    np.testing.assert_allclose(x_lu, x, rtol=1e-14)
 
 
 def test_remove_cycle_edges_breaks_every_cycle():
@@ -95,3 +98,35 @@ def test_remove_cycle_edges_breaks_every_cycle():
     assert find_cycles(6, edges.subset(keep)) == []
     cycles = find_cycles(6, edges)
     assert sorted(c.internal_flow for c in cycles) == [6.0, 15.0]
+
+
+@pytest.mark.parametrize("cycles", [0, 40])
+def test_solvers_agree_on_synthetic_3d_grid(cycles):
+    """Topological (acyclic only), block and COLAMD LU agree on a synthetic 3D grid."""
+    from synthetic import inject_cycles, sink_groups, smooth_step
+
+    shape = (6, 20, 20)
+    step = inject_cycles(shape, cycles, 3.0) if cycles else smooth_step(shape)
+    groups = sink_groups(step, 3)
+    solvers = ("topological", "block", "lu") if not cycles else ("block", "lu")
+    results = {s: gs.backward(step, groups, gs.TraceConfig(solver=s)) for s in solvers}
+    assert results["block"].solver_used == ["block"]
+    assert bool(results["block"].cycles) == bool(cycles)
+    for solver in solvers:
+        for g in groups:
+            np.testing.assert_allclose(
+                results[solver].fraction_through[g], results["lu"].fraction_through[g], atol=1e-12
+            )
+
+
+@pytest.mark.slow
+def test_block_matches_topological_at_one_million_cells():
+    """At 1M cells the block LU equals the topological substitution on an acyclic graph."""
+    from synthetic import sink_groups, smooth_step
+
+    step = smooth_step((100, 100, 100))
+    groups = sink_groups(step, 2)
+    topo = gs.backward(step, groups, gs.TraceConfig(solver="topological"))
+    block = gs.backward(step, groups, gs.TraceConfig(solver="block"))
+    for g in groups:
+        np.testing.assert_allclose(block.fraction_through[g], topo.fraction_through[g], atol=1e-12)

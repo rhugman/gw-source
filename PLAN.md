@@ -228,6 +228,12 @@ Following house style: small functions with explicit arguments, type hints, `ass
 - netCDF and GeoPackage export.
 - A cycle report (location, magnitude), and timing on a model of about 1M cells.
 - **Done when:** the transient test model runs, and the statistics match a brute-force calculation that stores every time step.
+- *Status (2026-10-02): done.* Notes from implementation:
+  - **MVR:** a provider with MOVER writes two disjoint aquifer-side records per bound, e.g. DRN (the part leaving the model) and DRN-TO-MVR (the part handed to the mover); together they equal the drain's C(h − elev). Both are kept as sink terms; the cell budget closes only with both (test model 7, DRN → MVR → SFR). MF6 computes the moved share at the last outer iteration, so its own residual and the records can differ at solver tolerance (~1e-9 relative). The second record of a package is named `<pkg>:<text>` (e.g. `DRN:DRN-TO-MVR`); selecting `DRN` selects both.
+  - **Solver:** new `block` solver (SCC block-triangular order + SuperLU with natural ordering, no pivoting) is the `auto` choice for cyclic graphs; COLAMD `lu` is kept as a reference. Closed recirculation loops (SCC with no exit) are found before the solve, set to 0 and reported (`result.closed_loops`).
+  - **Transient:** `trace_transient` re-selects groups on every step (dict of `select()` arguments or a function); mean and probability-in-range are time-weighted by DELT by default (`weighting="equal"` optional). `StepReader`/`open_model` read the grid once.
+  - **Benchmarks** (`benchmarks/`, macOS, 16 cores, 64 GB; scipy 1.18): synthetic 3D grid, 4 groups, 1M cells: assembly 0.24 s, components 0.10 s, closed-loop check 0.10 s, topological solve 0.55 s, metrics 0.11 s; with 7,000 injected cycles (largest 649 cells) the block solve takes 0.42 s. COLAMD LU takes 2.8 s at 50k and 6.7 s at 100k cells and is not usable beyond that. MF6 model of 250k cells: ~0.01 s I/O, ~0.36 s per step for 6 groups, 1.2–1.3 s for 40 groups; opening the files 1.9 s once. **D5:** numba is not needed; the scipy topological path is compiled and is not the bottleneck.
+  - **Memory limit:** each group costs about 90 MB per million cells (its outputs plus a solve column), so one group per term (thousands of wells) does not fit at 1M cells; aggregate with `groups_by_package`, `groups_by_boundname` or `groups_by_zone`, or trace groups in batches.
 
 ### Phase 3: travel time and ensembles
 - Eulerian mean travel time (§2.6).

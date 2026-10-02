@@ -23,7 +23,13 @@ from .metrics import (
     per_cell_by_package,
 )
 from .selectors import Selection
-from .solve import find_cycles, remove_cycle_edges, solve_system
+from .solve import (
+    dependency_graph,
+    find_cycles,
+    isolate_closed_loops,
+    remove_cycle_edges,
+    solve_system,
+)
 
 
 def _check_groups(step: FlowStep, groups: dict[str, Selection]) -> None:
@@ -65,19 +71,29 @@ def forward(
     return result
 
 
+def _solve(matrix, rhs: np.ndarray, config: TraceConfig) -> tuple[np.ndarray, str, list]:
+    """Isolate closed recirculation loops, then solve; return (X, solver used, loops)."""
+    graph = None if config.solver == "lu" else dependency_graph(matrix)
+    matrix, rhs, loops = isolate_closed_loops(matrix, rhs, config.closed_loop_tol, graph)
+    graph = None if loops else graph  # isolating loops changes the components
+    fraction, solver = solve_system(matrix, rhs, config.solver, graph)
+    return fraction, solver, loops
+
+
 def _gross_backward(
     step: FlowStep, groups: dict, edges: Edges, config: TraceConfig
 ) -> BackwardResult:
     """Gross-accounting backward trace: one solve with a column per group."""
     budget = cell_budget(step, edges)
     matrix, rhs = gross_backward_system(step, edges, budget, groups)
-    fraction, solver = solve_system(matrix, rhs, config.solver)
+    fraction, solver, loops = _solve(matrix, rhs, config)
     destination = group_term_flows(step, groups, sign=-1).sum(axis=0)
     by_package = per_cell_by_package(step, sign=+1)
     result = backward_metrics(
         step, groups, fraction, budget.outflow, budget.source, by_package, destination, "gross"
     )
     result.solver_used = [solver]
+    result.closed_loops = loops
     return result
 
 
@@ -87,13 +103,14 @@ def _gross_forward(
     """Gross-accounting forward trace: one solve with a column per group."""
     budget = cell_budget(step, edges)
     matrix, rhs = gross_forward_system(step, edges, budget, groups)
-    fraction, solver = solve_system(matrix, rhs, config.solver)
+    fraction, solver, loops = _solve(matrix, rhs, config)
     source = group_term_flows(step, groups, sign=+1).sum(axis=0)
     by_package = per_cell_by_package(step, sign=-1)
     result = forward_metrics(
         step, groups, fraction, budget.inflow, budget.sink, by_package, source, "gross"
     )
     result.solver_used = [solver]
+    result.closed_loops = loops
     return result
 
 
@@ -117,32 +134,45 @@ def _net_edges(
 
 def _net_solve(
     step: FlowStep, groups: dict, edges: Edges, config: TraceConfig, backward: bool
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[str]]:
-    """Solve net mode group by group; return (fractions, s, T, solvers), s and T per group."""
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[str], list[np.ndarray]]:
+    """Solve net mode group by group; return (fractions, s, T, solvers, closed loops)."""
     n, n_groups = step.n_cells, len(groups)
     fraction, s_all, t_all = (np.zeros((n, n_groups)) for _ in range(3))
-    solvers = []
+    solvers, closed = [], np.zeros(n, dtype=bool)
     for g, sel in enumerate(groups.values()):
         used = _net_edges(n, edges, sel.cells, backward, config.remove_cycles)
         s, throughflow = net_balance(n, used)
         matrix, rhs = net_system(n, used, sel.cells, throughflow, backward)
-        fraction[:, g], solver = solve_system(matrix, rhs, config.solver)
+        fraction[:, g], solver, loops = _solve(matrix, rhs, config)
         s_all[:, g], t_all[:, g] = s, throughflow
         solvers.append(solver)
-    return fraction, s_all, t_all, solvers
+        for cells in loops:
+            closed[cells] = True
+    return fraction, s_all, t_all, solvers, _loops_from_mask(n, edges, closed)
+
+
+def _loops_from_mask(n: int, edges: Edges, closed: np.ndarray) -> list[np.ndarray]:
+    """Split a mask of closed-loop cells into its strongly connected sets."""
+    if not closed.any():
+        return []
+    cycles = find_cycles(n, edges)
+    return [c.cells for c in cycles if closed[c.cells].all()]
 
 
 def _net_backward(
     step: FlowStep, groups: dict, edges: Edges, config: TraceConfig
 ) -> BackwardResult:
     """Net-mode backward trace (reference method): destination cells absorbing with f = 1."""
-    fraction, s, throughflow, solvers = _net_solve(step, groups, edges, config, backward=True)
+    fraction, s, throughflow, solvers, loops = _net_solve(
+        step, groups, edges, config, backward=True
+    )
     cells = np.column_stack([sel.cells for sel in groups.values()])
     destination = (throughflow * cells).sum(axis=0)
     result = backward_metrics(
         step, groups, fraction, throughflow, np.maximum(s, 0.0), {}, destination, "net"
     )
     result.solver_used = solvers
+    result.closed_loops = loops
     return result
 
 
@@ -150,11 +180,14 @@ def _net_forward(
     step: FlowStep, groups: dict, edges: Edges, config: TraceConfig
 ) -> ForwardResult:
     """Net-mode forward trace: source cells fixed at g = 1 on the reversed graph."""
-    fraction, s, throughflow, solvers = _net_solve(step, groups, edges, config, backward=False)
+    fraction, s, throughflow, solvers, loops = _net_solve(
+        step, groups, edges, config, backward=False
+    )
     cells = np.column_stack([sel.cells for sel in groups.values()])
     source = (throughflow * cells).sum(axis=0)
     result = forward_metrics(
         step, groups, fraction, throughflow, np.maximum(-s, 0.0), {}, source, "net"
     )
     result.solver_used = solvers
+    result.closed_loops = loops
     return result

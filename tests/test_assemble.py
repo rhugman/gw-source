@@ -88,11 +88,11 @@ def cycle_step() -> gs.FlowStep:
     return graph(3, edges, terms)
 
 
-def test_cycle_lu_exact():
+def test_cycle_block_lu_exact():
     """Under full mixing the cycle has the exact solution F = (0.7, 0.7, 7/8) for the cell-2 sink."""
     step = cycle_step()
     res = gs.backward(step, {"w2": gs.select(step, package="WEL", bounds=[2])})
-    assert res.solver_used == ["lu"]
+    assert res.solver_used == ["block"]
     np.testing.assert_allclose(res.fraction_through["w2"], [0.7, 0.7, 7.0 / 8.0], rtol=1e-14)
     assert [c.n_cells for c in res.cycles] == [2]
     assert res.cycles[0].internal_flow == 17.0 and res.cycles[0].min_edge_flow == 5.0
@@ -111,7 +111,7 @@ def test_cycle_net_mode_removes_min_edge():
     step = graph(4, edges, [(0, 10.0, 0), (3, -7.0, 1)])
     groups = {"c3": gs.select_cells(step, [3])}
     exact = gs.backward(step, groups, gs.TraceConfig(accounting="net"))
-    assert exact.solver_used == ["lu"]
+    assert exact.solver_used == ["block"]
     np.testing.assert_allclose(exact.fraction_through["c3"], [0.7, 0.7, 7.0 / 8.0, 1.0], rtol=1e-14)
     config = gs.TraceConfig(accounting="net", solver="topological", remove_cycles=True)
     cut = gs.backward(step, groups, config)

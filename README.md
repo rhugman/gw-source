@@ -2,7 +2,7 @@
 
 `gwsource` post-processes MODFLOW 6 groundwater-flow output to work out, for every cell, what fraction and volume of its water reaches a chosen destination (capture) or came from a chosen source (fate). It builds on the cell-mixing flow-tracing method of Foley & Black (2013) and Black & Foley (2013), solved as a sparse linear system so that cycles, weak sinks and many destinations are handled exactly.
 
-Status: early development (Phase 0 scaffolding). See [`PLAN.md`](PLAN.md) for the design.
+Status: early development (Phases 0–2: steady and transient snapshot tracing, netCDF/GeoPackage export). See [`PLAN.md`](PLAN.md) for the design.
 
 ## Setup
 
@@ -27,7 +27,11 @@ Rerun it whenever you want to pick up new FloPy or MODFLOW 6 changes.
 mamba run -n gw-source pytest
 ```
 
-The pytest header records the FloPy commit and MF6 version used. The tests build and run small MF6 models in temporary folders, so `bin/mf6` must exist.
+The pytest header records the FloPy commit and MF6 version used. The tests build and run small MF6 models in temporary folders, so `bin/mf6` must exist. Large checks are marked `slow` and skipped by default (`pytest -m slow` runs them).
+
+## Benchmarks
+
+`python benchmarks/bench_solver.py` times the solver on synthetic grids up to 1M cells; `python benchmarks/bench_mf6.py` builds a 250,000-cell MF6 model (in `benchmarks/large_ws`) and times I/O, assembly and solve per time step.
 
 ## Licence
 

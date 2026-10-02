@@ -51,6 +51,7 @@ class BackwardResult:
     destination_inflow: dict[str, float]
     solver_used: list[str] = field(default_factory=list)
     cycles: list[Cycle] = field(default_factory=list)
+    closed_loops: list[np.ndarray] = field(default_factory=list)
 
     @property
     def groups(self) -> list[str]:
@@ -71,6 +72,7 @@ class ForwardResult:
     source_inflow: dict[str, float]
     solver_used: list[str] = field(default_factory=list)
     cycles: list[Cycle] = field(default_factory=list)
+    closed_loops: list[np.ndarray] = field(default_factory=list)
 
     @property
     def groups(self) -> list[str]:

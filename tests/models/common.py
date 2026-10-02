@@ -85,20 +85,23 @@ def base_rch_cells(spec: BaseSpec, rech: float) -> list[tuple[tuple[int, int], f
     ]
 
 
-def make_sim(name: str, ws: Path, exe: Path, perioddata: tuple | list):
-    """Create the simulation, TDIS, IMS and an empty GWF model."""
+def make_sim(
+    name: str, ws: Path, exe: Path, perioddata: tuple | list, ims_kwargs: dict | None = None
+):
+    """Create the simulation, TDIS, IMS (defaults overridable) and an empty GWF model."""
     sim = flopy.mf6.MFSimulation(sim_name=name, sim_ws=str(ws), exe_name=str(exe))
     flopy.mf6.ModflowTdis(sim, nper=len(perioddata), perioddata=list(perioddata), time_units="days")
-    flopy.mf6.ModflowIms(
-        sim,
-        complexity="simple",
-        outer_dvclose=1.0e-9,
-        outer_maximum=200,
-        inner_maximum=300,
-        inner_dvclose=1.0e-10,
-        rcloserecord=1.0e-8,
-        linear_acceleration="bicgstab",
-    )
+    ims = {
+        "complexity": "simple",
+        "outer_dvclose": 1.0e-9,
+        "outer_maximum": 200,
+        "inner_maximum": 300,
+        "inner_dvclose": 1.0e-10,
+        "rcloserecord": 1.0e-8,
+        "linear_acceleration": "bicgstab",
+    }
+    ims.update(ims_kwargs or {})
+    flopy.mf6.ModflowIms(sim, **ims)
     gwf = flopy.mf6.ModflowGwf(sim, modelname=name, save_flows=True)
     return sim, gwf
 

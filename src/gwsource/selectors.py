@@ -9,7 +9,13 @@ A Selection carries two masks:
 
 Selecting by cells therefore means "all external terms located in those cells" in gross mode,
 and "those cells" in net mode. Selecting by package, bound or boundname marks the cells that
-host the selected entries.
+host the selected entries. A zone array selects the cells where zone == value (any grid type:
+the array may have the grid shape or one value per cell); combine it with package= to pick,
+for example, the recharge falling on one zone as a forward source.
+
+Boundnames need a FlowStep read with boundnames=True (they are not in the budget file). A
+boundname that is absent in a step (e.g. a well listed only in some stress periods) selects
+nothing in that step rather than failing, so groups can be re-selected on every time step.
 
 Groups are plain dicts {group name: Selection}.
 """
@@ -31,9 +37,13 @@ class Selection:
 
 
 def _package_mask(step: FlowStep, package: str | Iterable[str]) -> np.ndarray:
-    """Return entries whose package name or budget text matches (case-insensitive)."""
+    """Return entries whose package name, budget text or parent package matches (any case).
+
+    A package's *-TO-MVR record matches the package too: selecting 'DRN' selects all water
+    leaving the aquifer through the drains, whether or not the mover then passes it on.
+    """
     wanted = {package.upper()} if isinstance(package, str) else {p.upper() for p in package}
-    hits = [p.name.upper() in wanted or p.text.upper() in wanted for p in step.packages]
+    hits = [bool(p.aliases & wanted) for p in step.packages]
     assert any(hits), f"no package matches {sorted(wanted)}; have {step.package_names}"
     return np.asarray(hits, dtype=bool)[step.term_package]
 
@@ -105,3 +115,31 @@ def groups_by_term(step: FlowStep, term_mask: np.ndarray | None = None) -> dict[
         name = f"{step.packages[step.term_package[k]].name}:{step.term_bound[k]}"
         groups[name] = select(step, term_mask=mask)
     return groups
+
+
+def zone_mask(step: FlowStep, zones, values) -> np.ndarray:
+    """Return the cells whose zone is one of values; zones has the grid shape or one per cell."""
+    zones = np.asarray(zones)
+    assert zones.size == step.n_cells, "zone array must have one value per cell"
+    return np.isin(zones.ravel(), np.atleast_1d(values))
+
+
+def select_zone(step: FlowStep, zones, values, **criteria) -> Selection:
+    """Return the Selection of the cells where zone is in values (and any other select criteria)."""
+    return select(step, cells=zone_mask(step, zones, values), **criteria)
+
+
+def groups_by_zone(
+    step: FlowStep, zones, skip: Iterable = (0,), prefix: str = "zone_", **criteria
+) -> dict[str, Selection]:
+    """Return one group per zone value (except those in skip), named '<prefix><value>'."""
+    values = [v for v in np.unique(np.asarray(zones)) if v not in set(skip)]
+    return {f"{prefix}{v}": select_zone(step, zones, v, **criteria) for v in values}
+
+
+def groups_by_boundname(step: FlowStep, package: str | None = None) -> dict[str, Selection]:
+    """Return one group per boundname present in the step (optionally only of one package)."""
+    assert step.term_boundname is not None, "no boundnames: read the step with boundnames=True"
+    mask = np.ones(step.n_terms, dtype=bool) if package is None else _package_mask(step, package)
+    names = sorted({str(b) for b in step.term_boundname[mask] if b})
+    return {name: select(step, boundnames=[name], term_mask=mask) for name in names}

@@ -23,13 +23,31 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+MOVER_SUFFIX = "-TO-MVR"
+
 
 @dataclass(frozen=True)
 class Package:
-    """One budget record of external terms: package name (e.g. 'WEL-1'), budget text ('WEL')."""
+    """One budget record of external terms: unique name (e.g. 'WEL-1'), budget text ('WEL').
+
+    parent is the MF6 package that wrote the record when one package writes several records
+    (e.g. 'DRN' writes DRN and DRN-TO-MVR); empty means the record name itself.
+    """
 
     name: str
     text: str
+    parent: str = ""
+
+    @property
+    def aliases(self) -> set[str]:
+        """Upper-case names a selector can use: name, text, parent, and text without -TO-MVR."""
+        names = {self.name, self.text, self.parent, self.text.removesuffix(MOVER_SUFFIX)}
+        return {n.upper() for n in names if n}
+
+    @property
+    def is_mover(self) -> bool:
+        """True for a *-TO-MVR record (aquifer water handed to the water mover)."""
+        return self.text.upper().endswith(MOVER_SUFFIX)
 
 
 @dataclass

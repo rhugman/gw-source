@@ -58,14 +58,16 @@ def test_disv_matches_dis_within_cell_size_tolerance(model_run):
     assert abs(disv_area / dis_area - 1.0) < tol
 
 
-def test_xt3d_cycles_detected_and_solved_by_lu(model_run):
-    """Model 5 has flow cycles: they are reported, gross mode uses LU, topological refuses."""
+def test_xt3d_cycles_detected_and_solved_by_block_lu(model_run):
+    """Model 5 has flow cycles: reported, solved by block LU (equal to plain LU); topological refuses."""
     step = gs.read_step(model_run("m5_xt3d").ws)
     cycles = gs.diagnostics.cycle_report(step)
     assert len(cycles) >= 1 and all(c.n_cells > 1 and c.min_edge_flow > 0.0 for c in cycles)
     groups = {"wel": gs.select(step, package="WEL")}
     res = gs.backward(step, groups)
-    assert res.solver_used == ["lu"] and len(res.cycles) == len(cycles)
+    assert res.solver_used == ["block"] and len(res.cycles) == len(cycles)
+    lu = gs.backward(step, groups, gs.TraceConfig(solver="lu"))
+    np.testing.assert_allclose(res.fraction_through["wel"], lu.fraction_through["wel"], atol=1e-13)
     with pytest.raises(AssertionError, match="cycles"):
         gs.backward(step, groups, gs.TraceConfig(solver="topological"))
     net = gs.backward(step, groups, gs.TraceConfig(accounting="net", remove_cycles=True))

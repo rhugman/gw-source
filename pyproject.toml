@@ -29,5 +29,6 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["tests"]
-addopts = "-ra"
+pythonpath = ["tests", "benchmarks"]
+addopts = "-ra -m 'not slow'"
+markers = ["slow: large benchmark-sized checks, deselected by default (run with -m slow)"]
