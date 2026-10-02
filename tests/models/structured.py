@@ -112,6 +112,26 @@ def build_transient_dis(ws: Path, exe: Path, spec: BaseSpec | None = None) -> Mo
     return run_model(sim, gwf, name, ws, dis_filename, notes)
 
 
+CONSTANT_FLOW_PERIODS = ((1.0, 1, 1.0), (4.0e5, 30, 1.2))
+
+
+def build_constant_flow_dis(ws: Path, exe: Path, spec: BaseSpec | None = None) -> ModelRun:
+    """Model 10: model 1's steady flows held for a long time (many steps, no storage).
+
+    A short first period, then one long period of geometrically growing steps; every step has
+    the same flows, so transient tracking must converge to the steady snapshot fractions.
+    """
+    spec = BaseSpec() if spec is None else spec
+    name = "m10_constant"
+    sim, gwf = make_sim(name, ws, exe, CONSTANT_FLOW_PERIODS)
+    dis_filename = _add_base_dis(gwf, spec, name)
+    add_npf_ic_oc(gwf, name, k=spec.k, icelltype=1, strt=spec.strt)
+    n_periods = len(CONSTANT_FLOW_PERIODS)
+    add_base_stresses(gwf, spec, _dis_cellid, [spec.wel_rate] * n_periods, [1.0] * n_periods)
+    notes = {"spec": spec, "inactive_cells": spec.inactive_cells}
+    return run_model(sim, gwf, name, ws, dis_filename, notes)
+
+
 def build_layered_dis(ws: Path, exe: Path) -> ModelRun:
     """Model 2: 3-layer DIS with regional flow and two wells in the bottom layer only.
 

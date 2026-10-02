@@ -28,6 +28,11 @@ model ('<prefix>_<model>.npz'), the package-node results as CSV ('<prefix>_packa
 per reach, lake, well or UZF cell) and, optionally, a GeoPackage with one polygon layer per
 model layer ('<model>_layer_<k>') and a point layer 'package_nodes' (each package node placed at
 the mean centre of the cells it exchanges water with).
+
+Transient tracking (gwsource.tracking): tracking_dataset() gives (time, group, *grid) variables
+(time = end of step forward, start of step backward) plus the per-step balance tables, for one
+model's cells; save_tracking_npz() writes one npz per step ('<prefix>_<index>.npz'), gridded for
+one model or flat over every global node of a network (package nodes included).
 """
 
 import json
@@ -77,6 +82,27 @@ OUTPUT_INFO = {  # name: (long name, unit kind)
     "source_fraction": ("fraction of the water in the cell that came from the group", "1"),
     "volume_to": ("rate of water leaving in the cell that came from the group", "volume"),
     "volume_to_by_term": ("volume_to split by outflow package", "volume"),
+    "tracked_source_fraction": (
+        "fraction of the water in the node at the end of the step that came from the group",
+        "1",
+    ),
+    "tracked_fraction_through": (
+        "fraction of the water in the node during the step that leaves through the group "
+        "before the end of the simulation",
+        "1",
+    ),
+    "tracked_volume_from": (
+        "water entering through the node's source terms during the step that leaves through "
+        "the group",
+        "water",
+    ),
+    "fraction_any_sink": ("fraction of the water that leaves through any sink before the end", "1"),
+    "fraction_in_storage_at_end": ("fraction of the water still in the model at the end", "1"),
+}
+TRACKING_SERIES = {  # result attribute: dataset variable
+    "source_fraction": "tracked_source_fraction",
+    "fraction_through": "tracked_fraction_through",
+    "volume_from": "tracked_volume_from",
 }
 STAT_INFO = {
     "min": "minimum over time steps",
@@ -227,6 +253,7 @@ def unit_string(step: FlowStep, kind: str) -> str:
         "volume": f"{length}3 {time}-1",
         "flux": f"{length} {time}-1",
         "area": f"{length}2",
+        "water": f"{length}3",
         "time": time,
     }
     return symbols[kind]
@@ -598,4 +625,130 @@ def save_network(
             )
     if geopackage:
         written.append(gpkg)
+    return written
+
+
+# ---------------------------------------------------------------- transient tracking
+
+
+def _tracking_view(result, model: str | None) -> tuple[FlowStep, slice]:
+    """Return the (one-model) template step of a tracking result and its node slice."""
+    step = result.template
+    if not step.is_network:
+        return step, slice(0, step.n_cells)
+    block = model_block(step, model)
+    return model_view(step, block.model), slice(block.offset, block.offset + block.n)
+
+
+def _tracking_series(result) -> dict[str, dict[str, np.ndarray]]:
+    """Return {result attribute: {group: (n_steps, n) series}} of a tracking result."""
+    assert result.config.keep_series, "export needs a tracking run with keep_series=True"
+    names = [a for a in TRACKING_SERIES if hasattr(result, a)]
+    return {a: getattr(result, a) for a in names}
+
+
+def _tracking_time(result) -> np.ndarray:
+    """Return the time of each row: end of step (forward) or start of step (backward)."""
+    return result.totim if hasattr(result, "source_fraction") else result.totim - result.delt
+
+
+def _gridded_series(step: FlowStep, series: np.ndarray, sl: slice) -> np.ndarray:
+    """Return a (n_steps, n) node series as (n_steps, *grid), NaN on inactive cells."""
+    return np.stack([to_grid(step, row[sl]) for row in series])
+
+
+def _step_table(groups: list[str], per_group: dict, step: FlowStep, long_name: str) -> tuple:
+    """Return a (time, group) variable of water volumes from {group: (n_steps,)} values."""
+    attrs = {"long_name": long_name, "units": unit_string(step, "water")}
+    return (("time", "group"), np.column_stack([per_group[g] for g in groups]), attrs)
+
+
+def tracking_dataset(result, model: str | None = None):
+    """Return an xarray Dataset of a transient tracking result (time, group, *grid).
+
+    Forward: tracked_source_fraction at the end of each step and the tagged-water balance per
+    step and group ('balance_<key>'). Backward: tracked_fraction_through and
+    tracked_volume_from at the start of each step, fraction_any_sink,
+    fraction_in_storage_at_end and the destination outflow per step. For a network, one
+    model's cells (model=); package nodes are in save_tracking_npz.
+    """
+    step, sl = _tracking_view(result, model)
+    groups, dims = result.groups, grid_dims(step)
+    ds = _base_dataset(step, groups)
+    steps = np.asarray(result.steps, dtype=np.int64).reshape(-1, 2)
+    ds = ds.assign_coords(
+        time=("time", _tracking_time(result)),
+        kstp=("time", steps[:, 0] + 1),
+        kper=("time", steps[:, 1] + 1),
+    )
+    ds["time"].attrs = {"long_name": "simulation time", "units": unit_string(step, "time")}
+    ds["delt"] = (("time",), result.delt)
+    for attr, per_group in _tracking_series(result).items():
+        name = TRACKING_SERIES[attr]
+        data = np.stack([_gridded_series(step, per_group[g], sl) for g in groups], axis=1)
+        ds[name] = (("time", "group", *dims), data)
+        ds[name].attrs = _attrs(step, name)
+    if hasattr(result, "source_fraction"):
+        for key in next(iter(result.balance.values())):
+            per_group = {g: result.balance[g][key] for g in groups}
+            ds[f"balance_{key}"] = _step_table(groups, per_group, step, f"tagged water: {key}")
+    else:
+        for name in ("fraction_any_sink", "fraction_in_storage_at_end"):
+            ds[name] = (("time", *dims), _gridded_series(step, getattr(result, name), sl))
+            ds[name].attrs = _attrs(step, name)
+        ds["destination_outflow"] = _step_table(
+            groups, result.destination_outflow, step, "water leaving through the group"
+        )
+    mode = "forward" if hasattr(result, "source_fraction") else "backward"
+    extra = {
+        "mode": f"tracking {mode}",
+        "volume_mode": result.config.volume_mode,
+        "flow_error_correction": result.config.flow_error_correction,
+        "steps": result.steps,
+    }
+    ds.attrs = {
+        "title": f"gwsource transient tracking, {mode}",
+        "provenance": provenance(step, extra),
+    }
+    return ds
+
+
+def _step_values(step: FlowStep, values: np.ndarray, sl: slice, flat: bool) -> np.ndarray:
+    """Return one step's node values: flat (whole network) or one model's gridded cells."""
+    return values[sl] if flat else to_grid(step, values[sl])
+
+
+def save_tracking_npz(
+    directory: str | Path, result, prefix: str = "tracking", model: str | None = None
+) -> list[Path]:
+    """Write one npz per time step of a tracking result ('<prefix>_<step index>.npz').
+
+    Each file holds the step's per-node outputs as '<output>__<group>' (gridded for a single
+    model; for a network with model=None, flat over all global nodes, package nodes included),
+    and its kstpkper, totim and delt.
+    """
+    directory = Path(directory)
+    directory.mkdir(parents=True, exist_ok=True)
+    whole = result.template.is_network and model is None
+    step, sl = (result.template, slice(None)) if whole else _tracking_view(result, model)
+    series = _tracking_series(result)
+    if not hasattr(result, "source_fraction"):
+        series["fraction_any_sink"] = {"all": result.fraction_any_sink}
+        series["fraction_in_storage_at_end"] = {"all": result.fraction_in_storage_at_end}
+    written = []
+    for index, kstpkper in enumerate(result.steps):
+        arrays = {
+            KEY_SEP.join((attr, g)): _step_values(step, values[index], sl, whole)
+            for attr, per_group in series.items()
+            for g, values in per_group.items()
+        }
+        arrays.update(
+            kstpkper=np.asarray(kstpkper),
+            totim=result.totim[index],
+            delt=result.delt[index],
+            time=_tracking_time(result)[index],
+        )
+        path = directory / f"{prefix}_{index:04d}.npz"
+        np.savez_compressed(path, **arrays)
+        written.append(path)
     return written

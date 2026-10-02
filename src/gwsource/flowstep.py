@@ -221,7 +221,8 @@ def csr_from_edges(
     n_cells: int, src: np.ndarray, dst: np.ndarray, q: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Return (ia, ja, flowja), diagonal first in each row, for directed edges src→dst of flow q."""
-    src, dst, q = np.asarray(src), np.asarray(dst), np.asarray(q, dtype=float)
+    src, dst = np.asarray(src, dtype=np.int64), np.asarray(dst, dtype=np.int64)
+    q = np.asarray(q, dtype=float)
     assert np.all(src != dst), "self edges are not allowed"
     diag = np.arange(n_cells)
     rows = np.concatenate([diag, src, dst])

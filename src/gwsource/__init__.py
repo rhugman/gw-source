@@ -1,6 +1,16 @@
 """Cell-mixing flow tracing for MODFLOW 6 output (Foley & Black 2013; Black & Foley 2013)."""
 
-from . import diagnostics, ensemble, export, network, packages, prt, transient, traveltime
+from . import (
+    diagnostics,
+    ensemble,
+    export,
+    network,
+    packages,
+    prt,
+    tracking,
+    transient,
+    traveltime,
+)
 from .config import TraceConfig
 from .ensemble import EnsembleConfig, EnsembleResult, list_realisations, run_ensemble
 from .flowstep import FlowStep, NodeBlock, Package, from_edges
@@ -34,6 +44,14 @@ from .selectors import (
     select_zone,
 )
 from .trace import backward, forward
+from .tracking import (
+    BackwardTracking,
+    ForwardTracking,
+    TrackingConfig,
+    track_backward,
+    track_forward,
+    tracking_duality,
+)
 from .transient import TransientConfig, TransientResult, trace_transient
 from .traveltime import TravelTimeResult, travel_time, water_volume
 
@@ -41,16 +59,19 @@ __version__ = "0.0.1"
 
 __all__ = [
     "BackwardResult",
+    "BackwardTracking",
     "EnsembleConfig",
     "EnsembleResult",
     "FlowStep",
     "ForwardResult",
+    "ForwardTracking",
     "NetworkReader",
     "NodeBlock",
     "Package",
     "Selection",
     "StepReader",
     "TraceConfig",
+    "TrackingConfig",
     "TransientConfig",
     "TransientResult",
     "TravelTimeResult",
@@ -85,6 +106,10 @@ __all__ = [
     "select_cells",
     "select_zone",
     "trace_transient",
+    "track_backward",
+    "track_forward",
+    "tracking",
+    "tracking_duality",
     "transient",
     "travel_time",
     "traveltime",
