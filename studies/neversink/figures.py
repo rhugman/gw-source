@@ -145,7 +145,7 @@ def jaccard_table(out: Path) -> pd.DataFrame:
     prt = pd.read_csv(out / "prt_comparison.csv")
     for _, r in prt.iterrows():
         thin = "thinned" if r["thin_weak_sinks"] else "plain"
-        rows.append({"method": f"PRT z={r['release_z']:g}, {thin}, P > 0.5",
+        rows.append({"method": f"PRT {r['release']}, {thin}, P > 0.5",
                      "jaccard": r["jaccard_mp7_prt>0.5"]})
     return pd.DataFrame(rows)
 

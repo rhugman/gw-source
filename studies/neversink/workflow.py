@@ -61,8 +61,9 @@ MP7_POROSITY = 0.3  # all layers, from the published MPBAS files
 # The SFR network trace needs the GWF and SFR budgets to agree on the aquifer exchange to 1e-4
 # of the largest reach flow; with the published 0.01 m criterion three reaches miss that.
 TIGHT_DVCLOSE = (1e-4, 1e-6)
-# PRT checks: (release_z, thin_weak_sinks)
-PRT_CASES = ((1.0, True), (1.0, False), (0.5, True), (0.5, False))
+# PRT checks: (release_z, thin_weak_sinks); release_z None spreads the points over the cell volume
+PRT_CASES = ((None, True), (None, False), (1.0, True), (0.5, True))
+PRT_Z_LEVELS = 4
 
 
 def mf6_exe(bin_dir: Path = BIN) -> Path:
@@ -233,18 +234,21 @@ def run_prt(
     prt_ws: Path,
     thin_weak_sinks: bool,
     group: str = "priority",
-    release_z: float = 1.0,
+    release_z: float | None = None,
     porosity: float = MP7_POROSITY,
     subdivisions: int = 1,
+    z_levels: int = PRT_Z_LEVELS,
 ) -> gs.prt.PrtResult:
     """Run flux-weighted PRT particles from every source term of the cells that reach group.
 
-    release_z=1.0 releases at the water table (where recharge enters); the published MODPATH
-    runs place one particle at the cell centre (release_z=0.5).
+    release_z=None spreads the points over the cell volume (z_levels heights), as MF6 spreads the
+    sources; 1.0 releases at the water table, where top-layer particles stay (no flow through the
+    top face); the published MODPATH runs place one particle at the cell centre (0.5).
     """
     config = gs.PrtConfig(
         porosity=porosity,
         subdivisions=subdivisions,
+        z_levels=z_levels,
         release_z=release_z,
         thin_weak_sinks=thin_weak_sinks,
     )
@@ -361,9 +365,10 @@ def main(
         endpoints = read_endpoints()
         rows = []
         for release_z, thin in PRT_CASES:
-            prt_ws = out / f"prt_z{release_z:g}_thin{int(thin)}"
+            release = "volume" if release_z is None else f"z{release_z:g}"
+            prt_ws = out / f"prt_{release}_thin{int(thin)}"
             prt = run_prt(ws, step, result, exe, prt_ws, thin, release_z=release_z)
-            row = {"release_z": release_z, "thin_weak_sinks": thin}
+            row = {"release": release, "thin_weak_sinks": thin}
             rows.append({**row, **compare_prt(prt, result, endpoints)})
             np.save(prt_ws / "cell_capture_fraction.npy", prt.cell_capture_fraction.astype(np.float32))
             (prt_ws / "prt.trk.csv").unlink()  # 1.5 GB; the result is in the table

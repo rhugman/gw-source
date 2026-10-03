@@ -7,50 +7,70 @@ What it does
 2. Release points: one set per source term (positive external flow, optionally restricted to a
    source Selection) in a contributing cell, spread over the cell's plan polygon (DIS or DISV):
    the polygon is split into a fan of triangles from its centroid, each triangle into k x k
-   equal sub-triangles, and a point is placed at each sub-triangle's centroid. Every point
-   carries the flow weight q_term x (sub-triangle area / cell area), so sums over particles are
-   flux-weighted for a source spread uniformly over the cell (recharge, river or drain leakage).
-   Points are released at local z = release_z (1.0 = the water table for a convertible cell,
-   the cell top if confined), i.e. where areal recharge enters. Lateral sources (a CHD or GHB
-   on a model edge) are seeded the same way; that is an approximation of where they enter.
+   equal sub-triangles, and a point is placed at each sub-triangle's centroid. Each plan point
+   is released at z_levels local z = (i + 0.5) / z_levels (fractions of the saturated
+   thickness). Every point carries the flow weight q_term x (sub-triangle area / cell area) /
+   z_levels, so sums over particles are flux-weighted for a source spread uniformly over the
+   cell volume.
+   That is how MF6 represents a boundary source unless the package assigns it to a face
+   (IFLOWFACE): recharge, river or drain leakage and edge CHD/GHB inflow are distributed over
+   the cell, and PRT's velocity field has the matching uniform divergence. Releasing everything
+   at one height is not consistent with that field. In particular release_z=1 (the water table,
+   where recharge physically enters) traps the particles of the top layer at the water table:
+   the top face carries no flow, so the vertical velocity there is zero and they never descend
+   (in a 3-layer test model all of them ended in layer 1 and none reached a well in layer 3).
+   Lateral sources are seeded the same way; that is an approximation of where they enter.
 3. PRT: a separate simulation (own folder) with PRT DIS/DISV copied from the GWF input, MIP
    porosity, PRP with EXTEND_TRACKING (the last steady period is extended until particles
    terminate), FMI reading the GWF head and budget files, and EMS. FloPy writes the input; the
    MF6 executable is passed explicitly. PRT needs DATA-SPDIS (NPF SAVE_SPECIFIC_DISCHARGE).
+   Particles run until they terminate (strong sink, boundary face); there is no stop zone.
 4. Tracks: release, cell-exit and termination records (CSV track output). icell is the 1-based
-   user node; the termination record gives the end cell, status and time of each particle.
+   user node; the records give each particle's sequence of cells and the time it entered them.
 
 Weak sinks and the destination (stop_at_weak_sink is deliberately left off). PRT does not
-report which boundary package removes a particle, only the cell where it stops. A particle
-stops on entering a cell with no exit face (a strong sink, status 5); with STOP_AT_WEAK_SINK it
-would also stop in every weak sink cell (sinks plus outflow faces, status 3). That option is
-not used: it stops particles at the weak sinks of every other boundary too (e.g. the gaining
-river cells between recharge and a well), which truncates their paths. Instead
-- the cells that host the destination's sink terms form a stop zone (MIP IZONE = 1, PRP
-  ISTOPZONE = 1): a particle stops on entering one of them (status 6) and arrives at the
-  destination with the share d_k / O_k of its weight (d_k = the group's sink flow in cell k,
-  O_k = the gross outflow of k), the proportional weak-sink accounting of the gross method;
-- particles pass through the weak sinks of other groups, and with thin_weak_sinks=True (the
-  default) their weight is multiplied by the full-mixing survival 1 - Snk_j / O_j of every
-  cell j they visit outside the stop zone (Snk_j = sink terms of j), so that the captured flow
-  stays consistent with the flow budget. With thin_weak_sinks=False they pass unchanged, as in
-  a plain particle run, which over-counts the water reaching the destination.
-The remaining 1 - d_k / O_k of a particle's weight in a destination cell is dropped, not
-tracked on; that under-counts a destination group whose cells lie downstream of one another
-(e.g. a river line); for a single well cell nothing is lost.
+report which boundary package removes water, and with STOP_AT_WEAK_SINK a particle would stop
+in every weak sink cell (sinks plus outflow faces), also those of other boundaries (e.g. the
+gaining river cells between recharge and a well), which truncates paths. Instead each particle
+carries the full-mixing accounting of the gross method along its advective path: in every cell
+j it visits (the release cell included, each cell once), its remaining weight W gives
+d_j / O_j x W to the destination (d_j = the group's sink flow in j, O_j = the gross outflow of
+j) and keeps (1 - Snk_j / O_j) x W (Snk_j = all sink terms of j, the destination's included).
+The captured weight is the sum over the path; its arrival time is the entry time into each j.
+Nothing is dropped: water that passes a destination cell, or a well that takes only part of
+its cell's outflow, is followed on to the destination cells further down.
+With thin_weak_sinks=False the particles lose only the destination's share (1 - d_j / O_j), as
+in a plain particle run; that over-counts the water reaching the destination, because the
+water that other sinks remove on the way is counted too.
 
-What is measured. Particles stop on ENTERING the destination cell, and a particle released
-inside it stops at once. The arrival time is therefore comparable with
+Consistency. If the release points resolve the sources and the cell survival splits the
+weight among the outflow faces as the flow does, the captured flow equals the destination
+inflow (the duality of the gross method, now along advective paths). Observed:
+- 3-layer test model (wells in the bottom layer, a weak well upstream of a strong one):
+  402.6 of 405 m3/d with k = 3 and 2 levels, 405.3 with k = 4 and 16 levels. An earlier
+  version that released at the water table and stopped particles in the first destination
+  cell, dropping the rest of their weight, captured 266 m3/d; volume seeding with that stop
+  rule about 306 m3/d.
+- Neversink (4 layers, 1.68M cells, eight wells, k = 1, 4 levels): 3,736 of 3,671 m3/d,
+  every well within 11 % of its rate; the earlier version 1,940 (water table) and 3,005
+  (mid-cell). A single mid-cell height gives 3,722 there, so the z levels matter most where
+  the alternative would be the water table.
+Which sources supply the water differs between advection and mixing (Neversink: 51 % stream
+leakage along the paths, 43 % under full mixing), and so do per-cell capture fractions; that
+is the method difference, not an error.
+
+What is measured. Water is counted as arriving when it ENTERS a destination cell (at once for
+a particle released in it). The arrival time is therefore comparable with
 TravelTimeResult.mean_time_to_exit_cell (the time until the water enters the cell through
 whose sink it leaves); mean_time also includes the residence in that cell.
 
 PRT supports DIS and DISV only; for DISU the Eulerian travel time is the only option.
 
-Network steps (gwsource.network: several models, or package nodes) are not supported: the stop
-zone and the particle weights assume that the destination sinks and every node of the graph are
-cells of the one GWF model PRT tracks in, and particles do not follow package networks (an SFR
-reach, a MAW well bore) or cross into other models. track_particles() raises NotImplementedError
-for them.
+Network steps (gwsource.network: several models, or package nodes) are not supported: the
+destination shares and the particle weights assume that the destination sinks and every node
+of the graph are cells of the one GWF model PRT tracks in, and particles do not follow package
+networks (an SFR reach, a MAW well bore) or cross into other models. track_particles() raises
+NotImplementedError for them.
 """
 
 import os
@@ -67,8 +87,6 @@ from .mf6io import _block_lines, _option_value, find_model_files
 from .selectors import Selection
 from .traveltime import cell_porosity
 
-STOP_ZONE = 1
-STOP_ZONE_STATUS = 6  # terminated on entering a cell of the stop zone
 TERMINATE_REASON = 3
 PRT_GRIDS = ("DIS", "DISV")
 
@@ -80,9 +98,13 @@ class PrtConfig:
     porosity: scalar or per-cell (required; use the same value as for the Eulerian times).
     fraction_threshold: seed only cells with backward fraction above this.
     subdivisions: k; each fan triangle of a cell gets k * k points (4 k^2 points per DIS cell).
-    release_z: local z of the release points (0 = cell bottom, 1 = water table / cell top).
-    thin_weak_sinks: multiply particle weights by the full-mixing survival of the weak sinks
-        they pass outside the destination (see module docstring).
+    z_levels: n; each plan point is released at the n local z = (i + 0.5) / n, i = 0..n-1,
+        so the points fill the saturated cell volume (see module docstring). A one-layer
+        grid has no vertical flow and gets one level.
+    release_z: optional single local z for all points instead (0 = cell bottom, 1 = water
+        table / cell top); release_z=1 traps particles at the water table of the top layer.
+    thin_weak_sinks: multiply particle weights by the full-mixing survival of every cell they
+        pass, so other sinks remove their share (see module docstring).
     exit_solve_tolerance: PRP EXIT_SOLVE_TOLERANCE.
     stoptraveltime: optional PRP STOPTRAVELTIME.
     """
@@ -90,7 +112,8 @@ class PrtConfig:
     porosity: float | np.ndarray
     fraction_threshold: float = 1e-6
     subdivisions: int = 2
-    release_z: float = 1.0
+    z_levels: int = 4
+    release_z: float | None = None
     thin_weak_sinks: bool = True
     exit_solve_tolerance: float = 1e-5
     stoptraveltime: float | None = None
@@ -98,16 +121,26 @@ class PrtConfig:
     def __post_init__(self) -> None:
         """Validate option values."""
         assert self.subdivisions >= 1, "subdivisions must be >= 1"
-        assert 0.0 <= self.release_z <= 1.0, "release_z is a local z in [0, 1]"
+        assert self.z_levels >= 1, "z_levels must be >= 1"
+        if self.release_z is not None:
+            assert 0.0 <= self.release_z <= 1.0, "release_z is a local z in [0, 1]"
+
+    def local_z(self, nlay: int) -> np.ndarray:
+        """Return the local z of the release levels (one if release_z is set or nlay is 1)."""
+        if self.release_z is not None:
+            return np.array([self.release_z])
+        levels = 1 if nlay == 1 else self.z_levels  # one layer: no vertical flow, z is irrelevant
+        return (np.arange(levels) + 0.5) / levels
 
 
 @dataclass
 class ReleasePoints:
-    """Particle release points: 0-based cell (user node), local x, y, flow weight and package."""
+    """Particle release points: 0-based cell (user node), x, y, local z, flow weight, package."""
 
     cell: np.ndarray
     x: np.ndarray
     y: np.ndarray
+    z: np.ndarray
     weight: np.ndarray
     package: np.ndarray
 
@@ -121,9 +154,10 @@ class ReleasePoints:
 class PrtResult:
     """Per-particle end points and flux-weighted arrival statistics at the destination.
 
-    arrival_time: time from release to termination, per particle (NaN if not captured).
-    captured_weight: particle weight x survival through other weak sinks x destination share
-        of its end cell (0 if not captured).
+    arrival_time: capture-weighted mean time from release to entering the destination cells,
+        per particle (NaN if not captured).
+    captured_weight: particle weight x the share of it captured along its path (see module
+        docstring; 0 if it passes no destination cell).
     mean_arrival: flux-weighted mean arrival time of the captured particles.
     captured_flow: sum of captured weights (compare with the group's inflow from these sources).
     cell_mean_arrival, cell_capture_fraction: per release cell (NaN where nothing was released);
@@ -266,18 +300,25 @@ def release_points(
     contributing: np.ndarray,
     source: Selection | None,
     subdivisions: int,
+    local_z: np.ndarray,
 ) -> ReleasePoints:
-    """Return flux-weighted release points for the source terms in contributing cells."""
+    """Return flux-weighted release points for the source terms in contributing cells.
+
+    Each plan point is repeated at every local z, with an equal share of its weight.
+    """
     flow = np.maximum(step.term_flow, 0.0)
     keep = (flow > 0.0) & contributing[step.term_cell]
     if source is not None:
         keep &= source.terms
-    parts = {"cell": [], "xy": [], "weight": [], "package": []}
+    parts = {"cell": [], "xy": [], "z": [], "weight": [], "package": []}
+    nz = len(local_z)
     for k in np.flatnonzero(keep):
         cell = int(step.term_cell[k])
         points, share = fan_points(grid.polygons[cell % grid.ncpl], subdivisions)
+        share = np.repeat(share, nz) / nz
         parts["cell"].append(np.full(len(share), cell))
-        parts["xy"].append(points)
+        parts["xy"].append(np.repeat(points, nz, axis=0))
+        parts["z"].append(np.tile(local_z, len(points)))
         parts["weight"].append(flow[k] * share)
         name = step.packages[step.term_package[k]].name
         parts["package"].append(np.full(len(share), name, dtype=object))
@@ -287,6 +328,7 @@ def release_points(
         cell=np.concatenate(parts["cell"]),
         x=xy[:, 0],
         y=xy[:, 1],
+        z=np.concatenate(parts["z"]),
         weight=np.concatenate(parts["weight"]),
         package=np.concatenate(parts["package"]),
     )
@@ -328,10 +370,9 @@ def write_prt(
     release: ReleasePoints,
     config: PrtConfig,
     exe: str | Path,
-    stop_cells: np.ndarray,
     model: str | None = None,
 ) -> flopy.mf6.MFSimulation:
-    """Write a PRT simulation tracking the release points; stop_cells form the stop zone."""
+    """Write a PRT simulation tracking the release points until they leave the model."""
     files = find_model_files(gwf_ws, model)
     assert files.head_file is not None, "PRT needs the GWF head file (OC HEAD FILEOUT)"
     _assert_spdis(files.budget_file)
@@ -344,11 +385,10 @@ def write_prt(
     dis_class = flopy.mf6.ModflowPrtdis if grid.grid_type == "DIS" else flopy.mf6.ModflowPrtdisv
     dis_class(prt, **{k: v for k, v in grid.dis_kwargs.items() if v is not None})
     n_cells = grid.ncpl * int(grid.dis_kwargs["nlay"])
-    izone = np.where(stop_cells, STOP_ZONE, 0)
-    flopy.mf6.ModflowPrtmip(prt, porosity=cell_porosity(config.porosity, n_cells), izone=izone)
+    flopy.mf6.ModflowPrtmip(prt, porosity=cell_porosity(config.porosity, n_cells))
     packagedata = [
-        (i, _cellid(c, grid), x, y, config.release_z)
-        for i, (c, x, y) in enumerate(zip(release.cell, release.x, release.y))
+        (i, _cellid(c, grid), x, y, z)
+        for i, (c, x, y, z) in enumerate(zip(release.cell, release.x, release.y, release.z))
     ]
     flopy.mf6.ModflowPrtprp(
         prt,
@@ -357,7 +397,6 @@ def write_prt(
         local_z=True,
         extend_tracking=True,
         exit_solve_tolerance=config.exit_solve_tolerance,
-        istopzone=STOP_ZONE,
         stoptraveltime=config.stoptraveltime,
     )
     flopy.mf6.ModflowPrtoc(
@@ -389,34 +428,79 @@ def run_prt(sim: flopy.mf6.MFSimulation) -> Path:
     return Path(sim.sim_path) / "prt.trk.csv"
 
 
+TRACK_COLUMNS = {"irpt": 4, "icell": 6, "istatus": 8, "ireason": 9, "trelease": 10, "t": 11}
+
+
 def read_tracks(track_csv: str | Path) -> np.ndarray:
-    """Return the records of a PRT CSV track file as a structured array."""
-    return np.genfromtxt(track_csv, delimiter=",", names=True, dtype=None, encoding="utf-8")
+    """Return particle, cell, status, reason and times of a PRT CSV track file (record order)."""
+    dtype = [(name, "f8" if name in ("trelease", "t") else "i8") for name in TRACK_COLUMNS]
+    return np.loadtxt(
+        track_csv,
+        delimiter=",",
+        skiprows=1,
+        usecols=tuple(TRACK_COLUMNS.values()),
+        dtype=dtype,
+        ndmin=1,
+    )
 
 
 def endpoints(tracks: np.ndarray, n_particles: int) -> dict[str, np.ndarray]:
     """Return, per particle (release point order), its end cell (0-based), status and time."""
     term = tracks[tracks["ireason"] == TERMINATE_REASON]
-    index = term["irpt"].astype(int) - 1
+    index = term["irpt"] - 1
     assert len(np.unique(index)) == len(index), "a particle terminated twice"
     out = {
         "cell": np.full(n_particles, -1, dtype=np.int64),
         "status": np.full(n_particles, -1, dtype=np.int64),
         "time": np.full(n_particles, np.nan),
     }
-    out["cell"][index] = term["icell"].astype(np.int64) - 1
-    out["status"][index] = term["istatus"].astype(np.int64)
+    out["cell"][index] = term["icell"] - 1
+    out["status"][index] = term["istatus"]
     out["time"][index] = term["t"] - term["trelease"]
     return out
 
 
-def path_survival(tracks: np.ndarray, n_particles: int, survival: np.ndarray) -> np.ndarray:
-    """Return, per particle, the product of the cell survival factors over the cells it visited."""
-    particle = tracks["irpt"].astype(np.int64) - 1
-    cell = tracks["icell"].astype(np.int64) - 1
-    pairs = np.unique(np.column_stack([particle, cell]), axis=0)  # each visited cell once
-    log_factor = np.log(np.maximum(survival[pairs[:, 1]], 1e-300))
-    return np.exp(np.bincount(pairs[:, 0], weights=log_factor, minlength=n_particles))
+def cell_visits(tracks: np.ndarray) -> dict[str, np.ndarray]:
+    """Return the cells each particle passes, in order, with the time it entered them.
+
+    A particle is released in its first cell (entry time 0); every cell-exit record ends one
+    visit, and the next record's cell is the next visit, entered at the exit time. Only the
+    first visit of a cell counts (a particle that re-enters a cell, e.g. by grazing a face, is
+    not counted twice).
+    """
+    order = np.lexsort((np.arange(len(tracks)), tracks["t"], tracks["irpt"]))
+    rec = tracks[order]
+    particle, cell = rec["irpt"] - 1, rec["icell"] - 1
+    first = np.r_[True, particle[1:] != particle[:-1]]
+    new_visit = first | np.r_[True, cell[1:] != cell[:-1]]
+    entry = np.where(first, rec["t"], np.r_[rec["t"][0], rec["t"][:-1]]) - rec["trelease"]
+    visits = {"particle": particle[new_visit], "cell": cell[new_visit], "time": entry[new_visit]}
+    pairs = np.column_stack([visits["particle"], visits["cell"]])
+    keep = np.sort(np.unique(pairs, axis=0, return_index=True)[1])
+    return {key: v[keep] for key, v in visits.items()}
+
+
+def capture_along_paths(
+    visits: dict[str, np.ndarray], n_particles: int, share: np.ndarray, survival: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return, per particle, the captured share of its weight and the mean capture time.
+
+    In each visited cell j the particle's remaining weight W gives share_j x W to the destination
+    and keeps survival_j x W; the capture time is the entry time into j.
+    """
+    p = visits["particle"]
+    log_f = np.log(np.maximum(survival[visits["cell"]], 1e-300))
+    cum = np.cumsum(log_f)
+    start = np.r_[0, np.flatnonzero(p[1:] != p[:-1]) + 1]
+    offset = np.repeat(cum[start] - log_f[start], np.diff(np.r_[start, len(p)]))
+    remaining = np.exp(cum - log_f - offset)  # product of survival over the earlier visits
+    gain = remaining * share[visits["cell"]]
+    captured = np.bincount(p, weights=gain, minlength=n_particles)
+    time_sum = np.bincount(p, weights=gain * visits["time"], minlength=n_particles)
+    mean_time = np.divide(
+        time_sum, captured, out=np.full(n_particles, np.nan), where=captured > 0
+    )
+    return captured, mean_time
 
 
 # ---------------------------------------------------------------- statistics
@@ -429,13 +513,13 @@ def destination_share(step: FlowStep, destination: Selection) -> np.ndarray:
     return np.divide(d, outflow, out=np.zeros_like(d), where=outflow > 0)
 
 
-def weak_sink_survival(step: FlowStep, stop_cells: np.ndarray) -> np.ndarray:
-    """Return 1 - Snk / O per cell (1 in the stop zone and where O = 0)."""
+def weak_sink_survival(step: FlowStep) -> np.ndarray:
+    """Return 1 - Snk / O per cell (1 where O = 0): the share of the outflow through faces."""
     budget = cell_budget(step, flow_edges(step))
     removed = np.divide(
         budget.sink, budget.outflow, out=np.zeros(step.n_cells), where=budget.outflow > 0
     )
-    return np.where(stop_cells, 1.0, 1.0 - removed)
+    return 1.0 - removed
 
 
 def _weighted_mean(values: np.ndarray, weights: np.ndarray) -> float:
@@ -448,19 +532,16 @@ def arrival_statistics(
     step: FlowStep,
     release: ReleasePoints,
     ends: dict,
-    share: np.ndarray,
-    survival: np.ndarray,
+    captured_share: np.ndarray,
+    arrival: np.ndarray,
     ws: Path,
 ) -> PrtResult:
     """Return per-particle captured weights and flux-weighted arrival statistics.
 
-    survival is the per-particle weight factor for the weak sinks passed on the way (1 if not
-    thinned). A particle is captured if it terminated in the stop zone.
+    captured_share and arrival are the per-particle results of capture_along_paths().
     """
-    captured = (ends["status"] == STOP_ZONE_STATUS) & (ends["cell"] >= 0)
-    end_share = share[np.maximum(ends["cell"], 0)]
-    cw = np.where(captured, release.weight * survival * end_share, 0.0)
-    arrival = np.where(cw > 0, ends["time"], np.nan)
+    cw = release.weight * captured_share
+    arrival = np.where(cw > 0, arrival, np.nan)
     n = step.n_cells
     released = np.bincount(release.cell, weights=release.weight, minlength=n)
     cw_cell = np.bincount(release.cell, weights=cw, minlength=n)
@@ -526,13 +607,12 @@ def track_particles(
     files = find_model_files(gwf_ws, model)
     grid = load_prt_grid(gwf_ws, files.model, files.dis_type)
     contributing = result.fraction_through[group] > config.fraction_threshold
-    release = release_points(step, grid, contributing, source, config.subdivisions)
-    share = destination_share(step, result.selections[group])
-    stop_cells = share > 0.0
-    sim = write_prt(Path(prt_ws), Path(gwf_ws), grid, release, config, exe, stop_cells, files.model)
+    local_z = config.local_z(int(grid.dis_kwargs["nlay"]))
+    release = release_points(step, grid, contributing, source, config.subdivisions, local_z)
+    sim = write_prt(Path(prt_ws), Path(gwf_ws), grid, release, config, exe, files.model)
     tracks = read_tracks(run_prt(sim))
-    survival = np.ones(release.n)
-    if config.thin_weak_sinks:
-        survival = path_survival(tracks, release.n, weak_sink_survival(step, stop_cells))
+    share = destination_share(step, result.selections[group])
+    survival = weak_sink_survival(step) if config.thin_weak_sinks else 1.0 - share
+    captured, arrival = capture_along_paths(cell_visits(tracks), release.n, share, survival)
     ends = endpoints(tracks, release.n)
-    return arrival_statistics(step, release, ends, share, survival, Path(prt_ws))
+    return arrival_statistics(step, release, ends, captured, arrival, Path(prt_ws))

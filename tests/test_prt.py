@@ -106,3 +106,38 @@ def test_without_thinning_weak_sinks_overcount(model_run, mf6_exe, tmp_path):
     prt = track_particles(run.ws, step, res, "wel", config, mf6_exe, tmp_path / "prt")
     assert prt.captured_flow > 1.02 * res.destination_inflow["wel"]
     print("unthinned captured flow", prt.captured_flow)
+
+
+def test_layered_capture_matches_inflow(model_run, mf6_exe, tmp_path):
+    """Layered model, wells in the bottom layer: the captured particle flow closes on the inflow.
+
+    Two defects of an earlier version under-counted here: all points released at the water table
+    (top-layer particles stay there, as the top face carries no flow) and particles stopped in
+    the first well cell, dropping the weight that the weak well passes on to the strong one.
+    Observed 402.6 of 405 m3/d (earlier version 266; volume seeding but stopping 306).
+    """
+    run = model_run("m2_dis3lay")
+    step = gs.read_step(run.ws)
+    res = gs.backward(step, {"wel": gs.select(step, package="WEL")})
+    config = PrtConfig(porosity=POROSITY, subdivisions=3, z_levels=2)
+    prt = track_particles(run.ws, step, res, "wel", config, mf6_exe, tmp_path / "prt")
+    print("layered captured flow", prt.captured_flow, "of", res.destination_inflow["wel"])
+    assert prt.captured_flow == pytest.approx(res.destination_inflow["wel"], rel=0.02)
+    weak = run.notes["weak_well_node"]
+    assert res.fraction_through["wel"][weak] > 0.9  # the weak well's cell drains to the strong well
+
+
+def test_capture_along_paths_follows_weight_past_partial_sinks():
+    """A particle passing a partial destination cell keeps the rest of its weight downstream."""
+    from gwsource.prt import capture_along_paths
+
+    visits = {
+        "particle": np.array([0, 0, 0, 1]),
+        "cell": np.array([0, 1, 2, 2]),
+        "time": np.array([0.0, 10.0, 30.0, 0.0]),
+    }
+    share = np.array([0.0, 0.4, 1.0])
+    survival = np.array([0.5, 0.6, 0.0])  # cell 0 loses half to another sink
+    captured, mean_time = capture_along_paths(visits, 2, share, survival)
+    np.testing.assert_allclose(captured, [0.5 * 0.4 + 0.5 * 0.6 * 1.0, 1.0])
+    np.testing.assert_allclose(mean_time, [(0.2 * 10.0 + 0.3 * 30.0) / 0.5, 0.0])

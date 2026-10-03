@@ -6,7 +6,7 @@ Phase 5 case study, 2026-10-02: stage 1 (calibrated model), stage 2 (358-realisa
 
 - **Model and benchmark.** The study runs full-mixing backward tracing [FB13, BF13] on the USGS Neversink/Rondout MODFLOW 6 model (1.68 million cells, 50 m) from the eight priority wells (3,671 m³/d). It compares the result with the published MODPATH 7 areas contributing recharge to the same wells.
 - **Counts.** The cell counts are close: the sum of F over the particle start cells is 910, against 980 contributing cells in the published runs. 96 % of the well water enters the model in cells where the published particles start.
-- **Cell by cell, agreement is moderate.** The Jaccard index with the published cells is 0.30 for F > 0.1, 0.41 for F > 0.5 and 0.41 for the same number of cells ranked by F. Particle tracking on the same flow field gives 0.20 to 0.60 depending on release depth and weak-sink treatment. The published mask is one particle convention, not ground truth at cell level.
+- **Cell by cell, agreement is moderate.** The Jaccard index with the published cells is 0.30 for F > 0.1, 0.41 for F > 0.5 and 0.41 for the same number of cells ranked by F. Particle tracking on the same flow field gives 0.29 to 0.62 depending on weak-sink treatment and release depth, and with thinning it captures the wells' inflow to 2 %. The published mask is one particle convention, not ground truth at cell level.
 - **Streams.** With streams as cells, 43 % of the priority-well water is stream-reach leakage. With the 12,316 SFR reaches as nodes of the graph, all of it traces back to recharge. The contributing area then extends upstream along the streams, outside what a recharge-cell mask can show.
 - **Ensemble.** Over the 358 realisations at base pumping, the mean F correlates with the published probability of contribution at 0.76 and gives 90 % of its expected area; the zones above 0.5 overlap with a Jaccard index of 0.43. The published masks could not be paired with single realisations (Section 6).
 - **Pumping scenarios.** With the scenario rule inferred from the published masks, the median full-mixing area is within 10 % of the published median from base to maximum pumping (911 against 998 cells at base, 3,707 against 3,590 at maximum).
@@ -22,7 +22,7 @@ Phase 5 case study, 2026-10-02: stage 1 (calibrated model), stage 2 (358-realisa
 
 **Benchmark.** The published MODPATH 7 runs are forward runs with weak sinks stopping particles, in three regions (NE, S, W) around the well clusters. One particle starts at the centre of each cell of the uppermost active layer (122,021 particles). A cell counts as contributing if its particle ends in one of the eight priority wells (SV_193, SV_227, SV_407, SV_487, U_917, U__55, U___7, U___8). Their total pumping is 3,671 m³/d.
 
-**Comparison.** Each particle start cell is given the backward fraction F of that cell, the share of its water that reaches the wells. The MODPATH mask and F > threshold are then compared cell by cell. PRT checks use the Phase 3 helper (`gwsource.track_particles`) on the same flow field, with porosity 0.3 as in the published MODPATH files. The cells hosting the wells form a stop zone. With `thin_weak_sinks=True` particles pass other weak sinks with their weight reduced by the full-mixing survival fraction; with `False` they pass unchanged, as in a plain particle run.
+**Comparison.** Each particle start cell is given the backward fraction F of that cell, the share of its water that reaches the wells. The MODPATH mask and F > threshold are then compared cell by cell. PRT checks use the Phase 3 helper (`gwsource.track_particles`) on the same flow field, with porosity 0.3 as in the published MODPATH files. Each particle carries the gross accounting along its path: in every cell it passes, the wells take their share of the cell's outflow from the particle's remaining weight. With `thin_weak_sinks=True` the cell's other sinks remove their share too; with `False` they do not, as in a plain particle run.
 
 **Checks.**
 
@@ -78,19 +78,35 @@ The wells of the U cluster share cells and capture areas, and a published cell b
 | method | Jaccard | cells expected | captured flow (m³/d) |
 |---|---|---|---|
 | full mixing, F > 0.5 | 0.41 | 910 (sum of F) | 3,671 |
-| PRT, released at the water table, thinned, P > 0.5 | 0.37 | 562 | 1,940 |
-| PRT, released at the water table, plain, P > 0.5 | 0.20 | 2,297 | 6,692 |
-| PRT, released mid-cell, thinned, P > 0.5 | 0.60 | 750 | 3,005 |
-| PRT, released mid-cell, plain, P > 0.5 | 0.29 | 2,610 | 8,237 |
+| PRT, spread over the cell volume, thinned, P > 0.5 | 0.62 | 794 | 3,736 |
+| PRT, spread over the cell volume, plain, P > 0.5 | 0.29 | 2,857 | 9,555 |
+| PRT, released at the water table, thinned, P > 0.5 | 0.39 | 592 | 2,413 |
+| PRT, released mid-cell, thinned, P > 0.5 | 0.62 | 781 | 3,722 |
 
-P is the flow-weighted share of the particles released from a cell that arrive at the wells, evaluated at the published start cells (uppermost active layer). "Plain" means no weak-sink thinning. Particles were released from every source term (flux-weighted) of the 30,180 cells with F > 0 that have one, in all layers; one release sub-division per cell. Together these cells receive 90,349 m³/d. The captured flow is the PRT total, to be compared with the inflow of the wells, 3,671 m³/d.
+P is the flow-weighted share of the water released in a cell that reaches the wells, evaluated at the published start cells (uppermost active layer). "Plain" means no weak-sink thinning. Particles were released from every source term (flux-weighted) of the 30,180 cells with F > 0 that have one, in all layers, with one plan sub-division per cell (4 points), at four heights through the saturated thickness ("spread over the cell volume", 488,448 particles) or at one (122,112). Together these cells receive 90,349 m³/d. The captured flow is the PRT total, to be compared with the inflow of the wells, 3,671 m³/d.
 
-- Plain particles over-count the wells' water by a factor of 1.8 to 2.2. They pass every weak sink other than the wells without losing weight, so water that streams and other sinks take on the way is counted as reaching the wells. Thinning corrects this.
-- Thinned particles capture 53 % (water table) and 82 % (mid-cell) of the inflow. The shortfall was not investigated. The PRT helper drops the weight that remains in a well's cell when the well takes only part of its outflow (see the module docstring of `src/gwsource/prt.py`). That may contribute here, since the wells of U___7 and SV_487 take 44 % and 69 % of their cells' outflow.
-- The mean absolute difference between F and P over the seeded cells is 0.03 for thinned particles and 0.08 for plain ones; the maximum is 0.84 to 1.00.
-- Release depth and weak-sink treatment each move the Jaccard index by 0.1 to 0.3: depth by 0.23 (thinned) or 0.09 (plain), thinning by 0.17 (water table) or 0.31 (mid-cell). Mid-cell release with thinning matches the conventions of the benchmark (centre release, stopping at weak sinks) and agrees best (0.60). Water-table release is where recharge actually enters, and it agrees less (0.37).
+- With the points spread over the cell volume and thinning, the particles capture 3,736 m³/d, 1.8 % more than enters the wells, and each well gets within 11 % of its rate (SV_227 180 of 203 m³/d, U___8 1,171 of 1,110, the others closer). That is the agreement the duality of the gross method leads one to expect: the totals match and the paths differ.
+- Plain particles over-count the wells' water by a factor of 2.6 (2.1 to 2.5 for single-height releases). They pass every weak sink other than the wells without losing weight, so water that streams and other sinks take on the way is counted as reaching the wells. Thinning corrects this.
+- The mean absolute difference between F and P over the seeded cells is 0.025 to 0.027 for thinned particles and 0.09 for plain ones; the maximum is 0.81 to 1.00.
+- Which source supplies the wells differs between the methods: under full mixing 57 % of the water is recharge and 43 % stream leakage, along the particle paths 49 % and 51 %. A likely reason, not tested here, is that water from the losing reaches next to the U wells keeps to its streamlines along the particle paths, while under full mixing it mixes with recharge in each cell it passes. Either way it is a difference of method, not an error of either.
+- Release depth matters at the water table only. Released there, particles in the top layer never leave it: the top face carries no flow, so their vertical velocity is zero. Wells in deeper layers then get little (U__55 28 of 250 m³/d, SV_193 none of 63), and the total is 2,413 m³/d. Mid-cell release and release spread over the volume agree (3,722 and 3,736 m³/d, Jaccard 0.62 for both).
+- Thinning changes the agreement with the published cells more than anything else (0.62 thinned against 0.29 plain), because the benchmark stops particles at every weak sink. Thinned particles at mid-cell or spread over the volume agree best with it (0.62).
 
-Full mixing lies inside the range of particle results (0.20 to 0.60) that the same flow field yields under different conventions. The 0.41 for F > 0.5 should not be read as an error of full mixing alone.
+**Why the first PRT runs captured too little.** An earlier version of the PRT helper captured 1,940 m³/d (53 %, water table) and 3,005 m³/d (82 %, mid-cell) with thinning. Running PRT without a stop zone and evaluating both rules on the same tracks separates two defects of that version, both in the helper rather than in either method. This was a one-off evaluation, not part of `workflow.py`; its summaries are in `studies/neversink/output/prt_diagnosis/`.
+
+| release | first well cell only (earlier rule) | weight followed on (current) |
+|---|---|---|
+| water table | 1,940 (53 %) | 2,413 (66 %) |
+| mid-cell | 3,005 (82 %) | 3,722 (101 %) |
+| four heights through the cell | 3,015 (82 %) | 3,736 (102 %) |
+
+- **Weight dropped in partial well cells** (+720 m³/d, 20 % of the inflow). The earlier rule stopped a particle in the first well cell it entered and credited the well with the share d/O that the well takes of the cell's outflow; the rest was dropped. The well of U___7 takes 44 % of its cell's outflow, but 97 % of the water in that cell reaches a priority well (F = 0.97): most of what passes on flows to U___8 and U_917. Followed on, the particles credit U___8 with 609 m³/d and U_917 with 111 m³/d more. The helper now applies the gross accounting along the whole path: in each cell, the destination takes d/O of the remaining weight and the cell's sinks remove Snk/O; there is no stop zone.
+- **Particles trapped at the water table** (−1,300 m³/d at the water table against mid-cell). MF6 spreads recharge and the other boundary sources over the cell volume, and PRT's velocity field matches that. The helper now releases at several heights through the saturated thickness by default.
+- Ruled out: every particle ended in a cell with no exit face (status 5) with no weight left after its last cell, so no water was lost to other termination states, and no particle entered a cell twice, so thinning was applied once per cell.
+
+On the 3-layer test model with a weak well upstream of a strong one, the same two defects gave 266 of 405 m³/d. The current helper gives 402.6 m³/d (a regression test, `tests/test_prt.py`).
+
+Full mixing (0.41 for F > 0.5) lies inside the range of particle results (0.29 to 0.62) that the same flow field yields under different conventions. Its gap to the best particle convention is the difference between mixing and advective paths at cell level. It is not a shortfall of water: both close on the wells' inflow.
 
 ## 4. Streams
 
@@ -104,7 +120,7 @@ With the SFR reaches as nodes of the graph (`package_nodes=("SFR",)` in `gwsourc
 
 ## 5. Interpretation and guidance
 
-- **The published mask is a convention.** It uses one particle at each cell centre and stops at every weak sink. It is a valid delineation, but at the scale of single cells it is not a reference that full mixing, or any other method, should reproduce exactly. On the same flow field, particles span 0.20 to 0.60 agreement with it, depending on release depth and weak-sink treatment, and full mixing (0.30 to 0.41) is inside that range.
+- **The published mask is a convention.** It uses one particle at each cell centre and stops at every weak sink. It is a valid delineation, but at the scale of single cells it is not a reference that full mixing, or any other method, should reproduce exactly. On the same flow field, particles span 0.29 to 0.62 agreement with it, depending on weak-sink treatment and release depth, and full mixing (0.30 to 0.41) is inside that range.
 - **Thresholds.** `docs/dispersion_study.md` Section 5 recommends F = 0.5 for an advective zone and F ≥ 0.1 as a conservative envelope. Here, the F > 0.5 zone (445 cells) is a core that lies almost entirely inside the published area (980 cells) and covers 43 % of it. The F > 0.1 zone (2,139 cells) is about twice the size of the published area and still misses 27 % of its cells, so it was not a conservative envelope at cell level, unlike in the dispersion study (one well, analytical or particle reference zone). The published area sits between the two. That guidance was derived against references that do not stop at weak sinks, and this case does not test it in that sense.
 - **State the conventions.** Release depth and weak-sink treatment both change the agreement with the published mask substantially (Section 3). A comparison with it should state where particles start and what stops them.
 - **Streams.** With streams as cells, 43 % of the wells' water is attributed to stream leakage and the contributing area stops at the streams. Whether that is the intended reading depends on the question: it is correct for "which source package delivers the water", and incomplete for "where does the water come from".
@@ -163,7 +179,6 @@ With streams as cells, the full-mixing area is within 10 % of the published medi
 - The published masks cannot be paired with the rebuilt realisations (Section 6), so the comparison is between ensembles only.
 - 4,470 of the 122,021 MODPATH particles of the calibrated model end with status 5. By the MODPATH 7 status convention this is a stop in a cell with no exit face; 514 of the 980 contributing particles are among them. This was not investigated.
 - `baserat.zip` contains 357 masks against 358 realisations: the base realisation, the last row of the parameter table, has no mask.
-- The thinned PRT runs capture less water than enters the wells (Section 3), and the cause was not isolated.
 - The scenario rule is inferred (Section 7); maxrange is reproduced in distribution only, and the scenarios were run on 60 of the 358 realisations.
 - The comparison is on the uppermost active layer. Contributing areas in deeper layers are not compared.
 
@@ -173,7 +188,7 @@ With streams as cells, the full-mixing area is within 10 % of the published medi
 python studies/neversink/workflow.py
 ```
 
-Stage 1 is `workflow.py`; the ensemble and the scenarios need `python studies/neversink/pest_rebuild.py` (about 3 min, rebuilds the interface) and then `python studies/neversink/ensemble_run.py` (about 2 h on 6 processes; resumable; outside the Claude Code sandbox, which blocks process pools). In each script the gates in `__main__` select the parts to run; in `workflow.py` they are the two MF6 runs, the MODPATH comparison, the PRT checks and the figures. The two MF6 runs take 44 s and 75 s. Each of the four PRT runs (122,112 particles) takes about 7 minutes and writes a track file of about 1.5 GB, which the workflow deletes after use. Output goes to `studies/neversink/output/`, which is not tracked by git. The USGS repository goes in `studies/neversink/external/neversink_workflow/` (also not tracked) as a sparse checkout:
+Stage 1 is `workflow.py`; the ensemble and the scenarios need `python studies/neversink/pest_rebuild.py` (about 3 min, rebuilds the interface) and then `python studies/neversink/ensemble_run.py` (about 2 h on 6 processes; resumable; outside the Claude Code sandbox, which blocks process pools). In each script the gates in `__main__` select the parts to run; in `workflow.py` they are the two MF6 runs, the MODPATH comparison, the PRT checks and the figures. The two MF6 runs take 44 s and 75 s. The two PRT runs released at four heights (488,448 particles) take about 13 minutes each and write a track file of about 6 GB; the two single-height runs (122,112 particles) take about 5 minutes and 1.5 GB. The workflow deletes the track files after use. Output goes to `studies/neversink/output/`, which is not tracked by git. The USGS repository goes in `studies/neversink/external/neversink_workflow/` (also not tracked) as a sparse checkout:
 
 ```
 git clone --filter=blob:none --sparse https://github.com/usgs/neversink_workflow.git studies/neversink/external/neversink_workflow
