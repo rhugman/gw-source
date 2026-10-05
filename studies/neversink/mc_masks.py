@@ -16,22 +16,25 @@ bookkeeping steps of the published pipeline explain it; the flow fields are the 
 2. Mask k is not run k. scripts/modpath_mc_varq.py zips run r (row r of the scenario's parameter
    table, modpath_par_ens.csv order) as mp_results_{r}_{qrat}.zip. The masks are numbered in the
    order of those names sorted as text, where '_' sorts after the digits ('100_' before '10_'):
-   mask k is run mask_run_order()[k]. Runs 0..356 have masks; run 357, the base realisation,
-   has none. The postprocessing that wrote the .dat files is not archived; the order is inferred
-   from the R1 matches below, not read from code.
+   mask k is run pest_rebuild.mask_run_order()[k]. Runs 0..356 have masks; run 357, the base
+   realisation, has none. The postprocessing that wrote the .dat files is not archived; the
+   order is inferred from the R1 matches below, not read from code.
 
-With both corrections, the R1 masks of growth_mechanisms (PRT with the published conventions on
-the rebuilt flow fields, 60 realisations) match their paired published mask best in every case
-and scenario: Jaccard 0.989 to 1.000 (median 0.996) at base pumping, against 0.75 for the
-second-best mask (r1_matches, pairing_check). Everything else that depends on the cell position
-or the pairing (probability maps, per-realisation comparisons) is redone here on the corrected
-masks; mask areas are not affected.
+Both corrections live in ensemble_run: read_mask returns a mask moved back onto its cells
+(corrected=False: as stored, used here for the offset evidence) and mask_indices / run_indices
+give the pairing (pest_rebuild.mask_run_order). With both, the R1 masks of growth_mechanisms
+(PRT with the published conventions on the rebuilt flow fields, 60 realisations) match their
+paired published mask best in every case and scenario: Jaccard 0.989 to 1.000 (median 0.996) at
+base pumping, against 0.75 for the second-best mask (r1_matches, pairing_check). The
+per-realisation comparisons of full mixing with its own mask are here (paired_comparison,
+region_areas); probability_comparison sets the published probability from the masks as stored
+against the corrected one.
 
-Scenario well multipliers. The scenario rule of scenarios.py replaces each realisation's own
-priority-well multiplier (keep_multiplier=False). multiplier_test reruns six paired
-realisations with R1 only, with the multiplier kept and replaced. Kept reproduces the masks
+Scenario well multipliers. multiplier_test reruns six paired realisations with R1 only, with
+the realisation's own priority-well multiplier kept and replaced. Kept reproduces the masks
 (median Jaccard 0.998 at baserat, 0.995 at maxrat); replaced gives 0.965 and 0.967. The
-published scenarios therefore kept it: q = m (q_base + f (q_max - q_base)).
+published scenarios therefore kept it, q = m (q_base + f (q_max - q_base)), which is the
+default of scenarios.scenario_pars.
 
 Run with the project environment; multiplier_test needs a process pool (outside the sandbox):
 
@@ -66,8 +69,7 @@ import gwsource as gs  # noqa: E402
 
 OUT_DIR = wf.OUT / "mc_masks"
 MECH_DIR = wf.OUT / "scenarios" / "mechanisms60"
-N_RUNS = 357  # runs with a published mask (rows 0..356 of modpath_par_ens.csv)
-ROW_OFFSET = 1  # published masks lie this many rows south of their cells
+N_RUNS = pr.N_MASKS  # runs with a published mask (rows 0..356 of modpath_par_ens.csv)
 NROW, NCOL = 680, 619
 OFFSETS = tuple((di, dj) for di in (-1, 0, 1, 2) for dj in (-1, 0, 1))
 MULT_REALS = ("8", "130", "241", "324", "412", "498")  # spread over the masks; in mechanisms60
@@ -82,46 +84,22 @@ _WORKER = {}  # per-process state set by the pool initializer
 # ---------------------------------------------------------------- masks and pairing
 
 
-def shift_rows(grid: np.ndarray, rows: int) -> np.ndarray:
-    """Return a (..., nrow, ncol) grid moved by rows (positive: south), without wrapping."""
-    out = np.zeros_like(grid)
-    if rows >= 0:
-        out[..., rows:, :] = grid[..., : grid.shape[-2] - rows, :]
-    else:
-        out[..., :rows, :] = grid[..., -rows:, :]
-    return out
-
-
 def shift_grid(grid: np.ndarray, rows: int, cols: int) -> np.ndarray:
     """Return a (..., nrow, ncol) grid moved by rows (south) and cols (east), without wrapping."""
-    moved = shift_rows(grid, rows)
-    return np.swapaxes(shift_rows(np.swapaxes(moved, -1, -2), cols), -1, -2)
-
-
-def corrected_mask(index: int, qrat: str = "baserat", offset: int = ROW_OFFSET) -> np.ndarray:
-    """Return published mask number index moved back onto its cells (offset rows north)."""
-    raw = er.read_mask(index, qrat)
-    assert not raw[:offset].any(), f"{qrat} mask {index} has cells in its first {offset} rows"
-    return shift_rows(raw, -offset)
+    moved = er.shift_rows(grid, rows)
+    return np.swapaxes(er.shift_rows(np.swapaxes(moved, -1, -2), cols), -1, -2)
 
 
 def raw_masks(qrat: str, n_masks: int = N_RUNS) -> np.ndarray:
     """Return all published masks of a scenario as stored, (n_masks, nrow, ncol) boolean."""
-    return np.array([er.read_mask(i, qrat) for i in range(n_masks)])
+    return np.array([er.read_mask(i, qrat, corrected=False) for i in range(n_masks)])
 
 
-def mask_run_order(n_runs: int = N_RUNS, qrat: str = "baserat") -> list[int]:
-    """Return the run (parameter-table row) of every mask: the result names sorted as text."""
-    return sorted(range(n_runs), key=lambda r: f"mp_results_{r}_{qrat}.zip")
-
-
-def mask_pairing(n_runs: int = N_RUNS, pest_dir: Path = pr.PEST_DIR) -> pd.DataFrame:
-    """Return per published mask its run index and realisation name."""
-    names = pd.read_csv(pest_dir / "mask_index.csv", dtype={"real_name": str})["real_name"]
-    runs = mask_run_order(n_runs)
-    return pd.DataFrame(
-        {"mask_index": range(n_runs), "run_index": runs, "real_name": names.iloc[runs].to_numpy()}
-    )
+def mask_pairing(pest_dir: Path = pr.PEST_DIR) -> pd.DataFrame:
+    """Return per published mask (in mask order) its run index and realisation name."""
+    table = er.mask_table(pest_dir)
+    table = table[table["mask_index"] >= 0].sort_values("mask_index").reset_index(drop=True)
+    return table[["mask_index", "run_index", "real_name"]]
 
 
 def mask_of_real(pairing: pd.DataFrame) -> dict[str, int]:
@@ -183,7 +161,7 @@ def calibrated_offsets(masks: np.ndarray, calibrated: np.ndarray, offsets=OFFSET
 
 def corrected_matrix(qrat: str, plan: np.ndarray, n_masks: int = N_RUNS) -> np.ndarray:
     """Return the corrected masks of a scenario on the start cells, (n_masks, n_starts)."""
-    return np.array([corrected_mask(i, qrat).ravel()[plan] for i in range(n_masks)])
+    return np.array([er.read_mask(i, qrat).ravel()[plan] for i in range(n_masks)])
 
 
 def match_row(r1: np.ndarray, masks: np.ndarray, paired: int) -> dict:
@@ -317,19 +295,15 @@ def region_areas(
     return pd.DataFrame(rows)
 
 
-def corrected_probability(qrat: str, n_masks: int = N_RUNS) -> np.ndarray:
-    """Return the published probability of a scenario from the corrected masks."""
-    return sum(corrected_mask(i, qrat).astype(float) for i in range(n_masks)) / n_masks
-
-
-def probability_comparison(qrat: str, ens_dir: Path, plan: np.ndarray) -> pd.DataFrame:
-    """Repeat ensemble_run.compare_probability with the corrected published probability.
+def probability_comparison(qrat: str, maps_dir: Path, plan: np.ndarray) -> pd.DataFrame:
+    """Repeat ensemble_run.compare_probability with the masks as stored and corrected.
 
     The gwsource maps are the saved ones of ensemble_run.analyse (all realisations run).
     """
-    maps = dict(np.load(ens_dir / "probability_maps.npz"))
+    maps = dict(np.load(maps_dir / "probability_maps.npz"))
     rows = []
-    for label, published in (("as published", maps["mp7"]), ("corrected", corrected_probability(qrat))):
+    for label, corrected in (("as stored", False), ("corrected", True)):
+        published = er.published_probability(qrat, corrected=corrected)
         table = er.compare_probability({**maps, "mp7": published}, plan)
         rows.append(table.assign(qrat=qrat, published=label))
     return pd.concat(rows, ignore_index=True)
@@ -438,20 +412,29 @@ def evidence(out: Path, starts: pd.DataFrame, qrats: tuple[str, ...] = sc.QRATS)
     cal.to_csv(out / "calibrated_offsets.csv", index=False)
 
 
-def comparisons(out: Path, starts: pd.DataFrame, pairing: pd.DataFrame, plan: np.ndarray) -> None:
-    """Write the R1 matches, the paired full-mixing comparison and the probability tables."""
+def comparisons(
+    out: Path, starts: pd.DataFrame, pairing: pd.DataFrame, plan: np.ndarray,
+    mech_dir: Path = MECH_DIR, ens_dir: Path = er.ENS_DIR, base_maps: Path | None = None,
+    scenario_dir: Path = er.SCENARIO_DIR,
+) -> None:
+    """Write the R1 matches, the paired full-mixing comparison and the probability tables.
+
+    ens_dir and scenario_dir hold the stage-2 and stage-3 runs; base_maps (default ens_dir) the
+    base-rate probability maps.
+    """
     reals = gm.sample_realisations(60)
-    matches = r1_matches(reals, gm.QRATS, pairing, plan)
+    matches = r1_matches(reals, gm.QRATS, pairing, plan, mech_dir)
     matches.to_csv(out / "r1_matches.csv", index=False)
     pairing_check(matches).to_csv(out / "pairing_check.csv", index=False)
-    region_areas(gm.QRATS, pairing, starts, plan).to_csv(out / "region_areas.csv", index=False)
+    region_areas(gm.QRATS, pairing, starts, plan, mech_dir).to_csv(out / "region_areas.csv", index=False)
     summaries, probs = [], []
     for qrat in sc.QRATS:
-        ens_dir = er.ENS_DIR if qrat == "baserat" else er.SCENARIO_DIR / qrat
-        table, summary = paired_comparison(qrat, pairing, starts, plan, ens_dir)
+        runs = er.scenario_dir_of(qrat, ens_dir, scenario_dir)
+        table, summary = paired_comparison(qrat, pairing, starts, plan, runs)
         table.to_csv(out / f"paired_{qrat}.csv", index=False)
         summaries.append(summary)
-        probs.append(probability_comparison(qrat, ens_dir, plan))
+        maps_dir = (base_maps or ens_dir) if qrat == "baserat" else runs
+        probs.append(probability_comparison(qrat, maps_dir, plan))
     pd.DataFrame(summaries).to_csv(out / "paired_summary.csv", index=False)
     pd.concat(probs, ignore_index=True).to_csv(out / "probability_comparison.csv", index=False)
 
@@ -463,6 +446,10 @@ def main(
     out: Path = OUT_DIR,
     mult_reals: tuple[str, ...] = MULT_REALS,
     mult_qrats: tuple[str, ...] = MULT_QRATS,
+    mech_dir: Path = MECH_DIR,
+    ens_dir: Path = er.ENS_DIR,
+    base_maps: Path | None = None,
+    scenario_dir: Path = er.SCENARIO_DIR,
 ) -> None:
     """Write the pairing, the offset evidence, the comparisons and the multiplier test."""
     out.mkdir(parents=True, exist_ok=True)
@@ -473,7 +460,7 @@ def main(
     if write_evidence:
         evidence(out, starts)
     if compare:
-        comparisons(out, starts, pairing, plan)
+        comparisons(out, starts, pairing, plan, mech_dir, ens_dir, base_maps, scenario_dir)
     if run_multiplier:
         run_multiplier_test(out, mult_reals, mult_qrats, pairing)
         multiplier_table(out, pairing, plan).to_csv(out / "multiplier_test.csv", index=False)

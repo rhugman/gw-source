@@ -9,14 +9,17 @@ rates in neversink_mf6/wel_000.dat; max_flux_m3: permitted maximum).
 
 Inferred rule, for the eight priority wells only (q_base from wel_000.dat, q_max = max_flux_m3):
 
-    q = q_base + f * (q_max - q_base),  f = 0, 0.25, 0.5, 0.75, 1 for baserat ... maxrat
+    q = m * (q_base + f * (q_max - q_base)),  f = 0, 0.25, 0.5, 0.75, 1 for baserat ... maxrat
     maxrange: f ~ U(0, 1) drawn independently for every priority well and realisation
 
-written as the WEL multiplier q / q_base of the well's cell. The non-priority wells keep their
-realisation multipliers. baserat is the ensemble itself.
+with m the realisation's own WEL multiplier of the well's cell (0.93 to 1.08), written as the
+WEL multiplier q / q_base. The non-priority wells keep their realisation multipliers. baserat is
+the ensemble itself.
 
 Evidence. Mask cells were counted per MODPATH region (NE: the four U wells; W: SV_193, SV_227,
-SV_407; S: SV_487) and divided by the same realisation's baserat count. The table gives the
+SV_407; S: SV_487) and divided by the same realisation's baserat count (mask k is the same run
+in every scenario, so the ratio needs no pairing with the rebuilt realisations; moving the masks
+one row north onto their cells changes the medians below by at most 0.01). The table gives the
 median area ratio over the 357 realisations against the pumping ratio of each hypothesis, with
 the fit of area ~ Q^b and its rms log residual:
 
@@ -62,10 +65,13 @@ and max would give a median of 0.33. A draw common to all wells, or one per clus
 unknown, so maxrange can be reproduced only in distribution: maxrange_fractions draws f from
 np.random.default_rng((seed, real_index)), and an f per well can be passed instead.
 
+Multiplier. The mask areas alone do not show whether the realisation's own multiplier m was
+kept: the area does not correlate with m even in baserat. Paired with their realisations
+(mc_masks.py), the masks do: PRT with the published conventions reproduces them at a median
+Jaccard of 0.998 (baserat) and 0.995 (maxrat) with m kept, against 0.965 and 0.967 with m
+dropped (mc_masks.multiplier_test). Default here: kept (keep_multiplier=True).
+
 Uncertain:
-- Whether the realisation's own WEL multiplier m (0.93 to 1.08 for the priority wells) was kept
-  (q = m * (...)) or replaced. The masks do not resolve it: the area does not correlate with m
-  even in baserat. Default here: replaced (keep_multiplier=False).
 - In 23 realisations the S maxrange area exceeds the maxrat area by up to 8 % (estimated f up to
   1.11), unrelated to m. This may be noise of the cell count, or a draw bound slightly above max.
 """
@@ -136,14 +142,15 @@ def scenario_pars(
     wells: pd.DataFrame | None = None,
     seed: int = MAXRANGE_SEED,
     fractions: np.ndarray | None = None,
-    keep_multiplier: bool = False,
+    keep_multiplier: bool = True,
 ) -> pd.Series:
     """Return the realisation's parameters with the scenario's priority-well WEL multipliers.
 
-    real_index is the position in modpath_par_ens.csv (= the published mask index); it only
-    seeds the maxrange draw. fractions gives f per well (order of wells) instead of the fixed
-    or drawn values. keep_multiplier=True multiplies the realisation's own multiplier in rather
-    than replacing it. baserat returns the parameters unchanged unless fractions is given.
+    real_index is the realisation's row in modpath_par_ens.csv (its run index, not its mask
+    index); it only seeds the maxrange draw. fractions gives f per well (order of wells) instead
+    of the fixed or drawn values. keep_multiplier=True (as published) multiplies the
+    realisation's own multiplier in; False replaces it. baserat returns the parameters unchanged
+    unless fractions is given.
     """
     if wells is None:
         wells = priority_well_table()
