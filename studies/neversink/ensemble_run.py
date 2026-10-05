@@ -13,16 +13,17 @@ mask (docs/neversink_study.md). The per-realisation mask columns of the summarie
 compare F with an effectively random published mask. The comparisons that hold are of the
 ensembles: the published probability (the share of the 357 masks in which a cell contributes)
 against the share of realisations in which F exceeds a threshold and the mean F, and the
-distribution of contributing areas per pumping scenario.
+distribution of contributing areas (and of the wells' source split) per pumping scenario.
 
 Run from anywhere with the project environment; the realisations run in N_WORKERS processes
 (outside the Claude Code sandbox, which blocks process pools):
 
     python studies/neversink/ensemble_run.py
 
-Stage 3 runs the five other published pumping scenarios (scenarios.py) on the same N_SUBSET
-realisations, evenly spread over the published masks, and compares each with its scenario's
-masks; the base-rate results are also analysed on that subset.
+Stage 3 runs the five other published pumping scenarios (scenarios.py) on N_SUBSET realisations,
+evenly spread over the published masks (all 357 with a mask; the first run used 60, a subset of
+these), and compares each with its scenario's masks; the base-rate results are also analysed on
+that subset.
 
 Edit the gates in __main__ to rerun parts. The runs are resumable: a realisation with a summary
 file is skipped. Output goes to studies/neversink/output/ensemble/ and .../scenarios/<qrat>/
@@ -55,7 +56,7 @@ import gwsource as gs  # noqa: E402
 ENS_DIR = wf.OUT / "ensemble"
 SCENARIO_DIR = wf.OUT / "scenarios"
 SCENARIOS = ("0.25rat", "0.5rat", "0.75rat", "maxrat", "maxrange")
-N_SUBSET = 60  # realisations per pumping scenario, evenly spread over the 357 masks
+N_SUBSET = 357  # realisations per pumping scenario, evenly spread over the 357 masks (357: all)
 MASK_ZIP = wf.SOURCE / "output" / "modpath_mc" / "{qrat}.zip"
 N_WORKERS = 6
 THREADS_PER_WORKER = 2
@@ -275,6 +276,36 @@ def area_table(scenarios: tuple[str, ...] = ("baserat", *SCENARIOS)) -> pd.DataF
     return table
 
 
+def source_table(scenarios: tuple[str, ...] = ("baserat", *SCENARIOS)) -> pd.DataFrame:
+    """Return per scenario the median source split of the wells' water, streams as cells.
+
+    rch and sfr are the volumes from recharge and from stream leakage (m3/d); the stream share
+    is sfr / inflow per realisation. area_per_rch is the sum of F over the start cells per m3/d
+    of recharge. Growth is relative to the base rate.
+    """
+    rows = []
+    for qrat in scenarios:
+        summary = collect_summary(ENS_DIR if qrat == "baserat" else SCENARIO_DIR / qrat)
+        share = summary["cells:SFR_0"] / summary["inflow"]
+        rows.append(
+            {
+                "qrat": qrat,
+                "n_reals": len(summary),
+                "inflow": summary["inflow"].median(),
+                "rch": summary["cells:RCHA"].median(),
+                "sfr": summary["cells:SFR_0"].median(),
+                "stream_share": share.median(),
+                "stream_share_min": share.min(),
+                "stream_share_max": share.max(),
+                "area_per_rch": (summary["cells:expected_cells"] / summary["cells:RCHA"]).median(),
+            }
+        )
+    table = pd.DataFrame(rows)
+    for col in ("inflow", "rch", "sfr"):
+        table[f"{col}_growth"] = table[col] / table.loc[0, col]
+    return table
+
+
 def compare_probability(maps: dict, starts: np.ndarray) -> pd.DataFrame:
     """Compare each gwsource probability map with the published one on the start cells."""
     p = maps["mp7"].ravel()[starts]
@@ -320,9 +351,10 @@ def main(
     analyse_scenarios: bool = True,
     make_figures: bool = True,
     scenarios: tuple[str, ...] = SCENARIOS,
+    n_subset: int = N_SUBSET,
 ) -> None:
     """Run and analyse the base-rate ensemble, then the pumping scenarios on a subset."""
-    subset = scenario_subset()
+    subset = scenario_subset(n_subset)
     if run_base:
         run_ensemble(ENS_DIR)
         if not pending_realisations(ENS_DIR):
@@ -338,6 +370,7 @@ def main(
             analyse(ens_dir, qrat)
     if analyse_scenarios:
         area_table(("baserat", *scenarios)).to_csv(SCENARIO_DIR / "area_table.csv", index=False)
+        source_table(("baserat", *scenarios)).to_csv(SCENARIO_DIR / "source_table.csv", index=False)
     if make_figures:
         maps = dict(np.load(ENS_DIR / "probability_maps.npz"))
         idomain = wf.grid_idomain(wf.OUT / "optimal")
