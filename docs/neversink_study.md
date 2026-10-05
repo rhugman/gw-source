@@ -9,7 +9,7 @@ Phase 5 case study, 2026-10-02: stage 1 (calibrated model), stage 2 (358-realisa
 - **Cell by cell, agreement is moderate.** The Jaccard index with the published cells is 0.30 for F > 0.1, 0.41 for F > 0.5 and 0.41 for the same number of cells ranked by F. Particle tracking on the same flow field gives 0.29 to 0.62 depending on weak-sink treatment and release depth, and with thinning it captures the wells' inflow to 2 %. Run with the published particle conventions, MF6 PRT reproduces the published mask (Jaccard 0.998), so the mask is one particle convention, now fully accounted for, not ground truth at cell level.
 - **Streams.** With streams as cells, 43 % of the priority-well water is stream-reach leakage. With the 12,316 SFR reaches as nodes of the graph, all of it traces back to recharge. The contributing area then extends upstream along the streams, outside what a recharge-cell mask can show.
 - **Ensemble.** Over the 358 realisations at base pumping, the mean F correlates with the published probability of contribution at 0.76 and gives 90 % of its expected area; the zones above 0.5 overlap with a Jaccard index of 0.43. The published masks could not be paired with single realisations (Section 6).
-- **Pumping scenarios.** With the scenario rule inferred from the published masks, the median full-mixing area is within 11 % of the published median from base to maximum pumping (911 against 998 cells at base, 3,709 against 3,590 at maximum; 357 realisations per scenario). It grows faster than pumping mainly because the stream share of the wells' water falls as pumping rises.
+- **Pumping scenarios.** With the scenario rule inferred from the published masks, the median full-mixing area is within 11 % of the published median from base to maximum pumping (911 against 998 cells at base, 3,709 against 3,590 at maximum; 357 realisations per scenario). It grows faster than pumping mainly because the stream share of the wells' water falls as pumping rises. The additional pumping is mostly recharge that discharged to streams at base pumping; the published area grows more slowly (3.60 against 4.07 times) mainly because the published particles stop at buried stream cells, which PRT with the published conventions reproduces (3.60).
 - **Cost.** The trace takes 2 to 3 s for nine destination groups; MODFLOW 6 takes 44 s. The ensemble (358 realisations, two traces each) took 76 min on six processes.
 
 ## 1. Model, benchmark and method
@@ -200,15 +200,66 @@ Published: median over the 357 masks of the scenario; gwsource: median sum of F 
 
 *Figure 3. Median contributing area relative to base pumping. Dashed: the pumping ratio.*
 
-With streams as cells, the full-mixing area is within 11 % of the published median in every scenario (−10 % at 0.25rat, +3 % at maxrat). It grows faster than pumping (4.07 times at 3.67 times the pumping), the published area and the network area a little slower (3.60 and 3.42 times). The stream share accounts for most of the difference (`scenarios/source_table.csv`): with streams as cells, the share of the wells' water that is stream leakage falls from 42 % at base pumping to 29 % at maxrat (median over the realisations), so the recharge the wells capture grows 4.54 times. The area per unit of captured recharge falls by 11 % over the same range, and 4.54 × 0.89 ≈ 4.06, close to the area growth. Across realisations, the excess of the area growth over the pumping growth follows the drop in stream share (r = 0.94). Where the additional leakage enters, and why the published area grows more slowly, were not examined. Against the published probability maps of the scenarios, the correlation of mean F rises from 0.76 at base to 0.80 to 0.82, and the Jaccard index of the zones above 0.5 lies between 0.43 and 0.49.
+With streams as cells, the full-mixing area is within 11 % of the published median in every scenario (−10 % at 0.25rat, +3 % at maxrat). It grows faster than pumping (4.07 times at 3.67 times the pumping), the published area and the network area a little slower (3.60 and 3.42 times). The stream share accounts for most of the difference (`scenarios/source_table.csv`): with streams as cells, the share of the wells' water that is stream leakage falls from 42 % at base pumping to 29 % at maxrat (median over the realisations), so the recharge the wells capture grows 4.54 times. The area per unit of captured recharge falls by 11 % over the same range, and 4.54 × 0.89 ≈ 4.06, close to the area growth. Across realisations, the excess of the area growth over the pumping growth follows the drop in stream share (r = 0.94). Against the published probability maps of the scenarios, the correlation of mean F rises from 0.76 at base to 0.80 to 0.82, and the Jaccard index of the zones above 0.5 lies between 0.43 and 0.49.
+
+**Where the stream water changes.** `studies/neversink/growth_mechanisms.py` reruns 61 realisations (60 spread evenly over the masks, and the base realisation) at base, half and maximum pumping. It saves, per SFR reach, the exchange with the aquifer and the part of the reach's leakage that reaches each well cluster under full mixing. The reruns reproduce the stage-3 values of the same realisations exactly (stream share 42 % to 29 %, area growth 4.07). A first sample of 11 realisations gives the same results within a few percent. From base to maximum pumping, the stream water reaching the wells grows from 1,506 to 3,814 m³/d (mean), 2.5 times against 3.7 times the pumping:
+
+- 73 % of the increase is a larger share of the leakage of reaches that already lose water at base pumping.
+- 5 % is more leakage from those reaches, and 22 % is the product of the two.
+- 17 % of the increase comes from reaches that switch from gaining to losing (about 50 per realisation, nearly all within 2 km of a well). No losing reach switches to gaining.
+- 64 % of the increase comes from reaches within 1 km (plan) of the cluster's nearest well, and 82 % from within 2 km.
+- One segment south of the U wells (83 reaches, starting 206 m from them) gives 38 % of the increase. Its leakage grows by 10 %.
+- The reaches 250 m to 1 km from the U wells pass 40 % of their leakage to the wells at base pumping and 60 % at maximum pumping, while their leakage grows by 18 %.
+
+In the budget, the 9,790 m³/d of additional pumping is balanced by 8,780 m³/d less discharge to gaining reaches and 940 m³/d more leakage from losing ones (means). In terms of where the wells' water comes from, the recharge reaching the wells grows by 7,480 m³/d and the stream water by 2,310 m³/d. Most of the additional pumping is therefore recharge that discharged to streams at base pumping. Little is new stream leakage, which is why the stream share falls.
+
+**Why the published area grows more slowly.** On the same flow fields (with RCH and SFR given an IFLOWFACE column, which does not change the flows), PRT is run from the published starts three times:
+
+- with the published conventions (Section 3);
+- the same without stopping at weak sinks, with tracks;
+- with all boundary flows distributed over the cell, with tracks.
+
+The other stopping and thinning rules are applied to the tracks afterwards. Stopping at every weak sink on the tracks gives exactly the result of the first run.
+
+With the published conventions, PRT reproduces the published growth in distribution: the median area goes from 1,001 to 3,600 cells, growth 3.60, against 998 to 3,590 and 3.60 for the published masks. At half pumping the growth is 2.49 against 2.48. The median of the ratios per realisation is 3.55 for both. Table 6 changes one convention at a time.
+
+**Table 6. Median contributing area at base and maximum pumping, 61 realisations**
+
+| area | base | maxrat | growth |
+|---|---|---|---|
+| full mixing (F of the start cell; of the draped start cell gives the same) | 911 | 3,707 | 4.07 |
+| PRT, all flows distributed, thinned at every sink | 820 | 3,696 | 4.51 |
+| PRT, RCH and SFR on open top faces, thinned at the distributed sinks | 969 | 4,616 | 4.76 |
+| same, stopped at stream weak sinks, thinned elsewhere | 947 | 3,600 | 3.80 |
+| same, stopped at every weak sink (the published conventions) | 1,001 | 3,600 | 3.60 |
+| published masks (357) | 998 | 3,590 | 3.60 |
+
+PRT rows: particles from the published starts, seeded where F > 0. Thinned: the gross accounting of `gwsource.prt`. The areas are the sum of the captured weight or the number of captured particles.
+
+The published area grows more slowly mainly because the particles stop at stream cells that are weak sinks (4.76 to 3.80):
+
+- The stops remove captured weight equal to 34 contributing cells at base, 519 at half and 993 at maximum pumping (means).
+- All of it is at SFR reaches under an active cell, where the stream flow is a distributed sink: 85 % in layer 2 and 90 % 1 to 4 km from the nearest well.
+- The capture zone reaches these cells only at higher pumping. Under full mixing or thinning they pass on all but the stream's share of their outflow; under the published convention every particle that enters them stops.
+
+Stopping at the remaining weak sinks, mainly the well cells that take only part of their cell's outflow, counts those cells as fully captured. This raises the base area by 54 cells and leaves the maximum one unchanged, because at maximum pumping seven of the eight wells take all of their cell's outflow (3.80 to 3.60). The restriction to start cells plays no part: 96 % of the wells' water enters in start cells in every scenario, and draping changes the full-mixing area by less than one cell. Going from full mixing to thinned particles raises the growth (4.07 to 4.51 with distributed flows, 4.76 with the top-face convention); why was not examined.
+
+With the published conventions reproduced, no published Monte Carlo mask matches any of the 61 rebuilt realisations:
+
+- the best Jaccard index per case is 0.53 to 0.69 at base and 0.68 to 0.79 at maximum pumping, about 0.02 above the second best;
+- two published masks agree at a median of 0.56 (base) to 0.70 (maximum), and two rebuilt masks agree at the same values;
+- for the calibrated model the published mask is reproduced at 0.998.
+
+The Monte Carlo masks therefore come from flow fields that differ from the rebuilt realisations, so the failed pairing of Section 6 is not only a matter of order. Why they differ is unknown, since the scenario parameter files and the forward-run template are not archived.
 
 ## 8. Limitations and open points
 
-- The published masks cannot be paired with the rebuilt realisations (Section 6), so the comparison is between ensembles only.
+- The published masks cannot be paired with the rebuilt realisations (Section 6), so the comparison is between ensembles only. Even with the published conventions reproduced, no published Monte Carlo mask matches a rebuilt realisation better than two masks match each other (Section 7), so the masks were computed from different flow fields; the cause is unknown.
+- Why particles thinned at sinks give a faster area growth than full mixing (4.51 against 4.07 from base to maximum pumping, Table 6) was not examined.
 - `baserat.zip` contains 357 masks against 358 realisations: the base realisation, the last row of the parameter table, has no mask.
 - The scenario rule is inferred (Section 7); maxrange is reproduced in distribution only (its median area depends on the draws: 2,319 cells on 60 realisations, 2,362 on 357).
 - The comparison is on the uppermost active layer. Contributing areas in deeper layers are not compared.
-- MF6 PRT (6.9.0 development build) aborts (SIGILL) when a particle is released in a cell whose saturation is a film (1.4e-16, head at the cell bottom), even alone; one published start is left out for this reason. Not yet reported upstream.
+- MF6 PRT (6.9.0 development build) aborts (SIGILL) when a particle is released in a cell whose saturation is a film (1.4e-16, head at the cell bottom), even alone; one published start is left out for this reason. Films of 1.3e-15 to 1.3e-13 also abort it (realisation 443 at maxrat), so `growth_mechanisms.py` leaves out starts with saturation below 1e-10 (132 starts over 183 runs; no table changed against runs that tracked them). Not yet reported upstream.
 
 ## Reproducing
 
@@ -216,7 +267,7 @@ With streams as cells, the full-mixing area is within 11 % of the published medi
 python studies/neversink/workflow.py
 ```
 
-Stage 1 is `workflow.py`; the ensemble and the scenarios need `python studies/neversink/pest_rebuild.py` (about 3 min, rebuilds the interface) and then `python studies/neversink/ensemble_run.py` (about 3 h on 6 processes on an idle machine, longer under load: 76 min for the base ensemble, 102 min for the five scenarios; resumable; outside the Claude Code sandbox, which blocks process pools). In each script the gates in `__main__` select the parts to run; in `workflow.py` they are the two MF6 runs, the MODPATH comparison, the PRT checks, the PRT source split by well, the PRT diagnosis (off by default), the PRT reproduction of the published mask and the figures. The two MF6 runs take 44 s and 75 s. The two PRT runs released at four heights (488,448 particles) take about 13 minutes each and write a track file of about 6 GB; the two single-height runs (122,112 particles) take about 5 minutes and 1.5 GB. The source split by well is one more run released at four heights. The PRT diagnosis runs PRT once per release mode (water table, mid-cell, four heights) and evaluates both capture rules on the same tracks; it took 8 minutes on an otherwise idle machine. The reproduction of the published mask builds a copy of the model with IFLOWFACE (MF6 15 s) and runs PRT five times (about 30 s each; only termination records are written), about 3 minutes in all. The workflow deletes the track files after use. Output goes to `studies/neversink/output/`, which is not tracked by git. The USGS repository goes in `studies/neversink/external/neversink_workflow/` (also not tracked) as a sparse checkout:
+Stage 1 is `workflow.py`; the ensemble and the scenarios need `python studies/neversink/pest_rebuild.py` (about 3 min, rebuilds the interface) and then `python studies/neversink/ensemble_run.py` (about 3 h on 6 processes on an idle machine, longer under load: 76 min for the base ensemble, 102 min for the five scenarios; resumable; outside the Claude Code sandbox, which blocks process pools). `python studies/neversink/growth_mechanisms.py` reruns a sample at base, half and maximum pumping with the per-reach volumes and the three PRT runs (about 80 s per run on one process; 11 realisations in 10.5 min and, with `main(sample_n=60, out=...)`, 61 realisations in 59 min on six processes; resumable; output in `output/scenarios/mechanisms/` and `mechanisms60/`). In each script the gates in `__main__` select the parts to run; in `workflow.py` they are the two MF6 runs, the MODPATH comparison, the PRT checks, the PRT source split by well, the PRT diagnosis (off by default), the PRT reproduction of the published mask and the figures. The two MF6 runs take 44 s and 75 s. The two PRT runs released at four heights (488,448 particles) take about 13 minutes each and write a track file of about 6 GB; the two single-height runs (122,112 particles) take about 5 minutes and 1.5 GB. The source split by well is one more run released at four heights. The PRT diagnosis runs PRT once per release mode (water table, mid-cell, four heights) and evaluates both capture rules on the same tracks; it took 8 minutes on an otherwise idle machine. The reproduction of the published mask builds a copy of the model with IFLOWFACE (MF6 15 s) and runs PRT five times (about 30 s each; only termination records are written), about 3 minutes in all. The workflow deletes the track files after use. Output goes to `studies/neversink/output/`, which is not tracked by git. The USGS repository goes in `studies/neversink/external/neversink_workflow/` (also not tracked) as a sparse checkout:
 
 ```
 git clone --filter=blob:none --sparse https://github.com/usgs/neversink_workflow.git studies/neversink/external/neversink_workflow
