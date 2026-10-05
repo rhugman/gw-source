@@ -40,6 +40,11 @@ is its exact negative. Read for one model alone, these are boundary terms: a pac
 'GWF-GWF', the exchange name, partner = the other model and bound = the cell over there.
 gwsource.network turns them into edges when both models are read together.
 
+IFLOWFACE (checked on MF6 6.9 dev, RCH with AUXILIARY IFLOWFACE): a package's auxiliary
+variables are saved as extra columns of its list budget record (FloPy names the column by the
+AUXTXT, here 'IFLOWFACE'). MF6 PRT reads IFLOWFACE from the same budget file, so this column is
+what PRT uses. FlowStep.term_iflowface holds it per term (0 for records without it).
+
 Boundnames are not in the budget file. ID2 of a list record is the bound's position (1-based)
 in the package's list for the current stress period, so read_boundnames() loads the list input
 of every package with BOUNDNAMES through FloPy, per stress period (a period without a PERIOD
@@ -59,6 +64,7 @@ COMMENT_CHARS = ("#", "!", "//")
 DRY_HEAD = 1.0e29
 EXCHANGE_TEXT = "GWF-GWF"
 PACKAGEDATA_TYPES = ("sfr", "lak", "maw", "uzf")  # boundnames by reach, lake, well or UZF cell
+IFLOWFACE = "IFLOWFACE"
 
 
 @dataclass
@@ -393,6 +399,7 @@ def _record_package(parent: str, text: str, used: set[str]) -> Package:
 def _read_terms(cbc, indices: list[int], active: np.ndarray) -> dict:
     """Collect external term entries and the FLOW-JA-FACE array from one step's records."""
     out = {"cell": [], "flow": [], "package": [], "bound": [], "packages": [], "flowja": None}
+    out["iflowface"] = []
     out["saturation"] = None
     used: set[str] = set()
     for idx in indices:
@@ -420,22 +427,31 @@ def _read_terms(cbc, indices: list[int], active: np.ndarray) -> dict:
         if imeth == 6:
             parent = _decode(header["paknam2"]) or text
             cells, flow, bound = data["node"] - 1, data["q"], data["node2"]
+            iflowface = _aux_column(data, IFLOWFACE)
         else:
             parent = text
             cells, flow = _array_term(data, active)
-            bound = cells + 1
-        _append_terms(out, _record_package(parent, text, used), cells, flow, bound)
+            bound, iflowface = cells + 1, None
+        _append_terms(out, _record_package(parent, text, used), cells, flow, bound, iflowface)
     assert out["flowja"] is not None, "FLOW-JA-FACE not saved for this time step"
     return out
 
 
-def _append_terms(out: dict, package: Package, cells, flow, bound) -> None:
-    """Append one record's term entries (0-based cells, flows, bound numbers) to out."""
+def _aux_column(data: np.ndarray, name: str) -> np.ndarray | None:
+    """Return a list record's auxiliary column (name matched case-insensitively), or None."""
+    found = [c for c in data.dtype.names if c.upper() == name]
+    return np.asarray(data[found[0]]) if found else None
+
+
+def _append_terms(out: dict, package: Package, cells, flow, bound, iflowface=None) -> None:
+    """Append one record's term entries (0-based cells, flows, bound numbers, IFLOWFACE) to out."""
     out["packages"].append(package)
     out["cell"].append(np.asarray(cells, dtype=np.int64))
     out["flow"].append(np.asarray(flow, dtype=float))
     out["bound"].append(np.asarray(bound, dtype=np.int64))
-    out["package"].append(np.full(len(out["cell"][-1]), len(out["packages"]) - 1, dtype=np.int64))
+    n = len(out["cell"][-1])
+    out["package"].append(np.full(n, len(out["packages"]) - 1, dtype=np.int64))
+    out["iflowface"].append(np.zeros(n) if iflowface is None else np.rint(iflowface))
 
 
 def _concat(parts: list[np.ndarray], dtype) -> np.ndarray:
@@ -515,6 +531,7 @@ class StepReader:
             term_bound=term_bound,
             packages=terms["packages"],
             term_boundname=names,
+            term_iflowface=_concat(terms["iflowface"], np.int64),
             area=self.area if self.area is not None else self.grid.area,
             saturated_thickness=thickness,
             active=active,

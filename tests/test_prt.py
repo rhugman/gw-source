@@ -20,12 +20,22 @@ largest on the capture-zone edge, where full mixing and advection legitimately d
 cell. Only the correlation is asserted, loosely (> 0.9).
 """
 
+from dataclasses import replace
+
 import numpy as np
 import pytest
 
 import gwsource as gs
 from gwsource.assemble import cell_budget, flow_edges
-from gwsource.prt import PrtConfig, fan_points, track_particles
+from gwsource.prt import (
+    IFLOWFACE_BOTTOM,
+    IFLOWFACE_TOP,
+    PrtConfig,
+    _dis_polygons,
+    fan_points,
+    term_points,
+    track_particles,
+)
 
 POROSITY = 0.3
 
@@ -125,6 +135,60 @@ def test_layered_capture_matches_inflow(model_run, mf6_exe, tmp_path):
     assert prt.captured_flow == pytest.approx(res.destination_inflow["wel"], rel=0.02)
     weak = run.notes["weak_well_node"]
     assert res.fraction_through["wel"][weak] > 0.9  # the weak well's cell drains to the strong well
+
+
+def test_term_points_follow_iflowface():
+    """IFLOWFACE 0 fills the volume, -1 / -2 the top / bottom face, i > 0 lateral edge i."""
+    polygon = _dis_polygons(np.array([10.0]), np.array([4.0]))[0]  # SW, NW, NE, SE
+    local_z = np.array([0.25, 0.75])
+    xy, z, share = term_points(polygon, 0, 2, local_z)
+    assert len(z) == 16 * 2 and set(z) == {0.25, 0.75}
+    for face, height in ((IFLOWFACE_TOP, 1.0), (IFLOWFACE_BOTTOM, 0.0)):
+        xy, z, share = term_points(polygon, face, 2, local_z)
+        assert len(z) == 16 and np.all(z == height)
+    edges = {1: (0, None), 2: (None, 4.0), 3: (10.0, None), 4: (None, 0.0)}  # W, N, E, S
+    for face, (x, y) in edges.items():
+        xy, z, share = term_points(polygon, face, 2, local_z)
+        assert len(z) == 16 * 2 and share.sum() == pytest.approx(1.0)
+        if x is not None:
+            np.testing.assert_allclose(xy[:, 0], x)
+        if y is not None:
+            np.testing.assert_allclose(xy[:, 1], y)
+    with pytest.raises(AssertionError, match="not a face"):
+        term_points(polygon, 5, 2, local_z)
+
+
+def test_top_face_recharge_is_released_on_the_top_face(model_run, mf6_exe, tmp_path):
+    """Recharge assigned to the top face (IFLOWFACE = -1) is released there and closes the budget.
+
+    Model 2 with RCH AUXILIARY IFLOWFACE = -1 (same GWF flows). PRT then brings the recharge in
+    through the top face: it is the uppermost water, stays above the regional CHD inflow and
+    leaves at the east edge, so no recharge particle reaches the bottom-layer wells. Observed
+    (k = 3, 2 levels): released on the top face 405.8 of 405 m3/d, recharge 0; seeded over the
+    cell volume instead (as if IFLOWFACE were 0) 412.7, of which 6.9 recharge, released below
+    the top where PRT's velocity field carries no recharge water. The CHD particles are the
+    same in both runs, so the difference is the recharge alone.
+    """
+    run = model_run("m2_dis3lay_top")
+    step = gs.read_step(run.ws)
+    rch = step.package_names.index("RCH")
+    assert np.all(step.term_iflowface[step.term_package == rch] == IFLOWFACE_TOP)
+    assert np.all(step.term_iflowface[step.term_package != rch] == 0)
+    res = gs.backward(step, {"wel": gs.select(step, package="WEL")})
+    config = PrtConfig(porosity=POROSITY, subdivisions=3, z_levels=2)
+    prt = track_particles(run.ws, step, res, "wel", config, mf6_exe, tmp_path / "face")
+    volume_step = replace(step, term_iflowface=None)
+    volume = track_particles(run.ws, volume_step, res, "wel", config, mf6_exe, tmp_path / "vol")
+    face_rch, vol_rch = (p.release.package == "RCH" for p in (prt, volume))
+    q = res.destination_inflow["wel"]
+    print("top-face recharge: captured", prt.captured_flow, "volume seeding", volume.captured_flow,
+          "recharge", prt.captured_weight[face_rch].sum(), volume.captured_weight[vol_rch].sum())
+    assert np.all(prt.release.z[face_rch] == 1.0)
+    assert prt.captured_flow == pytest.approx(q, rel=0.02)
+    assert prt.captured_weight[face_rch].sum() < 0.5
+    assert volume.captured_weight[vol_rch].sum() > 5.0  # spurious recharge capture
+    excess = volume.captured_flow - prt.captured_flow
+    assert excess == pytest.approx(volume.captured_weight[vol_rch].sum(), abs=0.5)
 
 
 def test_capture_along_paths_follows_weight_past_partial_sinks():

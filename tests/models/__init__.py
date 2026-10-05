@@ -7,6 +7,7 @@ from .structured import (
     build_base_dis,
     build_constant_flow_dis,
     build_layered_dis,
+    build_layered_top_rch_dis,
     build_transient_dis,
     build_xt3d_dis,
 )
@@ -15,6 +16,7 @@ from .unstructured import build_base_disu, build_voronoi_disv
 MODEL_KEYS = (
     "m1_dis",
     "m2_dis3lay",
+    "m2_dis3lay_top",
     "m3_disv",
     "m4_disu_vert",
     "m4_disu_novert",
@@ -32,6 +34,7 @@ def build_model(key: str, ws, mf6_exe, triangle_exe) -> ModelRun:
     builders = {
         "m1_dis": lambda: build_base_dis(ws, mf6_exe),
         "m2_dis3lay": lambda: build_layered_dis(ws, mf6_exe),
+        "m2_dis3lay_top": lambda: build_layered_top_rch_dis(ws, mf6_exe),
         "m3_disv": lambda: build_voronoi_disv(ws, mf6_exe, triangle_exe),
         "m4_disu_vert": lambda: build_base_disu(ws, mf6_exe, with_vertices=True),
         "m4_disu_novert": lambda: build_base_disu(ws, mf6_exe, with_vertices=False),
@@ -54,6 +57,7 @@ __all__ = [
     "build_constant_flow_dis",
     "build_lak_uzf_dis",
     "build_layered_dis",
+    "build_layered_top_rch_dis",
     "build_maw_dis",
     "build_model",
     "build_mover_dis",
