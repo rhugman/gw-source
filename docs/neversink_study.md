@@ -9,7 +9,7 @@ Phase 5 case study, 2026-10-02: stage 1 (calibrated model), stage 2 (358-realisa
 - **Cell by cell, agreement is moderate.** The Jaccard index with the published cells is 0.30 for F > 0.1, 0.41 for F > 0.5 and 0.41 for the same number of cells ranked by F. Particle tracking on the same flow field gives 0.29 to 0.62 depending on weak-sink treatment and release depth, and with thinning it captures the wells' inflow to 2 %. Run with the published particle conventions, MF6 PRT reproduces the published mask (Jaccard 0.998), so the mask is one particle convention, now fully accounted for, not ground truth at cell level.
 - **Streams.** With streams as cells, 43 % of the priority-well water is stream-reach leakage. With the 12,316 SFR reaches as nodes of the graph, all of it traces back to recharge. The contributing area then extends upstream along the streams, outside what a recharge-cell mask can show.
 - **Ensemble.** Over the 358 realisations at base pumping, the mean F correlates with the published probability of contribution at 0.76 and gives 90 % of its expected area; the zones above 0.5 overlap with a Jaccard index of 0.43. The published masks could not be paired with single realisations (Section 6).
-- **Pumping scenarios.** With the scenario rule inferred from the published masks, the median full-mixing area is within 10 % of the published median from base to maximum pumping (911 against 998 cells at base, 3,707 against 3,590 at maximum).
+- **Pumping scenarios.** With the scenario rule inferred from the published masks, the median full-mixing area is within 11 % of the published median from base to maximum pumping (911 against 998 cells at base, 3,709 against 3,590 at maximum; 357 realisations per scenario). It grows faster than pumping mainly because the stream share of the wells' water falls as pumping rises.
 - **Cost.** The trace takes 2 to 3 s for nine destination groups; MODFLOW 6 takes 44 s. The ensemble (358 realisations, two traces each) took 76 min on six processes.
 
 ## 1. Model, benchmark and method
@@ -181,32 +181,32 @@ The core zones agree; the differences are where the published probability follow
 
 **Scenario rule.** The scripts that built the scenario ensembles are not archived. `studies/neversink/scenarios.py` infers the rule from the 6 × 357 published masks: only the eight priority wells change, with q = q_base + f (q_max − q_base), f = 0, 0.25, 0.5, 0.75 and 1 (baserat to maxrat) and, for maxrange, f drawn from U(0, 1) per well and realisation. In every realisation and region the published area grows monotonically from baserat to maxrat. The median area ratios fit this rule with a log rms of 0.05, against 0.36 for f × q_max (which would cut the U-cluster pumping below base at f = 0.25 while the published U area grows 1.7 times) and 0.18 for a geometric interpolation. The spread of the area in maxrange matches independent draws per well. The table footnote of the source repository says maximum rates were simulated only at the priority wells. Open: whether each realisation's own priority-well multiplier (0.93 to 1.08) was kept (the code replaces it), and the maxrange draws, which can be reproduced only in distribution.
 
-**Runs.** The five scenarios were run on the same 60 realisations, evenly spread over the parameter table (300 runs, about 55 min).
+**Runs.** The five scenarios were run on the 357 realisations that have a published mask (1,785 runs, about 20 min per scenario on six processes on an otherwise idle machine). A first pass on 60 of them gave medians within 0.2 % of these, except maxrange (2,319 against 2,362 cells), whose rates are drawn per realisation.
 
 **Table 5. Median contributing area (start cells) against pumping**
 
 | scenario | f | pumping (m³/d) | published | full mixing, streams as cells | full mixing, stream network |
 |---|---|---|---|---|---|
 | baserat | 0 | 3,663 | 998 | 911 | 1,534 |
-| 0.25rat | 0.25 | 6,095 | 1,794 | 1,607 | 2,508 |
-| 0.5rat | 0.5 | 8,548 | 2,475 | 2,324 | 3,454 |
-| 0.75rat | 0.75 | 11,001 | 3,034 | 3,033 | 4,365 |
-| maxrat | 1 | 13,453 | 3,590 | 3,707 | 5,248 |
-| maxrange | U(0, 1) | 8,632 | 2,413 | 2,319 | 3,464 |
+| 0.25rat | 0.25 | 6,095 | 1,794 | 1,606 | 2,510 |
+| 0.5rat | 0.5 | 8,548 | 2,475 | 2,324 | 3,455 |
+| 0.75rat | 0.75 | 11,001 | 3,034 | 3,033 | 4,366 |
+| maxrat | 1 | 13,453 | 3,590 | 3,709 | 5,249 |
+| maxrange | U(0, 1) | 8,661 | 2,413 | 2,362 | 3,493 |
 
-Published: median over the 357 masks of the scenario; gwsource: median sum of F over the start cells (358 realisations at base, 60 otherwise).
+Published: median over the 357 masks of the scenario; gwsource: median sum of F over the start cells (358 realisations at base, 357 otherwise).
 
 ![Area growth](figures/neversink_area_growth.png)
 
 *Figure 3. Median contributing area relative to base pumping. Dashed: the pumping ratio.*
 
-With streams as cells, the full-mixing area is within 10 % of the published median in every scenario (−11 % at 0.25rat, +3 % at maxrat). It grows somewhat faster than pumping (4.07 times at 3.67 times the pumping), the published area and the network area a little slower (3.60 and 3.42 times). A likely reason, not tested, is the stream share: at higher pumping more of the wells' water comes from recharge in the capture area than from stream leakage near the wells. Against the published probability maps of the scenarios, the correlation of mean F rises from 0.76 at base to 0.80 to 0.82, and the Jaccard index of the zones above 0.5 lies between 0.43 and 0.49.
+With streams as cells, the full-mixing area is within 11 % of the published median in every scenario (−10 % at 0.25rat, +3 % at maxrat). It grows faster than pumping (4.07 times at 3.67 times the pumping), the published area and the network area a little slower (3.60 and 3.42 times). The stream share accounts for most of the difference (`scenarios/source_table.csv`): with streams as cells, the share of the wells' water that is stream leakage falls from 42 % at base pumping to 29 % at maxrat (median over the realisations), so the recharge the wells capture grows 4.54 times. The area per unit of captured recharge falls by 11 % over the same range, and 4.54 × 0.89 ≈ 4.06, close to the area growth. Across realisations, the excess of the area growth over the pumping growth follows the drop in stream share (r = 0.94). Where the additional leakage enters, and why the published area grows more slowly, were not examined. Against the published probability maps of the scenarios, the correlation of mean F rises from 0.76 at base to 0.80 to 0.82, and the Jaccard index of the zones above 0.5 lies between 0.43 and 0.49.
 
 ## 8. Limitations and open points
 
 - The published masks cannot be paired with the rebuilt realisations (Section 6), so the comparison is between ensembles only.
 - `baserat.zip` contains 357 masks against 358 realisations: the base realisation, the last row of the parameter table, has no mask.
-- The scenario rule is inferred (Section 7); maxrange is reproduced in distribution only, and the scenarios were run on 60 of the 358 realisations.
+- The scenario rule is inferred (Section 7); maxrange is reproduced in distribution only (its median area depends on the draws: 2,319 cells on 60 realisations, 2,362 on 357).
 - The comparison is on the uppermost active layer. Contributing areas in deeper layers are not compared.
 - MF6 PRT (6.9.0 development build) aborts (SIGILL) when a particle is released in a cell whose saturation is a film (1.4e-16, head at the cell bottom), even alone; one published start is left out for this reason. Not yet reported upstream.
 
@@ -216,7 +216,7 @@ With streams as cells, the full-mixing area is within 10 % of the published medi
 python studies/neversink/workflow.py
 ```
 
-Stage 1 is `workflow.py`; the ensemble and the scenarios need `python studies/neversink/pest_rebuild.py` (about 3 min, rebuilds the interface) and then `python studies/neversink/ensemble_run.py` (about 2 h on 6 processes; resumable; outside the Claude Code sandbox, which blocks process pools). In each script the gates in `__main__` select the parts to run; in `workflow.py` they are the two MF6 runs, the MODPATH comparison, the PRT checks, the PRT source split by well, the PRT diagnosis (off by default), the PRT reproduction of the published mask and the figures. The two MF6 runs take 44 s and 75 s. The two PRT runs released at four heights (488,448 particles) take about 13 minutes each and write a track file of about 6 GB; the two single-height runs (122,112 particles) take about 5 minutes and 1.5 GB. The source split by well is one more run released at four heights. The PRT diagnosis runs PRT once per release mode (water table, mid-cell, four heights) and evaluates both capture rules on the same tracks; it took 8 minutes on an otherwise idle machine. The reproduction of the published mask builds a copy of the model with IFLOWFACE (MF6 15 s) and runs PRT five times (about 30 s each; only termination records are written), about 3 minutes in all. The workflow deletes the track files after use. Output goes to `studies/neversink/output/`, which is not tracked by git. The USGS repository goes in `studies/neversink/external/neversink_workflow/` (also not tracked) as a sparse checkout:
+Stage 1 is `workflow.py`; the ensemble and the scenarios need `python studies/neversink/pest_rebuild.py` (about 3 min, rebuilds the interface) and then `python studies/neversink/ensemble_run.py` (about 3 h on 6 processes on an idle machine, longer under load: 76 min for the base ensemble, 102 min for the five scenarios; resumable; outside the Claude Code sandbox, which blocks process pools). In each script the gates in `__main__` select the parts to run; in `workflow.py` they are the two MF6 runs, the MODPATH comparison, the PRT checks, the PRT source split by well, the PRT diagnosis (off by default), the PRT reproduction of the published mask and the figures. The two MF6 runs take 44 s and 75 s. The two PRT runs released at four heights (488,448 particles) take about 13 minutes each and write a track file of about 6 GB; the two single-height runs (122,112 particles) take about 5 minutes and 1.5 GB. The source split by well is one more run released at four heights. The PRT diagnosis runs PRT once per release mode (water table, mid-cell, four heights) and evaluates both capture rules on the same tracks; it took 8 minutes on an otherwise idle machine. The reproduction of the published mask builds a copy of the model with IFLOWFACE (MF6 15 s) and runs PRT five times (about 30 s each; only termination records are written), about 3 minutes in all. The workflow deletes the track files after use. Output goes to `studies/neversink/output/`, which is not tracked by git. The USGS repository goes in `studies/neversink/external/neversink_workflow/` (also not tracked) as a sparse checkout:
 
 ```
 git clone --filter=blob:none --sparse https://github.com/usgs/neversink_workflow.git studies/neversink/external/neversink_workflow
