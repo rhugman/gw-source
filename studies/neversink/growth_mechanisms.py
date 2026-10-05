@@ -1,10 +1,11 @@
 """Neversink case study, stage 3 follow-up: where the stream water reaching the wells changes
 with pumping, and why the published contributing area grows more slowly than full mixing.
 
-Sample. SAMPLE_N realisations whose published mask indices are evenly spread over the 357 masks
-(ensemble_run.scenario_subset) plus the base (calibrated) realisation, each at base, half and
-maximum pumping (QRATS). Stage 3 kept only package totals per run; here every run is rebuilt as
-ensemble_run.run_realisation does (same parameters and scenario rule), with the RCH and SFR
+Sample. SAMPLE_N realisations at rows of modpath_par_ens.csv evenly spread over the 357 runs
+with a published mask (ensemble_run.scenario_subset) plus the base (calibrated) realisation, each
+at base, half and maximum pumping (QRATS). Stage 3 kept only package totals per run; here every
+run is rebuilt as ensemble_run.run_realisation does (same parameters and scenario rule, the
+realisation's own priority-well multiplier kept), with the RCH and SFR
 flows given an IFLOWFACE auxiliary (top face where it is open, as in mp7_convention). The aux
 column does not change the flow solution, so one MF6 run serves both full mixing and PRT.
 
@@ -35,8 +36,9 @@ thins, in R2 only the distributed ones; a stop is a survival of 0. The area of a
 sum over the start cells of the count or captured weight; its growth is the scenario's area over
 the baserat area. VARIANTS orders them from full mixing to the published convention, one change
 at a time. stream_stops() locates the stream cells where the stop removes weight. The R1 masks
-are compared with the published masks of the same scenario in distribution and by best match
-(mask_matches, mask_similarity), since single masks cannot be paired with realisations.
+are compared with the published masks of the same scenario (moved back onto their cells,
+ensemble_run.read_mask): in distribution, by best match and with the realisation's own mask
+(mask_matches, mask_similarity).
 
 Run from anywhere with the project environment, outside the Claude Code sandbox (process pool):
 
@@ -78,7 +80,6 @@ OUT_DIR = wf.OUT / "scenarios" / "mechanisms"
 SAMPLE_N = 10
 QRATS = ("baserat", "0.5rat", "maxrat")
 BASE_REAL = "base"
-BASE_INDEX = 357  # the base realisation's row of modpath_par_ens.csv (it has no published mask)
 N_WORKERS = 6
 THREADS_PER_WORKER = 2
 GROUP = er.GROUP
@@ -115,7 +116,7 @@ _WORKER = {}  # per-process state set by the pool initializer
 
 
 def sample_realisations(n: int = SAMPLE_N) -> list[str]:
-    """Return the sample: n realisations evenly spread over the published masks, and the base."""
+    """Return the sample: n realisations evenly spread over the runs with a mask, and the base."""
     return [*er.scenario_subset(n), BASE_REAL]
 
 
@@ -128,8 +129,7 @@ def case_pars(real: str, qrat: str) -> pd.Series | None:
     """Return the parameters of a realisation under a scenario (None: the ensemble row)."""
     if qrat == "baserat":
         return None
-    index = er.mask_indices().get(real, BASE_INDEX)
-    return sc.scenario_pars(pr.realisation_pars(real), qrat, index)
+    return sc.scenario_pars(pr.realisation_pars(real), qrat, er.run_indices()[real])
 
 
 def write_case(real: str, qrat: str, ws: Path, iface) -> dict:
@@ -395,14 +395,19 @@ def collect(out: Path) -> pd.DataFrame:
     return table
 
 
-def stage3_summary(qrat: str) -> pd.DataFrame:
+def stage3_summary(
+    qrat: str, ens_dir: Path = er.ENS_DIR, scenario_dir: Path = er.SCENARIO_DIR
+) -> pd.DataFrame:
     """Return the stage-2/3 summary rows of a scenario (all realisations run there)."""
-    summary = er.collect_summary(er.ENS_DIR if qrat == "baserat" else er.SCENARIO_DIR / qrat)
+    summary = er.collect_summary(er.scenario_dir_of(qrat, ens_dir, scenario_dir))
     summary["stream_share"] = summary["cells:SFR_0"] / summary["inflow"]
     return summary.rename(columns={"cells:expected_cells": "area:f_start"})
 
 
-def sample_check(table: pd.DataFrame, qrats: tuple[str, ...] = QRATS) -> pd.DataFrame:
+def sample_check(
+    table: pd.DataFrame, qrats: tuple[str, ...] = QRATS, ens_dir: Path = er.ENS_DIR,
+    scenario_dir: Path = er.SCENARIO_DIR,
+) -> pd.DataFrame:
     """Return medians of the sample against stage 3 (same realisations, and all of them).
 
     rerun_max_diff is the largest relative difference of the rerun to stage 3 per realisation.
@@ -411,7 +416,7 @@ def sample_check(table: pd.DataFrame, qrats: tuple[str, ...] = QRATS) -> pd.Data
     rows = []
     for qrat in qrats:
         mine = table[table["qrat"] == qrat].set_index("real")
-        old = stage3_summary(qrat).set_index("real")
+        old = stage3_summary(qrat, ens_dir, scenario_dir).set_index("real")
         same = old.loc[old.index.intersection(mine.index)]
         for col in cols:
             diff = (mine.loc[same.index, col] - same[col]).abs() / same[col].abs()
@@ -614,11 +619,12 @@ def growth_table(table: pd.DataFrame, published: dict[str, np.ndarray]) -> pd.Da
 def mask_matches(
     out: Path, reals: list[str], published: dict[str, np.ndarray], calibrated: np.ndarray
 ) -> pd.DataFrame:
-    """Return per case the published mask that R1 matches best (Jaccard), and the base check.
+    """Return per case the published mask R1 matches best (Jaccard), its own mask and the base check.
 
     calibrated is the published mask of the calibrated model (workflow.mp7_mask), the reference
-    for the base realisation at base pumping.
+    for the base realisation at base pumping (it has no Monte Carlo mask).
     """
+    paired = er.mask_indices()
     rows = []
     for real in reals:
         for qrat, masks in published.items():
@@ -629,7 +635,8 @@ def mask_matches(
             row = {"real": real, "qrat": qrat, "r1_cells": int(r1.sum()), "best_mask": best}
             row.update(best_jaccard=float(jac[best]), second_jaccard=float(np.sort(jac)[-2]))
             row["median_jaccard"] = float(np.median(jac))
-            row["mask_index"] = er.mask_indices().get(real, -1)
+            row["mask_index"] = paired.get(real, -1)
+            row["paired_jaccard"] = float(jac[paired[real]]) if real in paired else np.nan
             if real == BASE_REAL and qrat == "baserat":
                 row["jaccard_calibrated"] = wf.jaccard(r1, calibrated)
             rows.append(row)
@@ -709,11 +716,17 @@ def mask_similarity(out: Path, reals: list[str], published: dict[str, np.ndarray
     return pd.DataFrame(rows)
 
 
-def analyse(out: Path, reals: list[str], qrats: tuple[str, ...] = QRATS) -> None:
-    """Write the sample check, the reach tables (base to maxrat) and the growth decomposition."""
+def analyse(
+    out: Path, reals: list[str], qrats: tuple[str, ...] = QRATS, ens_dir: Path = er.ENS_DIR,
+    scenario_dir: Path = er.SCENARIO_DIR,
+) -> None:
+    """Write the sample check, the reach tables (base to maxrat) and the growth decomposition.
+
+    ens_dir and scenario_dir hold the stage-2 and stage-3 runs the sample is checked against.
+    """
     table = collect(out)
     table.to_csv(out / "summary.csv", index=False)
-    sample_check(table, qrats).to_csv(out / "sample_check.csv", index=False)
+    sample_check(table, qrats, ens_dir, scenario_dir).to_csv(out / "sample_check.csv", index=False)
     reaches = reach_table()
     long = reach_long(out, reals, qrats)
     stream_by_distance(long, reaches).to_csv(out / "stream_by_distance.csv", index=False)
@@ -736,13 +749,15 @@ def main(
     sample_n: int = SAMPLE_N,
     qrats: tuple[str, ...] = QRATS,
     n_workers: int = N_WORKERS,
+    ens_dir: Path = er.ENS_DIR,
+    scenario_dir: Path = er.SCENARIO_DIR,
 ) -> None:
-    """Run the sample at the scenarios and analyse it."""
+    """Run the sample at the scenarios and analyse it against the stage-2 and stage-3 runs."""
     reals = sample_realisations(sample_n)
     if run:
         run_cases(out, reals, qrats, n_workers)
     if analyse_runs:
-        analyse(out, reals, qrats)
+        analyse(out, reals, qrats, ens_dir, scenario_dir)
 
 
 if __name__ == "__main__":

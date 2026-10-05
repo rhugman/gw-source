@@ -7,27 +7,30 @@ aquifer exchange tolerance than the default (AQUIFER_RTOL_NETWORK; see docs/neve
 Per realisation the F of the uppermost active layer is kept (both traces) with a summary row;
 the workspace is deleted.
 
-The published masks cannot be paired with the rebuilt realisations: mask i was assumed to be
-row i of modpath_par_ens.csv, but a realisation's F matches mask i no better than any other
-mask (docs/neversink_study.md). The per-realisation mask columns of the summaries therefore
-compare F with an effectively random published mask. The comparisons that hold are of the
-ensembles: the published probability (the share of the 357 masks in which a cell contributes)
-against the share of realisations in which F exceeds a threshold and the mean F, and the
-distribution of contributing areas (and of the wells' source split) per pumping scenario.
+The published masks (output/modpath_mc/{qrat}.zip) are stored one row south of their cells, and
+mask k belongs to run pest_rebuild.mask_run_order()[k], run r being row r of modpath_par_ens.csv
+(mc_masks.py, docs/neversink_study.md). read_mask moves a mask back onto its cells and
+mask_indices gives each realisation its own mask; every comparison here uses both. Per
+realisation, F is compared with its own mask (the mask columns of the summaries, recomputed from
+the saved F maps by analyse). Per ensemble, the published probability (the share of the 357
+masks in which a cell contributes) is compared with the share of realisations in which F exceeds
+a threshold and with the mean F, and the contributing areas (and the wells' source split) per
+pumping scenario.
 
 Run from anywhere with the project environment; the realisations run in N_WORKERS processes
 (outside the Claude Code sandbox, which blocks process pools):
 
     python studies/neversink/ensemble_run.py
 
-Stage 3 runs the five other published pumping scenarios (scenarios.py) on N_SUBSET realisations,
-evenly spread over the published masks (all 357 with a mask; the first run used 60, a subset of
-these), and compares each with its scenario's masks; the base-rate results are also analysed on
-that subset.
+Stage 3 runs the five other published pumping scenarios (scenarios.py, the realisation's own
+priority-well multiplier kept) on N_SUBSET realisations at rows evenly spread over the 357 runs
+with a mask (357: all of them), and compares each with its scenario's masks; the base-rate
+results are also analysed on that subset.
 
 Edit the gates in __main__ to rerun parts. The runs are resumable: a realisation with a summary
 file is skipped. Output goes to studies/neversink/output/ensemble/ and .../scenarios/<qrat>/
-(git-ignored).
+(git-ignored; main takes other folders, and base_out sends the base-rate tables elsewhere
+without rerunning the base ensemble).
 """
 
 import io
@@ -56,8 +59,9 @@ import gwsource as gs  # noqa: E402
 ENS_DIR = wf.OUT / "ensemble"
 SCENARIO_DIR = wf.OUT / "scenarios"
 SCENARIOS = ("0.25rat", "0.5rat", "0.75rat", "maxrat", "maxrange")
-N_SUBSET = 357  # realisations per pumping scenario, evenly spread over the 357 masks (357: all)
+N_SUBSET = 357  # realisations per pumping scenario, rows evenly spread over the 357 runs (357: all)
 MASK_ZIP = wf.SOURCE / "output" / "modpath_mc" / "{qrat}.zip"
+MASK_ROW_OFFSET = 1  # the published masks are stored this many rows south of their cells
 N_WORKERS = 6
 THREADS_PER_WORKER = 2
 AQUIFER_RTOL_NETWORK = 1e-3
@@ -67,18 +71,46 @@ GROUP = "priority"
 _WORKER = {}  # per-process state set by the pool initializer (interface, exe, start cells)
 
 
-def read_mask(index: int, qrat: str = "baserat") -> np.ndarray:
-    """Return published mask number index of a scenario as a (nrow, ncol) boolean grid."""
+def shift_rows(grid: np.ndarray, rows: int) -> np.ndarray:
+    """Return a (..., nrow, ncol) grid moved by rows (positive: south), without wrapping."""
+    out = np.zeros_like(grid)
+    if rows >= 0:
+        out[..., rows:, :] = grid[..., : grid.shape[-2] - rows, :]
+    else:
+        out[..., :rows, :] = grid[..., -rows:, :]
+    return out
+
+
+def read_mask(index: int, qrat: str = "baserat", corrected: bool = True) -> np.ndarray:
+    """Return published mask number index of a scenario as a (nrow, ncol) boolean grid.
+
+    corrected=True moves it MASK_ROW_OFFSET rows north onto its cells; False returns it as stored.
+    """
     with zipfile.ZipFile(str(MASK_ZIP).format(qrat=qrat)) as z:
         with z.open(f"{qrat}/{qrat}_real{index}.dat") as f:
-            return np.loadtxt(io.TextIOWrapper(f)) > 0.5
+            raw = np.loadtxt(io.TextIOWrapper(f)) > 0.5
+    if not corrected:
+        return raw
+    assert not raw[:MASK_ROW_OFFSET].any(), f"{qrat} mask {index} has cells in its first rows"
+    return shift_rows(raw, -MASK_ROW_OFFSET)
+
+
+def mask_table(pest_dir: Path = pr.PEST_DIR) -> pd.DataFrame:
+    """Return per realisation its run index (row of modpath_par_ens.csv) and mask index (-1: none)."""
+    return pr.mask_index_table(all_realisations(pest_dir))
 
 
 def mask_indices(pest_dir: Path = pr.PEST_DIR) -> dict[str, int]:
-    """Return {realisation name: published mask index}; 'base' (index -1) has no mask."""
-    table = pd.read_csv(pest_dir / "mask_index.csv", dtype={"real_name": str})
+    """Return {realisation name: its published mask index}; 'base' has no mask."""
+    table = mask_table(pest_dir)
     table = table[table["mask_index"] >= 0]
     return dict(zip(table["real_name"], table["mask_index"].astype(int)))
+
+
+def run_indices(pest_dir: Path = pr.PEST_DIR) -> dict[str, int]:
+    """Return {realisation name: run index}, the row of modpath_par_ens.csv ('base' included)."""
+    table = mask_table(pest_dir)
+    return dict(zip(table["real_name"], table["run_index"].astype(int)))
 
 
 def start_cells(nrow: int, ncol: int) -> np.ndarray:
@@ -139,22 +171,26 @@ def trace_both(ws: Path, top: np.ndarray, aquifer_rtol: float = AQUIFER_RTOL_NET
     return maps, row
 
 
-def realisation_pars(real: str, mask_index: int | None, qrat: str) -> pd.Series | None:
-    """Return the parameters of a realisation under a pumping scenario (None: as published)."""
+def realisation_pars(real: str, run_index: int, qrat: str) -> pd.Series | None:
+    """Return the parameters of a realisation under a pumping scenario (None: as published).
+
+    run_index (the row of modpath_par_ens.csv) seeds the maxrange draw.
+    """
     if qrat == "baserat":
         return None
-    assert mask_index is not None, f"{real} has no published mask index (needed by {qrat})"
-    return sc.scenario_pars(pr.realisation_pars(real), qrat, mask_index)
+    return sc.scenario_pars(pr.realisation_pars(real), qrat, run_index)
 
 
-def run_realisation(real: str, ens_dir: Path, mask_index: int | None, qrat: str = "baserat") -> dict:
+def run_realisation(
+    real: str, ens_dir: Path, run_index: int, mask_index: int | None, qrat: str = "baserat"
+) -> dict:
     """Write, run and trace one realisation; save its F maps and summary; delete the workspace."""
     iface, exe, top, starts = (_WORKER[k] for k in ("iface", "exe", "top", "starts"))
     ws = ens_dir / "ws" / real
     t0 = time.perf_counter()
-    pars = realisation_pars(real, mask_index, qrat)
+    pars = realisation_pars(real, run_index, qrat)
     pr.write_realisation(real, ws, pars=pars, iface=iface, npf_options=())
-    row = {"real": real, "qrat": qrat, "mask_index": mask_index}
+    row = {"real": real, "qrat": qrat, "run_index": run_index, "mask_index": mask_index}
     row["write_seconds"] = time.perf_counter() - t0
     row["mf6_seconds"] = wf.run_mf6(ws, exe)
     maps, trace_row = trace_both(ws, top)
@@ -183,11 +219,16 @@ def all_realisations(pest_dir: Path = pr.PEST_DIR) -> list[str]:
     return list(pd.read_csv(pest_dir / "modpath_par_ens.csv", usecols=[0], dtype=str).iloc[:, 0])
 
 
-def scenario_subset(n: int = N_SUBSET, n_masks: int = 357) -> list[str]:
-    """Return n realisations whose mask indices are evenly spread over 0 .. n_masks - 1."""
-    wanted = set(np.linspace(0, n_masks - 1, n).round().astype(int))
-    names = {i: r for r, i in mask_indices().items()}
-    return [names[i] for i in sorted(wanted)]
+def scenario_subset(n: int = N_SUBSET, n_runs: int = pr.N_MASKS) -> list[str]:
+    """Return n realisations at rows of modpath_par_ens.csv evenly spread over 0 .. n_runs - 1.
+
+    Rows 0 .. 356 are the runs with a published mask (n = 357: all of them). The sample is
+    defined by table row, not by mask index, so it is the same set of realisations as before the
+    mask pairing was corrected (when row and mask index were taken to be equal).
+    """
+    rows = np.unique(np.linspace(0, n_runs - 1, n).round().astype(int))
+    names = all_realisations()
+    return [names[i] for i in rows]
 
 
 def pending_realisations(ens_dir: Path, reals: list[str] | None = None) -> list[str]:
@@ -207,13 +248,15 @@ def run_ensemble(
     for sub in ("ws", "fractions", "summary"):
         (ens_dir / sub).mkdir(parents=True, exist_ok=True)
     reals = pending_realisations(ens_dir, reals)
-    indices = mask_indices()
+    runs, masks = run_indices(), mask_indices()
     log = ens_dir / "failures.log"
     for var in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
         os.environ[var] = str(threads)  # inherited by the workers before they import numpy
     t0 = time.perf_counter()
     with ProcessPoolExecutor(n_workers, initializer=init_worker, initargs=(pr.PEST_DIR,)) as pool:
-        jobs = {pool.submit(run_realisation, r, ens_dir, indices.get(r), qrat): r for r in reals}
+        jobs = {
+            pool.submit(run_realisation, r, ens_dir, runs[r], masks.get(r), qrat): r for r in reals
+        }
         for k, job in enumerate(as_completed(jobs), start=1):
             real = jobs[job]
             try:
@@ -231,13 +274,15 @@ def collect_summary(ens_dir: Path = ENS_DIR) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def published_probability(qrat: str = "baserat", n_masks: int = 357) -> np.ndarray:
+def published_probability(
+    qrat: str = "baserat", n_masks: int = pr.N_MASKS, corrected: bool = True
+) -> np.ndarray:
     """Return the published probability: the share of a scenario's masks in which a cell contributes."""
-    total = sum(read_mask(i, qrat).astype(float) for i in range(n_masks))
+    total = sum(read_mask(i, qrat, corrected).astype(float) for i in range(n_masks))
     return total / n_masks
 
 
-def published_areas(qrat: str, starts: np.ndarray, n_masks: int = 357) -> np.ndarray:
+def published_areas(qrat: str, starts: np.ndarray, n_masks: int = pr.N_MASKS) -> np.ndarray:
     """Return the number of contributing start cells of every published mask of a scenario."""
     return np.array([read_mask(i, qrat).ravel()[starts].sum() for i in range(n_masks)])
 
@@ -247,9 +292,8 @@ def probability_maps(
 ) -> dict[str, np.ndarray]:
     """Return the published probability (all masks) and gwsource's share of F > t and mean F.
 
-    The published masks cannot be paired with the rebuilt realisations (their order is not that
-    of modpath_par_ens.csv; see docs/neversink_study.md), so the published map uses all masks
-    and the gwsource maps all realisations of summary.
+    The published map uses all (corrected) masks of the scenario and the gwsource maps all
+    realisations of summary.
     """
     maps = {"mp7": published_probability(qrat)}
     for label in ("cells", "network"):
@@ -267,17 +311,26 @@ def probability_maps(
     return {k: (v if k == "mp7" else v / n) for k, v in maps.items()}
 
 
-def area_table(scenarios: tuple[str, ...] = ("baserat", *SCENARIOS)) -> pd.DataFrame:
+def scenario_dir_of(qrat: str, ens_dir: Path = ENS_DIR, scenario_dir: Path = SCENARIO_DIR) -> Path:
+    """Return the folder of a scenario's runs: the base ensemble or scenario_dir / qrat."""
+    return ens_dir if qrat == "baserat" else scenario_dir / qrat
+
+
+def area_table(
+    scenarios: tuple[str, ...] = ("baserat", *SCENARIOS),
+    ens_dir: Path = ENS_DIR,
+    scenario_dir: Path = SCENARIO_DIR,
+) -> pd.DataFrame:
     """Return per scenario the median contributing area, published (all masks) and gwsource.
 
-    gwsource's area is the sum of F over the start cells (cells only and with the stream
-    network); growth is relative to the base rate.
+    The published area is the number of (corrected) mask cells on the start cells; gwsource's is
+    the sum of F over the start cells (cells only and with the stream network); growth is
+    relative to the base rate.
     """
     starts = start_cells(680, 619)
     rows = []
     for qrat in scenarios:
-        ens_dir = ENS_DIR if qrat == "baserat" else SCENARIO_DIR / qrat
-        summary = collect_summary(ens_dir)
+        summary = collect_summary(scenario_dir_of(qrat, ens_dir, scenario_dir))
         rows.append(
             {
                 "qrat": qrat,
@@ -294,7 +347,11 @@ def area_table(scenarios: tuple[str, ...] = ("baserat", *SCENARIOS)) -> pd.DataF
     return table
 
 
-def source_table(scenarios: tuple[str, ...] = ("baserat", *SCENARIOS)) -> pd.DataFrame:
+def source_table(
+    scenarios: tuple[str, ...] = ("baserat", *SCENARIOS),
+    ens_dir: Path = ENS_DIR,
+    scenario_dir: Path = SCENARIO_DIR,
+) -> pd.DataFrame:
     """Return per scenario the median source split of the wells' water, streams as cells.
 
     rch and sfr are the volumes from recharge and from stream leakage (m3/d); the stream share
@@ -303,7 +360,7 @@ def source_table(scenarios: tuple[str, ...] = ("baserat", *SCENARIOS)) -> pd.Dat
     """
     rows = []
     for qrat in scenarios:
-        summary = collect_summary(ENS_DIR if qrat == "baserat" else SCENARIO_DIR / qrat)
+        summary = collect_summary(scenario_dir_of(qrat, ens_dir, scenario_dir))
         share = summary["cells:SFR_0"] / summary["inflow"]
         rows.append(
             {
@@ -345,21 +402,56 @@ def compare_probability(maps: dict, starts: np.ndarray) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def analyse(ens_dir: Path, qrat: str = "baserat", reals: list[str] | None = None, tag: str = "") -> None:
+def own_mask_columns(
+    ens_dir: Path, summary: pd.DataFrame, qrat: str, starts: np.ndarray
+) -> pd.DataFrame:
+    """Return the summary with every realisation's F maps compared with its own corrected mask.
+
+    Recomputed from the saved F maps, so it holds also for runs whose summary files predate the
+    corrected masks and pairing. Realisations without a mask get NaN.
+    """
+    runs, masks = run_indices(), mask_indices()
+    rows = []
+    for real in summary["real"]:
+        row = {"real": real, "run_index": runs[real], "mask_index": masks.get(real, -1)}
+        if real in masks:
+            mask = read_mask(masks[real], qrat)
+            fractions = np.load(ens_dir / "fractions" / f"{real}.npz")
+            for label in ("cells", "network"):
+                compared = compare_one(fractions[label], mask, starts)
+                row.update({f"{label}:{k}": v for k, v in compared.items()})
+        rows.append(row)
+    own = pd.DataFrame(rows).set_index("real")
+    out = summary.set_index("real")
+    out = out.drop(columns=[c for c in own.columns if c in out.columns])
+    return out.join(own).reset_index()
+
+
+def analyse(
+    ens_dir: Path,
+    qrat: str = "baserat",
+    reals: list[str] | None = None,
+    tag: str = "",
+    out_dir: Path | None = None,
+) -> None:
     """Write the summary, probability maps and their comparison for finished realisations.
 
-    reals restricts the analysis (e.g. to the scenario subset); tag is added to the file names.
+    reals restricts the analysis (e.g. to the scenario subset); tag is added to the file names;
+    the tables go to out_dir (default: ens_dir).
     """
+    out_dir = ens_dir if out_dir is None else out_dir
+    out_dir.mkdir(parents=True, exist_ok=True)
+    idomain = wf.grid_idomain(wf.OUT / "optimal")
+    starts = start_cells(*idomain.shape[1:])
     summary = collect_summary(ens_dir)
     if reals is not None:
         summary = summary[summary["real"].isin(reals)]
-    summary.to_csv(ens_dir / f"summary{tag}.csv", index=False)
-    idomain = wf.grid_idomain(wf.OUT / "optimal")
+    summary = own_mask_columns(ens_dir, summary, qrat, starts)
+    summary.to_csv(out_dir / f"summary{tag}.csv", index=False)
     maps = probability_maps(ens_dir, summary, idomain.shape[1:], qrat)
-    np.savez_compressed(ens_dir / f"probability_maps{tag}.npz", **maps)
-    starts = start_cells(*idomain.shape[1:])
+    np.savez_compressed(out_dir / f"probability_maps{tag}.npz", **maps)
     table = compare_probability(maps, starts).assign(qrat=qrat, n_reals=len(summary))
-    table.to_csv(ens_dir / f"probability_comparison{tag}.csv", index=False)
+    table.to_csv(out_dir / f"probability_comparison{tag}.csv", index=False)
 
 
 def main(
@@ -370,30 +462,40 @@ def main(
     make_figures: bool = True,
     scenarios: tuple[str, ...] = SCENARIOS,
     n_subset: int = N_SUBSET,
+    ens_dir: Path = ENS_DIR,
+    base_out: Path | None = None,
+    scenario_dir: Path = SCENARIO_DIR,
+    fig_dir: Path = wf.FIG_DIR,
 ) -> None:
-    """Run and analyse the base-rate ensemble, then the pumping scenarios on a subset."""
+    """Run and analyse the base-rate ensemble, then the pumping scenarios on a subset.
+
+    ens_dir holds the base-rate runs; base_out (default ens_dir) receives their tables, so the
+    base ensemble can be reanalysed into another folder without rerunning it.
+    """
     subset = scenario_subset(n_subset)
+    base_out = ens_dir if base_out is None else base_out
     if run_base:
-        run_ensemble(ENS_DIR)
-        if not pending_realisations(ENS_DIR):
-            (ENS_DIR / "DONE").write_text("all realisations finished\n")
+        run_ensemble(ens_dir)
+        if not pending_realisations(ens_dir):
+            (ens_dir / "DONE").write_text("all realisations finished\n")
     if analyse_base:
-        analyse(ENS_DIR)
-        analyse(ENS_DIR, reals=subset, tag="_subset")
+        analyse(ens_dir, out_dir=base_out)
+        analyse(ens_dir, reals=subset, tag="_subset", out_dir=base_out)
     for qrat in scenarios:
-        ens_dir = SCENARIO_DIR / qrat
         if run_scenarios:
-            run_ensemble(ens_dir, reals=subset, qrat=qrat)
+            run_ensemble(scenario_dir / qrat, reals=subset, qrat=qrat)
         if analyse_scenarios:
-            analyse(ens_dir, qrat)
+            analyse(scenario_dir / qrat, qrat)
     if analyse_scenarios:
-        area_table(("baserat", *scenarios)).to_csv(SCENARIO_DIR / "area_table.csv", index=False)
-        source_table(("baserat", *scenarios)).to_csv(SCENARIO_DIR / "source_table.csv", index=False)
+        qrats = ("baserat", *scenarios)
+        area_table(qrats, ens_dir, scenario_dir).to_csv(scenario_dir / "area_table.csv", index=False)
+        source_table(qrats, ens_dir, scenario_dir).to_csv(scenario_dir / "source_table.csv", index=False)
     if make_figures:
-        maps = dict(np.load(ENS_DIR / "probability_maps.npz"))
+        maps = dict(np.load(base_out / "probability_maps.npz"))
         idomain = wf.grid_idomain(wf.OUT / "optimal")
-        figures.probability_maps(maps, wf.FIG_DIR, idomain, wf.PRIORITY_WELLS)
-        figures.area_growth(pd.read_csv(SCENARIO_DIR / "area_table.csv"), wf.FIG_DIR)
+        fig_dir.mkdir(parents=True, exist_ok=True)
+        figures.probability_maps(maps, fig_dir, idomain, wf.PRIORITY_WELLS)
+        figures.area_growth(pd.read_csv(scenario_dir / "area_table.csv"), fig_dir)
 
 
 if __name__ == "__main__":

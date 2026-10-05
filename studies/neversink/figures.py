@@ -212,7 +212,7 @@ def area_growth(table: pd.DataFrame, fig_dir: Path) -> Path:
         if key != "pumping":  # the reference line is read off the legend
             ax.annotate(f"{fixed[col].iloc[-1]:.2f}", (1.0, fixed[col].iloc[-1]), xytext=(6, 0),
                         textcoords="offset points", va="center", fontsize=8, color=INK)
-    ax.set_xlabel("pumping scenario f  (q = q_base + f (q_max - q_base))")
+    ax.set_xlabel("pumping scenario f  (q = m (q_base + f (q_max - q_base)))")
     ax.set_ylabel("median contributing area / base")
     ax.set_xlim(-0.03, 1.12)
     ax.legend(loc="upper left", fontsize=8)

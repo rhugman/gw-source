@@ -29,8 +29,9 @@ never_ies_0.noise_lt_obs.4.obs.csv.
 
 The MODPATH Monte Carlo ensemble (modpath_par_ens.csv) is rebuilt with the notebook 3.2
 rejection sampling: iteration 4, phi < 3200 and |PERC_DISC| < 0.01 (read from the iteration-0
-observation file, as the notebook does). That gives 358 realisations, with 'base' last. The
-published masks baserat_real0..356 are positions 0..356 of that table, so 'base' has none.
+observation file, as the notebook does). That gives 358 realisations, with 'base' last. Rows
+0..356 of that table (the runs) have a published mask, 'base' has none; mask k is run
+mask_run_order()[k] (text-sorted run names; mc_masks.py), written to mask_index.csv.
 
 Run with the project environment (MF6 from <repo>/bin):
 
@@ -67,6 +68,7 @@ PST_ROOT = "never_ies_0.noise_lt_obs"
 BEST_ITER = 4
 PHI_TOO_HIGH = 3200.0
 PERC_DISC_MAX = 0.01
+N_MASKS = 357  # published masks per scenario (runs 0..356; the base realisation has none)
 NLAY = 4
 
 # Notebook 0.0 settings
@@ -313,10 +315,21 @@ def build_par_ensemble(
     return par_ens
 
 
-def mask_index_table(par_ens: pd.DataFrame, n_masks: int = 357) -> pd.DataFrame:
-    """Return the published mask index (baserat_real{i}) of every kept realisation."""
-    mask = [i if i < n_masks else -1 for i in range(len(par_ens))]
-    return pd.DataFrame({"real_name": par_ens.index, "mask_index": mask})
+def mask_run_order(n_masks: int = N_MASKS) -> list[int]:
+    """Return the run (row of modpath_par_ens.csv) of every published mask, in mask order.
+
+    scripts/modpath_mc_varq.py saves run r as mp_results_{r}_{qrat}.zip and the masks follow
+    those names sorted as text ('100_' before '10_'); the order is the same in every scenario.
+    """
+    return sorted(range(n_masks), key=lambda r: f"mp_results_{r}_baserat.zip")
+
+
+def mask_index_table(real_names: list[str], n_masks: int = N_MASKS) -> pd.DataFrame:
+    """Return per realisation (table order) its run index and published mask index (-1: none)."""
+    mask = np.full(len(real_names), -1)
+    mask[mask_run_order(n_masks)] = np.arange(n_masks)
+    runs = np.arange(len(real_names))
+    return pd.DataFrame({"real_name": list(real_names), "run_index": runs, "mask_index": mask})
 
 
 def realisation_pars(real_name: str, par_ens_file: Path = PEST_DIR / "modpath_par_ens.csv") -> pd.Series:
@@ -594,7 +607,7 @@ def main(
     rebuild_ensemble: bool = True,
     check_base_input: bool = True,
     run_checks: bool = True,
-    check_reals: tuple[str, ...] = ("base", "0", "280"),  # 0 and 280: masks 0 and 200
+    check_reals: tuple[str, ...] = ("base", "0", "280"),  # 0 and 280: rows 0 and 200
     pest_dir: Path = PEST_DIR,
 ) -> None:
     """Rebuild the interface and ensemble, then check realisations; tables go to pest_dir."""
@@ -605,7 +618,7 @@ def main(
     if rebuild_ensemble:
         par_ens = build_par_ensemble(pest_dir / "modpath_par_ens.csv")
         assert len(par_ens) == 358, f"expected 358 realisations, got {len(par_ens)}"
-        mask_index_table(par_ens).to_csv(pest_dir / "mask_index.csv", index=False)
+        mask_index_table(list(par_ens.index)).to_csv(pest_dir / "mask_index.csv", index=False)
     iface = load_interface(pest_dir)
     reals_dir = pest_dir / "reals"
     if check_base_input:
