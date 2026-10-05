@@ -99,25 +99,43 @@ def compare_one(f_top: np.ndarray, mask: np.ndarray, starts: np.ndarray) -> dict
     return row
 
 
-def trace_both(ws: Path, top: np.ndarray, aquifer_rtol: float = AQUIFER_RTOL_NETWORK) -> tuple:
-    """Trace the priority wells with streams as cells and as nodes; return F maps and a row."""
-    t0 = time.perf_counter()
+def trace_pair(ws: Path, aquifer_rtol: float = AQUIFER_RTOL_NETWORK) -> dict[str, tuple]:
+    """Trace the wells with streams as cells and as nodes: {label: (step, result)}."""
     step = gs.read_step(ws, boundnames=True)
-    res = gs.backward(step, wf.well_groups(step))
     net = gs.read_network(ws, package_nodes=("SFR",), boundnames=True, aquifer_rtol=aquifer_rtol)
-    res_net = gs.backward(net, wf.well_groups(net))
-    n = step.n_cells
-    maps = {
-        "cells": figures.top_map(res.fraction_through[GROUP][:n], top).astype(np.float32),
-        "network": figures.top_map(res_net.fraction_through[GROUP][:n], top).astype(np.float32),
+    return {
+        "cells": (step, gs.backward(step, wf.well_groups(step))),
+        "network": (net, gs.backward(net, wf.well_groups(net))),
     }
-    row = {"trace_seconds": time.perf_counter() - t0, "inflow": res.destination_inflow[GROUP]}
-    for label, (s, r) in {"cells": (step, res), "network": (net, res_net)}.items():
+
+
+def trace_maps(traces: dict[str, tuple], top: np.ndarray) -> dict[str, np.ndarray]:
+    """Return F of the uppermost active layer of both traces (float32)."""
+    n = traces["cells"][0].n_cells
+    return {
+        label: figures.top_map(r.fraction_through[GROUP][:n], top).astype(np.float32)
+        for label, (_, r) in traces.items()
+    }
+
+
+def trace_row(traces: dict[str, tuple]) -> dict:
+    """Return the inflow, closure, cycles and volumes by source package of both traces."""
+    row = {"inflow": traces["cells"][1].destination_inflow[GROUP]}
+    for label, (s, r) in traces.items():
         check = gs.diagnostics.backward_closure(s, r, GROUP)
         row[f"closure_{label}"] = check.error
         row[f"cycles_{label}"] = len(r.cycles)
         for pkg, v in r.volume_from_by_term[GROUP].items():
             row[f"{label}:{pkg}"] = float(v.sum())
+    return row
+
+
+def trace_both(ws: Path, top: np.ndarray, aquifer_rtol: float = AQUIFER_RTOL_NETWORK) -> tuple:
+    """Trace the priority wells with streams as cells and as nodes; return F maps and a row."""
+    t0 = time.perf_counter()
+    traces = trace_pair(ws, aquifer_rtol)
+    maps = trace_maps(traces, top)
+    row = {"trace_seconds": time.perf_counter() - t0, **trace_row(traces)}
     return maps, row
 
 
