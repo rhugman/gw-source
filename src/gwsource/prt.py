@@ -73,7 +73,9 @@ inflow (the duality of the gross method, now along advective paths). Observed:
 - Neversink (4 layers, 1.68M cells, eight wells, k = 1, 4 levels): 3,736 of 3,671 m3/d,
   every well within 11 % of its rate; the earlier version 1,940 (water table) and 3,005
   (mid-cell). A single mid-cell height gives 3,722 there, so the z levels matter most where
-  the alternative would be the water table.
+  the alternative would be the water table. Over five seeding layouts the total scattered
+  between 0.0 and +1.8 % without a trend (quadrature, not the thinning factor); the per-well
+  errors shrank with the number of z levels (RMS 18 % with one, 6 % with four).
 Which sources supply the water differs between advection and mixing (Neversink: 51 % stream
 leakage along the paths, 43 % under full mixing), and so do per-cell capture fractions; that
 is the method difference, not an error.
