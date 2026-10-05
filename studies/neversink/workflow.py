@@ -359,11 +359,196 @@ def save_fractions(path: Path, result: gs.BackwardResult, n_cells: int) -> None:
     )
 
 
+# ---------------------------------------------------------------- PRT sources by well
+# One thinned PRT run (volume seeding) evaluated for every well group, to split each well's
+# particle capture by source package and compare it with full mixing (Section 3).
+SOURCE_PACKAGES = ("RCHA", "SFR_0")
+# Plan distance classes [m] of a source cell from the well; below 75 m: the well cell and its
+# eight neighbours (50 m cells)
+DISTANCE_BINS = (0.0, 75.0, 250.0, 500.0, 1000.0, 2000.0, np.inf)
+
+
+def prt_release(
+    ws: Path,
+    step: gs.FlowStep,
+    result: gs.BackwardResult,
+    config: gs.PrtConfig,
+    group: str = "priority",
+    model: str = MODEL,
+) -> tuple[gs.prt.PrtGrid, gs.prt.ReleasePoints]:
+    """Return the PRT grid and the release points of the cells reaching group (track_particles)."""
+    files = gs.find_model_files(ws, model)
+    grid = gs.prt.load_prt_grid(ws, files.model, files.dis_type)
+    contributing = result.fraction_through[group] > config.fraction_threshold
+    local_z = config.local_z(int(grid.dis_kwargs["nlay"]))
+    release = gs.prt.release_points(step, grid, contributing, None, config.subdivisions, local_z)
+    return grid, release
+
+
+def capture_by_group(
+    track_file: Path, step: gs.FlowStep, result: gs.BackwardResult, n_particles: int
+) -> dict[str, np.ndarray]:
+    """Return every group's thinned captured share of each particle's weight; deletes the tracks."""
+    visits = gs.prt.cell_visits(gs.prt.read_tracks(track_file))
+    track_file.unlink()  # 6 GB for 488k particles; the visits hold what is needed
+    survival = gs.prt.weak_sink_survival(step)
+    captured = {}
+    for group in result.groups:
+        share = gs.prt.destination_share(step, result.selections[group])
+        captured[group] = gs.prt.capture_along_paths(visits, n_particles, share, survival)[0]
+    return captured
+
+
+def run_prt_by_group(
+    ws: Path,
+    step: gs.FlowStep,
+    result: gs.BackwardResult,
+    exe: Path,
+    prt_ws: Path,
+    porosity: float = MP7_POROSITY,
+    subdivisions: int = 1,
+    z_levels: int = PRT_Z_LEVELS,
+) -> tuple[gs.prt.PrtGrid, gs.prt.ReleasePoints, dict[str, np.ndarray]]:
+    """Run one thinned PRT from the cells reaching any priority well and evaluate every group."""
+    config = gs.PrtConfig(porosity=porosity, subdivisions=subdivisions, z_levels=z_levels)
+    grid, release = prt_release(ws, step, result, config)
+    sim = gs.prt.write_prt(prt_ws, ws, grid, release, config, exe, MODEL)
+    return grid, release, capture_by_group(gs.prt.run_prt(sim), step, result, release.n)
+
+
+def cell_distance(grid: gs.prt.PrtGrid, cells: np.ndarray, targets: np.ndarray) -> np.ndarray:
+    """Return the plan distance from each cell's centre to the nearest target cell's centre."""
+    centres = np.array([p.mean(axis=0) for p in grid.polygons])  # vertex mean: the DIS cell centre
+    xy, txy = centres[cells % grid.ncpl], centres[np.unique(targets % grid.ncpl)]
+    dx, dy = xy[:, None, 0] - txy[None, :, 0], xy[:, None, 1] - txy[None, :, 1]
+    return np.hypot(dx, dy).min(axis=1)
+
+
+def prt_sources_by_well(
+    result: gs.BackwardResult,
+    release: gs.prt.ReleasePoints,
+    captured: dict[str, np.ndarray],
+    packages: tuple[str, ...] = SOURCE_PACKAGES,
+) -> pd.DataFrame:
+    """Return, per group, the water by source package under full mixing and along PRT paths."""
+    rows = []
+    for group in result.groups:
+        row = {"group": group}
+        for pkg in packages:
+            row[f"mixing_{pkg}"] = float(result.volume_from_by_term[group][pkg].sum())
+            is_pkg = release.package == pkg
+            row[f"prt_{pkg}"] = float(np.sum(release.weight * captured[group] * is_pkg))
+        for method in ("mixing", "prt"):
+            row[f"{method}_total"] = sum(row[f"{method}_{pkg}"] for pkg in packages)
+        for pkg in packages:
+            for method in ("mixing", "prt"):
+                row[f"{method}_share_{pkg}"] = row[f"{method}_{pkg}"] / row[f"{method}_total"]
+            row[f"prt_minus_mixing_{pkg}"] = row[f"prt_{pkg}"] - row[f"mixing_{pkg}"]
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def prt_sources_by_distance(
+    result: gs.BackwardResult,
+    grid: gs.prt.PrtGrid,
+    release: gs.prt.ReleasePoints,
+    captured: dict[str, np.ndarray],
+    packages: tuple[str, ...] = SOURCE_PACKAGES,
+    bins: tuple[float, ...] = DISTANCE_BINS,
+) -> pd.DataFrame:
+    """Return the released flow and the water reaching each group by package and distance.
+
+    Distance is the plan distance of the source cell from the group's well cell(s); the water
+    reaching the group is given under full mixing and along PRT paths.
+
+    mean_F and mean_P are the flow-weighted capture fractions of those sources (water reaching
+    the group / released flow).
+    """
+    cells = np.unique(release.cell)
+    n_cells = len(result.fraction_through["priority"])
+    rows = []
+    for group in result.groups:
+        distance = cell_distance(grid, cells, np.flatnonzero(result.selections[group].cells))
+        bin_of_cell = np.digitize(distance, bins) - 1
+        for pkg in packages:
+            is_pkg = release.package == pkg
+            w = release.weight * is_pkg
+            q = np.bincount(release.cell, weights=w, minlength=n_cells)
+            p = np.bincount(release.cell, weights=w * captured[group], minlength=n_cells)
+            f = result.volume_from_by_term[group][pkg]
+            for b in range(len(bins) - 1):
+                sel = cells[bin_of_cell == b]
+                row = {"group": group, "package": pkg, "from_m": bins[b], "to_m": bins[b + 1]}
+                row.update(released=q[sel].sum(), mixing=f[sel].sum(), prt=p[sel].sum())
+                rows.append(row)
+    table = pd.DataFrame(rows)
+    table["prt_minus_mixing"] = table["prt"] - table["mixing"]
+    table["mean_F"] = table["mixing"] / table["released"]
+    table["mean_P"] = table["prt"] / table["released"]
+    return table
+
+
+def prt_capture_by_depth(
+    result: gs.BackwardResult,
+    release: gs.prt.ReleasePoints,
+    captured: dict[str, np.ndarray],
+    packages: tuple[str, ...] = SOURCE_PACKAGES,
+) -> pd.DataFrame:
+    """Return the released flow and the water reaching each group by package and release height.
+
+    The full-mixing value is the same at every height (local z): F does not depend on it.
+    """
+    levels = np.unique(release.z)
+    rows = []
+    for group in result.groups:
+        for pkg in packages:
+            mixing = float(result.volume_from_by_term[group][pkg].sum()) / len(levels)
+            for z in levels:
+                sel = (release.package == pkg) & (release.z == z)
+                rows.append(
+                    {
+                        "group": group,
+                        "package": pkg,
+                        "local_z": z,
+                        "released": float(release.weight[sel].sum()),
+                        "mixing": mixing,
+                        "prt": float(np.sum(release.weight[sel] * captured[group][sel])),
+                    }
+                )
+    return pd.DataFrame(rows)
+
+
+def write_prt_sources(
+    ws: Path, step: gs.FlowStep, result: gs.BackwardResult, exe: Path, out: Path
+) -> None:
+    """Run the per-group PRT evaluation and write the source tables and per-particle capture."""
+    prt_ws = out / "prt_by_well"
+    grid, release, captured = run_prt_by_group(ws, step, result, exe, prt_ws)
+    np.savez_compressed(
+        prt_ws / "particle_capture.npz",
+        cell=release.cell,
+        package=release.package.astype(str),
+        z=release.z,
+        weight=release.weight,
+        **{g: c.astype(np.float32) for g, c in captured.items()},
+    )
+    by_well = prt_sources_by_well(result, release, captured)
+    wells = by_well[by_well["group"] != "priority"]["prt_total"].sum()
+    priority = by_well.loc[by_well["group"] == "priority", "prt_total"].item()
+    assert abs(wells - priority) <= 1e-6 * priority, "the wells' capture does not sum to priority"
+    by_distance = prt_sources_by_distance(result, grid, release, captured)
+    by_depth = prt_capture_by_depth(result, release, captured)
+    by_well.to_csv(out / "prt_sources_by_well.csv", index=False)
+    by_distance.to_csv(out / "prt_sources_by_distance.csv", index=False)
+    by_depth.to_csv(out / "prt_capture_by_depth.csv", index=False)
+
+
 def main(
     run_published: bool = True,
     run_tight: bool = True,
     compare_mp7: bool = True,
     run_prt_check: bool = True,
+    run_prt_sources: bool = True,
     make_figures: bool = True,
     out: Path = OUT,
     fig_dir: Path = FIG_DIR,
@@ -415,6 +600,9 @@ def main(
             np.save(prt_ws / "cell_capture_fraction.npy", prt.cell_capture_fraction.astype(np.float32))
             (prt_ws / "prt.trk.csv").unlink()  # 1.5 GB; the result is in the table
         pd.DataFrame(rows).to_csv(out / "prt_comparison.csv", index=False)
+    if run_prt_sources:
+        step, result, _ = trace_wells(ws)
+        write_prt_sources(ws, step, result, exe, out)
     if make_figures:
         sys.path.insert(0, str(HERE))
         import figures
