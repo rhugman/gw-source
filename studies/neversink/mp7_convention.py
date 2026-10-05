@@ -138,6 +138,14 @@ def prepare_iflowface_model(ws: Path, src: Path = wf.MODEL_SRC) -> dict:
     Returns the number of SFR reaches put on the top face and left distributed.
     """
     wf.prepare_model(ws, src)
+    return add_iflowface(ws)
+
+
+def add_iflowface(ws: Path) -> dict:
+    """Assign the RCH and SFR flows of a model input to the top face where it is open (in place).
+
+    Returns the number of SFR reaches put on the top face and left distributed.
+    """
     sim = flopy.mf6.MFSimulation.load(sim_ws=str(ws), load_only=["dis"], verbosity_level=0)
     idomain = sim.get_model(wf.MODEL).dis.idomain.array
     reaches = sfr_reach_cells(ws / "neversink_packagedata.dat")
@@ -222,6 +230,22 @@ def write_published_flow_budget(
     return changes
 
 
+def write_distributed_budget(
+    budget_file: Path, out_file: Path, texts: tuple[str, ...] = ("RCHA", "SFR")
+) -> None:
+    """Copy a budget file with the IFLOWFACE column of the given records set to 0 (distributed).
+
+    PRT reads the face assignment from the budget file, so the copy gives the MF6 default of
+    distributing these flows over the cell without another flow run.
+    """
+    shutil.copyfile(budget_file, out_file)
+    for text in texts:
+        record = budget_record(out_file, text, "r+")
+        assert "IFLOWFACE" in record.dtype.names, f"{text}: no IFLOWFACE column"
+        record["IFLOWFACE"] = 0.0
+        record.flush()
+
+
 def cell_saturation(budget_file: Path, n_cells: int) -> np.ndarray:
     """Return the saturation of every cell (user nodes, 0 where inactive) from DATA-SAT."""
     rec = flopy.utils.CellBudgetFile(budget_file).get_data(text="DATA-SAT")[0]
@@ -261,8 +285,14 @@ def write_mp7_prt(
     exe: Path,
     porosity: float = wf.MP7_POROSITY,
     model: str = wf.MODEL,
+    stop_at_weak_sink: bool = True,
+    tracks: bool = False,
 ) -> flopy.mf6.MFSimulation:
-    """Write a PRT run with one particle per start (cell, x, y, local z), stopping at weak sinks."""
+    """Write a PRT run with one particle per start (cell, x, y, local z), stopping at weak sinks.
+
+    stop_at_weak_sink=False lets the particles pass weak sinks; tracks=True also writes the
+    release and cell-exit records (gwsource.prt.cell_visits), not only the terminations.
+    """
     if prt_ws.exists():
         shutil.rmtree(prt_ws)
     prt_ws.mkdir(parents=True)
@@ -281,10 +311,16 @@ def write_mp7_prt(
         packagedata=packagedata,
         local_z=True,
         extend_tracking=True,
-        stop_at_weak_sink=True,
+        stop_at_weak_sink=stop_at_weak_sink,
         exit_solve_tolerance=1e-5,
     )
-    flopy.mf6.ModflowPrtoc(prt, trackcsv_filerecord="prt.trk.csv", track_terminate=True)
+    flopy.mf6.ModflowPrtoc(
+        prt,
+        trackcsv_filerecord="prt.trk.csv",
+        track_release=tracks,
+        track_exit=tracks,
+        track_terminate=True,
+    )
     gwf_files = [("GWFHEAD", gwf_ws / f"{model}.hds"), ("GWFBUDGET", budget_file)]
     flopy.mf6.ModflowPrtfmi(
         prt, packagedata=[(kind, gs.prt._relative(path, prt_ws)) for kind, path in gwf_files]
