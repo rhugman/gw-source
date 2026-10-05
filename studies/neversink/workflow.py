@@ -64,6 +64,8 @@ TIGHT_DVCLOSE = (1e-4, 1e-6)
 # PRT checks: (release_z, thin_weak_sinks); release_z None spreads the points over the cell volume
 PRT_CASES = ((None, True), (None, False), (1.0, True), (0.5, True))
 PRT_Z_LEVELS = 4
+# PRT diagnosis (earlier against current capture rule): water table, mid-cell, cell volume
+PRT_DIAGNOSIS_Z = (1.0, 0.5, None)
 
 
 def mf6_exe(bin_dir: Path = BIN) -> Path:
@@ -324,6 +326,135 @@ def compare_prt(
     }
 
 
+def prt_tracks(
+    ws: Path,
+    step: gs.FlowStep,
+    result: gs.BackwardResult,
+    exe: Path,
+    prt_ws: Path,
+    config: gs.PrtConfig,
+    group: str = "priority",
+) -> tuple[gs.prt.ReleasePoints, np.ndarray]:
+    """Seed, write and run PRT as track_particles() does; return the release points and tracks.
+
+    The track file (1.5 to 6 GB) is deleted once read.
+    """
+    files = gs.find_model_files(ws, MODEL)
+    grid = gs.prt.load_prt_grid(ws, files.model, files.dis_type)
+    contributing = result.fraction_through[group] > config.fraction_threshold
+    local_z = config.local_z(int(grid.dis_kwargs["nlay"]))
+    release = gs.prt.release_points(step, grid, contributing, None, config.subdivisions, local_z)
+    sim = gs.prt.write_prt(prt_ws, ws, grid, release, config, exe, files.model)
+    track_csv = gs.prt.run_prt(sim)
+    tracks = gs.prt.read_tracks(track_csv)
+    track_csv.unlink()
+    return release, tracks
+
+
+def repeat_visits(tracks: np.ndarray, n_visits: int) -> int:
+    """Return the cell re-entries that cell_visits() drops (n_visits = its number of visits)."""
+    order = np.lexsort((np.arange(len(tracks)), tracks["t"], tracks["irpt"]))
+    particle, cell = tracks["irpt"][order], tracks["icell"][order]
+    new_visit = np.r_[True, (particle[1:] != particle[:-1]) | (cell[1:] != cell[:-1])]
+    return int(new_visit.sum()) - n_visits
+
+
+def first_destination_visits(visits: dict[str, np.ndarray], share: np.ndarray) -> dict:
+    """Return each particle's visits up to and including the first cell with share > 0.
+
+    Capture along these paths is the earlier rule: a particle stops in the first destination
+    cell it enters, which takes share x its remaining weight; the rest of the weight is dropped.
+    """
+    p = visits["particle"]
+    hit = (share[visits["cell"]] > 0).astype(np.int64)
+    start = np.r_[0, np.flatnonzero(p[1:] != p[:-1]) + 1]
+    hits_before = np.cumsum(hit) - hit
+    hits_before -= np.repeat(hits_before[start], np.diff(np.r_[start, len(p)]))
+    keep = hits_before == 0
+    return {key: v[keep] for key, v in visits.items()}
+
+
+def weight_left(
+    visits: dict[str, np.ndarray], release: gs.prt.ReleasePoints, survival: np.ndarray
+) -> np.ndarray:
+    """Return each particle's weight left after its last cell (weight x survival along the path)."""
+    log_f = np.log(np.maximum(survival[visits["cell"]], 1e-300))
+    return release.weight * np.exp(
+        np.bincount(visits["particle"], weights=log_f, minlength=release.n)
+    )
+
+
+def captured_flows(
+    visits: dict[str, np.ndarray],
+    release: gs.prt.ReleasePoints,
+    shares: dict[str, np.ndarray],
+    survival: np.ndarray,
+) -> dict[str, float]:
+    """Return the flow each destination (name: d/O per cell) captures along the visits [L3/T]."""
+    out = {}
+    for name, share in shares.items():
+        captured, _ = gs.prt.capture_along_paths(visits, release.n, share, survival)
+        out[name] = float(release.weight @ captured)
+    return out
+
+
+def compare_prt_rules(
+    ws: Path,
+    step: gs.FlowStep,
+    result: gs.BackwardResult,
+    exe: Path,
+    prt_ws: Path,
+    config: gs.PrtConfig,
+    group: str = "priority",
+    wells: dict = PRIORITY_WELLS,
+) -> list[dict]:
+    """Run PRT once and evaluate the earlier and the current capture rule on the same tracks.
+
+    Earlier rule: stop in the first destination cell (first_destination_visits). Current rule:
+    gross accounting along the whole path (capture_along_paths). Returns one row for thinned and
+    one for plain particles (config.thin_weak_sinks is not used): captured flow of the group and
+    of each well under both rules, end-status counts and the weight left by end status.
+    """
+    t0 = time.perf_counter()
+    release, tracks = prt_tracks(ws, step, result, exe, prt_ws, config, group)
+    seconds = time.perf_counter() - t0
+    status = gs.prt.endpoints(tracks, release.n)["status"]
+    visits = gs.prt.cell_visits(tracks)
+    repeats = repeat_visits(tracks, len(visits["particle"]))
+    del tracks
+    shares = {
+        name: gs.prt.destination_share(step, result.selections[name]) for name in [group, *wells]
+    }
+    first = first_destination_visits(visits, shares[group])
+    common = {
+        "particles": release.n,
+        "released_flow": float(release.weight.sum()),
+        "prt_seconds": seconds,
+        "visits": len(visits["particle"]),
+        "repeat_visits": repeats,
+        **{f"status_{s}": int(np.sum(status == s)) for s in np.unique(status)},
+    }
+    rows = []
+    for thin in (True, False):
+        survival = gs.prt.weak_sink_survival(step) if thin else 1.0 - shares[group]
+        old = captured_flows(first, release, shares, survival)
+        new = captured_flows(visits, release, shares, survival)
+        left = weight_left(visits, release, survival)
+        rows.append(
+            {
+                "thin_weak_sinks": thin,
+                **common,
+                "captured_first_cell": old[group],
+                "captured_whole_path": new[group],
+                "gain_later_visits": new[group] - old[group],
+                **{f"left_status_{s}": float(left[status == s].sum()) for s in np.unique(status)},
+                **{f"first_cell_{w}": old[w] for w in wells},
+                **{f"whole_path_{w}": new[w] for w in wells},
+            }
+        )
+    return rows
+
+
 def source_coverage(step: gs.FlowStep, result: gs.BackwardResult, start: np.ndarray) -> pd.DataFrame:
     """Return, per group, the share of the destination inflow that enters in the start cells.
 
@@ -364,6 +495,7 @@ def main(
     run_tight: bool = True,
     compare_mp7: bool = True,
     run_prt_check: bool = True,
+    diagnose_prt: bool = False,
     make_figures: bool = True,
     out: Path = OUT,
     fig_dir: Path = FIG_DIR,
@@ -415,6 +547,20 @@ def main(
             np.save(prt_ws / "cell_capture_fraction.npy", prt.cell_capture_fraction.astype(np.float32))
             (prt_ws / "prt.trk.csv").unlink()  # 1.5 GB; the result is in the table
         pd.DataFrame(rows).to_csv(out / "prt_comparison.csv", index=False)
+    if diagnose_prt:
+        step, result, _ = trace_wells(ws)
+        rows = []
+        for release_z in PRT_DIAGNOSIS_Z:
+            release = "volume" if release_z is None else f"z{release_z:g}"
+            config = gs.PrtConfig(
+                porosity=MP7_POROSITY, subdivisions=1, z_levels=PRT_Z_LEVELS, release_z=release_z
+            )
+            prt_ws = out / f"prt_diagnosis_{release}"
+            rows += [
+                {"release": release, **row}
+                for row in compare_prt_rules(ws, step, result, exe, prt_ws, config)
+            ]
+        pd.DataFrame(rows).to_csv(out / "prt_diagnosis.csv", index=False)
     if make_figures:
         sys.path.insert(0, str(HERE))
         import figures
