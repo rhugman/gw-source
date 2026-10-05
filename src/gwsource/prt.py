@@ -5,21 +5,35 @@ What it does
 1. Contributing cells: cells whose backward fraction F to the destination group exceeds a
    threshold (under full mixing F = 0 means no flow path, so no particle could arrive either).
 2. Release points: one set per source term (positive external flow, optionally restricted to a
-   source Selection) in a contributing cell, spread over the cell's plan polygon (DIS or DISV):
-   the polygon is split into a fan of triangles from its centroid, each triangle into k x k
-   equal sub-triangles, and a point is placed at each sub-triangle's centroid. Each plan point
-   is released at z_levels local z = (i + 0.5) / z_levels (fractions of the saturated
-   thickness). Every point carries the flow weight q_term x (sub-triangle area / cell area) /
-   z_levels, so sums over particles are flux-weighted for a source spread uniformly over the
-   cell volume.
-   That is how MF6 represents a boundary source unless the package assigns it to a face
-   (IFLOWFACE): recharge, river or drain leakage and edge CHD/GHB inflow are distributed over
-   the cell, and PRT's velocity field has the matching uniform divergence. Releasing everything
-   at one height is not consistent with that field. In particular release_z=1 (the water table,
-   where recharge physically enters) traps the particles of the top layer at the water table:
-   the top face carries no flow, so the vertical velocity there is zero and they never descend
-   (in a 3-layer test model all of them ended in layer 1 and none reached a well in layer 3).
-   Lateral sources are seeded the same way; that is an approximation of where they enter.
+   source Selection) in a contributing cell, placed where PRT's velocity field brings that
+   term's water in. Every point carries an equal-area (or equal-length) share of q_term, so
+   sums over particles are flux-weighted.
+   Plan points: the cell's plan polygon (DIS or DISV) is split into a fan of triangles from its
+   centroid, each triangle into k x k equal sub-triangles, and a point is placed at each
+   sub-triangle's centroid (weight = sub-triangle area / cell area).
+   Distributed terms (IFLOWFACE = 0, or no IFLOWFACE auxiliary): each plan point is released
+   at z_levels local z = (i + 0.5) / z_levels (fractions of the saturated thickness), so the
+   points fill the cell volume. That is how MF6 represents a boundary source by default:
+   recharge, river or drain leakage and edge CHD/GHB inflow are distributed over the cell, and
+   PRT's velocity field has the matching uniform divergence. Releasing everything at one
+   height is not consistent with that field. In particular release_z=1 (the water table)
+   traps the particles of the top layer at the water table: the top face carries no flow, so
+   the vertical velocity there is zero and they never descend (in a 3-layer test model all of
+   them ended in layer 1 and none reached a well in layer 3).
+   Face terms: a package can assign its flow to a cell face with the auxiliary variable
+   IFLOWFACE (AUXILIARY IFLOWFACE in the GWF package; the value is saved as a column of its
+   budget record, which is where PRT reads it, see gwsource.mf6io). Values (MF6 PRT source:
+   prt-fmi.f90, MethodDis, MethodDisv): 0 = distributed; -1 = top; -2 = bottom; i = 1..nvert =
+   lateral face i, the edge from vertex i to vertex i + 1 of the cell polygon (DISV: the
+   CELL2D vertex order; DIS: 1 west, 2 north, 3 east, 4 south). PRT then treats the term as a
+   flux through that face (a boundary face flow, no divergence inside the cell), and the
+   consistent release is on that face: top or bottom face terms at the plan points with local
+   z = 1 or 0 (one height); a lateral face term at points along its edge (as many as the
+   cell has plan points, at the midpoints of equal pieces) x the z_levels heights, a
+   midpoint rule for a flux spread uniformly over the saturated face. Recharge on the top
+   face is the uppermost water of the column and descends only as recharge is added on top
+   of it downstream (in the 3-layer test model with IFLOWFACE = -1 no recharge particle
+   reaches the bottom-layer wells; volume seeding there credits them with 6.9 m3/d of it).
 3. PRT: a separate simulation (own folder) with PRT DIS/DISV copied from the GWF input, MIP
    porosity, PRP with EXTEND_TRACKING (the last steady period is extended until particles
    terminate), FMI reading the GWF head and budget files, and EMS. FloPy writes the input; the
@@ -51,6 +65,11 @@ inflow (the duality of the gross method, now along advective paths). Observed:
   version that released at the water table and stopped particles in the first destination
   cell, dropping the rest of their weight, captured 266 m3/d; volume seeding with that stop
   rule about 306 m3/d.
+  With recharge on the top face (IFLOWFACE = -1, same GWF flows): 405.8 released on the top
+  face, 412.7 seeded over the volume. With the CHD edges on their lateral faces instead (1
+  west, 3 east; not in the test suite): 398 to 412 m3/d for k = 3..6 and 2..8 levels, the same
+  scatter as volume seeding of the CHD (395 to 403): each edge cell brings ~126 m3/d, so a few
+  particles on the capture-zone edge move the sum.
 - Neversink (4 layers, 1.68M cells, eight wells, k = 1, 4 levels): 3,736 of 3,671 m3/d,
   every well within 11 % of its rate; the earlier version 1,940 (water table) and 3,005
   (mid-cell). A single mid-cell height gives 3,722 there, so the z levels matter most where
@@ -89,6 +108,7 @@ from .traveltime import cell_porosity
 
 TERMINATE_REASON = 3
 PRT_GRIDS = ("DIS", "DISV")
+IFLOWFACE_TOP, IFLOWFACE_BOTTOM = -1, -2
 
 
 @dataclass
@@ -98,11 +118,14 @@ class PrtConfig:
     porosity: scalar or per-cell (required; use the same value as for the Eulerian times).
     fraction_threshold: seed only cells with backward fraction above this.
     subdivisions: k; each fan triangle of a cell gets k * k points (4 k^2 points per DIS cell).
-    z_levels: n; each plan point is released at the n local z = (i + 0.5) / n, i = 0..n-1,
-        so the points fill the saturated cell volume (see module docstring). A one-layer
-        grid has no vertical flow and gets one level.
-    release_z: optional single local z for all points instead (0 = cell bottom, 1 = water
-        table / cell top); release_z=1 traps particles at the water table of the top layer.
+    z_levels: n; each plan point of a distributed term is released at the n local
+        z = (i + 0.5) / n, i = 0..n-1, so the points fill the saturated cell volume (see module
+        docstring); lateral face terms use the same heights. A one-layer grid has no vertical
+        flow and gets one level. Top and bottom face terms (IFLOWFACE -1, -2) are always
+        released on their face (local z 1 or 0).
+    release_z: optional single local z instead of the levels (0 = cell bottom, 1 = water
+        table / cell top); release_z=1 traps particles of distributed terms at the water table
+        of the top layer.
     thin_weak_sinks: multiply particle weights by the full-mixing survival of every cell they
         pass, so other sinks remove their share (see module docstring).
     exit_solve_tolerance: PRP EXIT_SOLVE_TOLERANCE.
@@ -192,11 +215,15 @@ class PrtGrid:
 
 
 def _dis_polygons(delr: np.ndarray, delc: np.ndarray) -> list[np.ndarray]:
-    """Return the (row-major) cell rectangles of a DIS layer in local coordinates."""
+    """Return the (row-major) cell rectangles of a DIS layer in local coordinates.
+
+    Vertices run clockwise from the south-west corner, so edge i (vertex i to i + 1) is MF6's
+    DIS face i (1 west, 2 north, 3 east, 4 south), as edge i of a DISV cell is its face i.
+    """
     x = np.concatenate([[0.0], np.cumsum(delr)])
     y = delc.sum() - np.concatenate([[0.0], np.cumsum(delc)])
     return [
-        np.array([[x[c], y[r]], [x[c + 1], y[r]], [x[c + 1], y[r + 1]], [x[c], y[r + 1]]])
+        np.array([[x[c], y[r + 1]], [x[c], y[r]], [x[c + 1], y[r]], [x[c + 1], y[r + 1]]])
         for r in range(len(delc))
         for c in range(len(delr))
     ]
@@ -294,6 +321,39 @@ def _subtriangle_centroids(k: int) -> np.ndarray:
     return np.array(out)
 
 
+def edge_points(polygon: np.ndarray, face: int, n: int) -> tuple[np.ndarray, np.ndarray]:
+    """Return (points (n, 2), equal weights summing to 1) along lateral face `face` (1-based).
+
+    Face i is the polygon edge from vertex i to vertex i + 1 (MF6 PRT numbering); the points
+    are the midpoints of n equal pieces of it.
+    """
+    assert 1 <= face <= len(polygon), f"IFLOWFACE {face} is not a face of a {len(polygon)}-gon"
+    a, b = polygon[face - 1], polygon[face % len(polygon)]
+    t = (np.arange(n) + 0.5) / n
+    return a + t[:, None] * (b - a), np.full(n, 1.0 / n)
+
+
+def term_points(
+    polygon: np.ndarray, iflowface: int, k: int, local_z: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Return (plan points (n, 2), local z, weight shares summing to 1) of one source term.
+
+    IFLOWFACE 0: the cell volume (fan points x local_z); top (-1) or bottom (-2) face: the fan
+    points at local z 1 or 0; lateral face i: as many points along edge i as the fan has, x
+    local_z.
+    """
+    if iflowface in (IFLOWFACE_TOP, IFLOWFACE_BOTTOM):
+        points, share = fan_points(polygon, k)
+        z = 1.0 if iflowface == IFLOWFACE_TOP else 0.0
+        return points, np.full(len(share), z), share
+    if iflowface == 0:
+        points, share = fan_points(polygon, k)
+    else:
+        points, share = edge_points(polygon, iflowface, len(polygon) * k * k)
+    nz = len(local_z)
+    return np.repeat(points, nz, axis=0), np.tile(local_z, len(points)), np.repeat(share, nz) / nz
+
+
 def release_points(
     step: FlowStep,
     grid: PrtGrid,
@@ -304,21 +364,23 @@ def release_points(
 ) -> ReleasePoints:
     """Return flux-weighted release points for the source terms in contributing cells.
 
-    Each plan point is repeated at every local z, with an equal share of its weight.
+    Each term is released over its cell volume or over its IFLOWFACE face (term_points).
     """
     flow = np.maximum(step.term_flow, 0.0)
     keep = (flow > 0.0) & contributing[step.term_cell]
     if source is not None:
         keep &= source.terms
+    iflowface = step.term_iflowface
+    if iflowface is None:
+        iflowface = np.zeros(step.n_terms, dtype=np.int64)
     parts = {"cell": [], "xy": [], "z": [], "weight": [], "package": []}
-    nz = len(local_z)
     for k in np.flatnonzero(keep):
         cell = int(step.term_cell[k])
-        points, share = fan_points(grid.polygons[cell % grid.ncpl], subdivisions)
-        share = np.repeat(share, nz) / nz
+        polygon = grid.polygons[cell % grid.ncpl]
+        points, z, share = term_points(polygon, int(iflowface[k]), subdivisions, local_z)
         parts["cell"].append(np.full(len(share), cell))
-        parts["xy"].append(np.repeat(points, nz, axis=0))
-        parts["z"].append(np.tile(local_z, len(points)))
+        parts["xy"].append(points)
+        parts["z"].append(z)
         parts["weight"].append(flow[k] * share)
         name = step.packages[step.term_package[k]].name
         parts["package"].append(np.full(len(share), name, dtype=object))

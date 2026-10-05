@@ -138,7 +138,20 @@ def build_layered_dis(ws: Path, exe: Path) -> ModelRun:
     The large well sits in the middle of the grid. The small well extracts much less than the
     regional throughflow of its cell, so it is a genuine weak sink.
     """
-    name = "m2_dis3lay"
+    return _layered_dis(ws, exe, "m2_dis3lay", rch_iflowface=None)
+
+
+def build_layered_top_rch_dis(ws: Path, exe: Path) -> ModelRun:
+    """Model 2 with recharge assigned to the cell top face (RCH AUXILIARY IFLOWFACE = -1).
+
+    The GWF solution is that of model 2; only MF6 PRT sees the difference (recharge enters
+    through the top face instead of being spread over the cell).
+    """
+    return _layered_dis(ws, exe, "m2_dis3lay_top", rch_iflowface=-1)
+
+
+def _layered_dis(ws: Path, exe: Path, name: str, rch_iflowface: int | None) -> ModelRun:
+    """Build and run model 2, optionally with an IFLOWFACE auxiliary value on every recharge."""
     nlay, nrow, ncol, delr = 3, 15, 25, 50.0
     sim, gwf = make_sim(name, ws, exe, STEADY)
     dis_filename = f"{name}.dis"
@@ -151,10 +164,16 @@ def build_layered_dis(ws: Path, exe: Path) -> ModelRun:
     chd = [((lay, row, 0), 9.0) for lay in range(nlay) for row in range(nrow)]
     chd += [((lay, row, ncol - 1), 2.0) for lay in range(nlay) for row in range(nrow)]
     rch = [((0, row, col), 5.0e-4) for row in range(nrow) for col in range(ncol)]
+    aux = None
+    if rch_iflowface is not None:
+        rch = [(*rec, rch_iflowface) for rec in rch]
+        aux = ["IFLOWFACE"]
     strong_well, weak_well = (2, 7, 14), (2, 7, 5)
     wel = [(strong_well, -400.0), (weak_well, -5.0)]
     flopy.mf6.ModflowGwfchd(gwf, stress_period_data={0: chd}, save_flows=True, pname="chd")
-    flopy.mf6.ModflowGwfrch(gwf, stress_period_data={0: rch}, save_flows=True, pname="rch")
+    flopy.mf6.ModflowGwfrch(
+        gwf, stress_period_data={0: rch}, auxiliary=aux, save_flows=True, pname="rch"
+    )
     flopy.mf6.ModflowGwfwel(gwf, stress_period_data={0: wel}, save_flows=True, pname="wel")
     weak_node = int(np.ravel_multi_index(weak_well, (nlay, nrow, ncol)))
     notes = {"strong_well": strong_well, "weak_well": weak_well, "weak_well_node": weak_node}

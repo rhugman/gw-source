@@ -17,6 +17,8 @@ Conventions
   of an array record such as STO-SS). ``term_flow`` is positive INTO the cell: a positive entry
   is a source term, a negative entry is a sink term. Entries with zero flow are neither.
 - ``packages`` is the term table: ``term_package`` indexes into it.
+- ``term_iflowface`` (optional) is the IFLOWFACE auxiliary value of every term entry (0 where
+  the package has none): the cell face MF6 PRT assigns the boundary flow to (gwsource.prt).
 - ``saturated_thickness`` (optional, per cell) is the saturated thickness of the cell for this
   step; with ``area`` it gives the water volume that travel times need (gwsource.traveltime).
 
@@ -123,6 +125,7 @@ class FlowStep:
     term_bound: np.ndarray
     packages: list[Package]
     term_boundname: np.ndarray | None = None
+    term_iflowface: np.ndarray | None = None
     area: np.ndarray | None = None
     saturated_thickness: np.ndarray | None = None
     active: np.ndarray | None = None
@@ -201,6 +204,8 @@ def validate_step(step: FlowStep) -> None:
     assert m == 0 or step.term_package.max() < len(step.packages), "term_package range"
     if step.term_boundname is not None:
         assert len(step.term_boundname) == m, "term_boundname must have one entry per term"
+    if step.term_iflowface is not None:
+        assert len(step.term_iflowface) == m, "term_iflowface must have one entry per term"
     if step.area is not None:
         assert len(step.area) == n, "area must have one value per cell"
     if step.saturated_thickness is not None:
