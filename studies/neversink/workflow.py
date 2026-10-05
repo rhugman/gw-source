@@ -44,6 +44,7 @@ BIN = REPO / "bin"
 
 MODEL = "neversink"
 MP7_REGIONS = ("NE", "S", "W")
+ENDPOINT_COLUMNS = ("particleid", "node0", "node", "status", "cellface")
 # Priority wells: WEL boundnames and their 0-based MODPATH destination nodes
 # (scripts/get_endpoints.py of the source repository).
 PRIORITY_WELLS = {
@@ -176,17 +177,21 @@ def trace_checks(step: gs.FlowStep, result: gs.BackwardResult) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def read_endpoints(mp_dir: Path = MP7_OUT, regions: tuple[str, ...] = MP7_REGIONS) -> pd.DataFrame:
+def read_endpoints(
+    mp_dir: Path = MP7_OUT,
+    regions: tuple[str, ...] = MP7_REGIONS,
+    columns: tuple[str, ...] = ENDPOINT_COLUMNS,
+) -> pd.DataFrame:
     """Return start (node0) and end (node) cell, status and exit face of every MODPATH 7 particle.
 
     Nodes are 0-based; cellface is the face the particle last crossed (0 = inside, 6 = top).
+    columns selects other fields of the endpoint records (e.g. x0, y0, zloc0, time).
     """
-    columns = ["particleid", "node0", "node", "status", "cellface"]
     frames = []
     for region in regions:
         ep = flopy.utils.EndpointFile(mp_dir / f"{MODEL}_mp_forward_weak_{region}.mpend")
         data = pd.DataFrame.from_records(ep.get_alldata())
-        frames.append(data[columns].assign(region=region))
+        frames.append(data[list(columns)].assign(region=region))
     return pd.concat(frames, ignore_index=True)
 
 
@@ -677,6 +682,7 @@ def main(
     run_prt_check: bool = True,
     run_prt_sources: bool = True,
     diagnose_prt: bool = False,
+    reproduce_mp7: bool = True,
     make_figures: bool = True,
     out: Path = OUT,
     fig_dir: Path = FIG_DIR,
@@ -745,6 +751,11 @@ def main(
                 for row in compare_prt_rules(ws, step, result, exe, prt_ws, config)
             ]
         pd.DataFrame(rows).to_csv(out / "prt_diagnosis.csv", index=False)
+    if reproduce_mp7:
+        sys.path.insert(0, str(HERE))
+        import mp7_convention
+
+        mp7_convention.reproduce(out, exe, ws)
     if make_figures:
         sys.path.insert(0, str(HERE))
         import figures
