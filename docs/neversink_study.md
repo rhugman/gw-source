@@ -71,6 +71,14 @@ The wells of the U cluster share cells and capture areas, and a published cell b
 
 **Coverage.** 96 % of the priority-well water (95 to 100 % per well) enters in the start cells of the published particles. Water entering elsewhere (deeper layers, outside the three regions) is invisible to the published runs; it is small here.
 
+**End states of the published particles.** Each published particle ends in one of three ways (`studies/neversink/output/mp7_status.csv`). The end cells are classed on the MF6 budget: a strong sink sends all its outflow to boundary sinks, a weak sink only part of it.
+
+- Status 2 (89,920 particles): the particle leaves through a face. 88,781 of them leave through the top face of a stream cell: the published MPBAS file places SFR (and RCH) flows on the top face (IFACE 6), and that works where the top face is the model boundary, i.e. where no active cell lies above the stream cell. The other 1,139 leave sideways; for the 1,119 that end in cells without a sink, the neighbour is dry, which MODPATH treats as inactive. None of the status-2 particles ends in a priority well.
+- Status 3 (27,631): stopped on entering a weak-sink cell (the weak-sink option of the published runs), every one of them. Most are stream cells with an active cell above (26,828). There the top face is internal, and the stream flow acts as a sink inside the cell: every particle that stops in a stream cell (status 3 or 5) has an active cell above it, and none of those that leave through a stream cell's top face has. This is inferred from the end points, not from the MODPATH documentation. The rest are well (612) and CHD (191) cells. 466 of these particles end in the five priority wells that take only part of their cell's outflow (SV_407, SV_487, U__55, U___7, U___8).
+- Status 5 (4,470): ended in a cell with no exit face, every one of them a strong-sink cell. These are wells (2,570), stream cells with an active cell above (1,472) and CHD cells (428). 514 of them end in the three priority wells that take all of their cell's outflow (SV_193 48, SV_227 115, U_917 351).
+
+Status 5 is therefore the normal capture outcome at a strong sink, not an abnormal stop: the 980 published cells are the 514 particles that end in strong-sink wells plus the 466 stopped in weak-sink wells. The PRT runs of Section 3 end every particle the same way, also with status 5. The split between status 2 and status 3 does show a convention of the published runs that the comparison inherits: a stream cell with an active cell above stops particles as a weak sink, while one without lets them pass and leave only through its top face.
+
 ## 3. Results: particle tracking on the same flow field
 
 **Table 3. Agreement with the published cells (Jaccard, priority wells)**
@@ -177,7 +185,6 @@ With streams as cells, the full-mixing area is within 10 % of the published medi
 ## 8. Limitations and open points
 
 - The published masks cannot be paired with the rebuilt realisations (Section 6), so the comparison is between ensembles only.
-- 4,470 of the 122,021 MODPATH particles of the calibrated model end with status 5. By the MODPATH 7 status convention this is a stop in a cell with no exit face; 514 of the 980 contributing particles are among them. This was not investigated.
 - `baserat.zip` contains 357 masks against 358 realisations: the base realisation, the last row of the parameter table, has no mask.
 - The scenario rule is inferred (Section 7); maxrange is reproduced in distribution only, and the scenarios were run on 60 of the 358 realisations.
 - The comparison is on the uppermost active layer. Contributing areas in deeper layers are not compared.

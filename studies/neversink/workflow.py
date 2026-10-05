@@ -175,18 +175,59 @@ def trace_checks(step: gs.FlowStep, result: gs.BackwardResult) -> pd.DataFrame:
 
 
 def read_endpoints(mp_dir: Path = MP7_OUT, regions: tuple[str, ...] = MP7_REGIONS) -> pd.DataFrame:
-    """Return the start (node0) and end (node) cell of every MODPATH 7 particle, 0-based."""
+    """Return start (node0) and end (node) cell, status and exit face of every MODPATH 7 particle.
+
+    Nodes are 0-based; cellface is the face the particle last crossed (0 = inside, 6 = top).
+    """
+    columns = ["particleid", "node0", "node", "status", "cellface"]
     frames = []
     for region in regions:
         ep = flopy.utils.EndpointFile(mp_dir / f"{MODEL}_mp_forward_weak_{region}.mpend")
         data = pd.DataFrame.from_records(ep.get_alldata())
-        frames.append(data[["particleid", "node0", "node", "status"]].assign(region=region))
+        frames.append(data[columns].assign(region=region))
     return pd.concat(frames, ignore_index=True)
 
 
 def mp7_mask(endpoints: pd.DataFrame, dest_nodes: list[int]) -> np.ndarray:
     """Return, per particle, whether it ends in one of dest_nodes (the published criterion)."""
     return endpoints["node"].isin(dest_nodes).to_numpy()
+
+
+def endpoint_status(
+    endpoints: pd.DataFrame, step: gs.FlowStep, wells: dict = PRIORITY_WELLS
+) -> pd.DataFrame:
+    """Return, per MODPATH 7 status, the kind of cell the particles end in and the wells reached.
+
+    The end cell is classed on the MF6 budget: a strong sink sends all its outflow to boundary
+    sinks (no face outflow), a weak sink part of it. Columns end_<package> count end cells by the
+    package of their sink; top_face counts exits through the top face, where the published MPBAS
+    file places RCH and SFR flows (IFACE 6).
+    """
+    budget = gs.cell_budget(step)
+    node = endpoints["node"].to_numpy()
+    sink, face_out = budget.sink[node], budget.edge_out[node]
+    strong = (sink > 0) & (face_out <= 1e-12 * sink)
+    sink_package = np.full(step.n_cells, "", dtype=object)
+    names = np.array([pkg.name for pkg in step.packages], dtype=object)
+    leaving = step.term_flow < 0
+    sink_package[step.term_cell[leaving]] = names[step.term_package[leaving]]
+    table = pd.DataFrame(
+        {
+            "status": endpoints["status"].to_numpy(),
+            "strong_sink": strong,
+            "weak_sink": (sink > 0) & ~strong,
+            "no_sink": sink <= 0,
+            "top_face": endpoints["cellface"].to_numpy() == 6,
+            "package": sink_package[node],
+            "well": endpoints["node"].map({v: k for k, v in wells.items()}).to_numpy(),
+        }
+    )
+    rows = table.groupby("status")[["strong_sink", "weak_sink", "no_sink", "top_face"]].sum()
+    rows.insert(0, "particles", table.groupby("status").size())
+    by_package = pd.crosstab(table["status"], table["package"]).add_prefix("end_")
+    by_well = pd.crosstab(table["status"], table["well"]).reindex(columns=list(wells), fill_value=0)
+    out = rows.join(by_package).join(by_well).fillna(0).astype(int)
+    return out.drop(columns="end_", errors="ignore").reset_index()
 
 
 def jaccard(a: np.ndarray, b: np.ndarray) -> float:
@@ -347,6 +388,7 @@ def main(
         endpoints = read_endpoints()
         trace_checks(step, result).assign(seconds=seconds).to_csv(out / "checks_cells.csv", index=False)
         compare_masks(result, endpoints).to_csv(out / "mp7_comparison.csv", index=False)
+        endpoint_status(endpoints, step).to_csv(out / "mp7_status.csv", index=False)
         source_coverage(step, result, endpoints["node0"].to_numpy()).to_csv(
             out / "mp7_coverage.csv", index=False
         )
