@@ -496,7 +496,8 @@ def prt_capture_by_depth(
 ) -> pd.DataFrame:
     """Return the released flow and the water reaching each group by package and release height.
 
-    The full-mixing value is the same at every height (local z): F does not depend on it.
+    F does not depend on the height, so the full-mixing column is the package total divided
+    evenly over the heights (each height carries the same share of the released flow).
     """
     levels = np.unique(release.z)
     rows = []
