@@ -142,17 +142,17 @@ Full-mixing flow tracing computes, from the cell-by-cell flows of a groundwater 
 
 | # | content | status | source |
 |---|---|---|---|
-| Fig. 1 | Schematic: a cell with intercell edges and source/sink terms; backward and forward systems; gross vs net on a weak-sink cell | to make | PLAN §2; tutorial 02 |
-| Fig. 2 | Verification summary: closure and duality errors over test models; GWT agreement; DIS/DISU/split agreement | to make | test outputs (needs a small script collecting the errors) |
-| Fig. 3 | Numerical dispersion: band width and area error against cell size | exists | `docs/figures/dispersion_analytic_convergence.png` (consider merging with `dispersion_model1_convergence.png`, or SI) |
-| Fig. 4 | Neversink model, wells, regions and published contributing cells (location map) | to make | `external/neversink_workflow`, `output/mp7_priority.npz` |
-| Fig. 5 | F with published cells; streams as cells and as network | exists | `docs/figures/neversink_capture_maps.png` (NS Fig. 1) |
-| Fig. 6 | Jaccard with the published mask by method and convention (full mixing thresholds; PRT plain/thinned, release depth; PRT MF6 default to published conventions) | to make | NS Tables 1, 3 and §3 reproduction table; `agreement_with_mp7.csv`, `prt_comparison.csv`, `mp7_reproduction.csv` |
-| Fig. 7 | Published probability vs ensemble mean F (cells, network) | exists | `docs/figures/neversink_probability_maps.png` (NS Fig. 2) |
-| Fig. 8 | Area growth against pumping: published, full mixing, network, PRT with published conventions | exists, extend | `docs/figures/neversink_area_growth.png` (NS Fig. 3); add PRT curve from `mechanisms60/` |
-| Fig. 9 | Growth mechanism: stream share vs pumping, and area-growth excess vs stream-share drop across realisations (r = 0.94) | to make | `output/scenarios/source_table.csv`, `mechanisms60/growth_decomposition.csv` |
+| Fig. 1 | Schematic: a cell with intercell edges and source/sink terms; backward and forward systems; gross vs net on a weak-sink cell | made | `docs/paper/figures/fig1_method_schematic.png` / `.pdf`; code `studies/paper/method_figures.py` |
+| Fig. 2 | Verification summary: closure and duality errors over test models; GWT agreement; DIS/DISU/split agreement | made | `docs/paper/figures/fig2_verification.png` / `.pdf`; code `studies/paper/method_figures.py` |
+| Fig. 3 | Numerical dispersion: band width and area error against cell size | made | `docs/paper/figures/fig3_numerical_dispersion.png` / `.pdf`; code `studies/paper/method_figures.py` |
+| Fig. 4 | Neversink model, wells, regions and published contributing cells (location map) | made | `docs/paper/figures/fig4_location_map.png` / `.pdf`; code `studies/paper/neversink_figures.py` |
+| Fig. 5 | F with published cells; streams as cells and as network | made | `docs/paper/figures/fig5_capture_maps.png` / `.pdf`; code `studies/paper/neversink_figures.py` |
+| Fig. 6 | Jaccard with the published mask by method and convention (full mixing thresholds; PRT plain/thinned, release depth; PRT MF6 default to published conventions) | made | `docs/paper/figures/fig6_agreement.png` / `.pdf`; code `studies/paper/neversink_figures.py` |
+| Fig. 7 | Published probability vs ensemble mean F (cells, network) | made | `docs/paper/figures/fig7_probability_maps.png` / `.pdf`; code `studies/paper/neversink_figures.py` |
+| Fig. 8 | Area growth against pumping: published, full mixing, network, PRT with published conventions | made | `docs/paper/figures/fig8_area_growth.png` / `.pdf`; code `studies/paper/neversink_figures.py` |
+| Fig. 9 | Growth mechanism: stream share vs pumping, and area-growth excess vs stream-share drop across realisations (r = 0.94) | made | `docs/paper/figures/fig9_growth_mechanism.png` / `.pdf`; code `studies/paper/neversink_figures.py` |
 | Table 1 | Comparison of the reference method and this formulation (solve, accounting, cycles, outputs) | to adapt | PLAN §1 table |
-| Table 2 | Verification checks with tolerance and observed error | to make | tests; PLAN phase notes |
+| Table 2 | Verification checks with tolerance and observed error | made | `docs/paper/figures/verification_table.md` / `.csv`; code `studies/paper/verification.py` |
 | Table 3 | Calibrated model vs published cells (counts, Jaccard) | exists | NS Table 1 |
 | Table 4 | Particle tracking variants: Jaccard, expected cells, captured flow | exists | NS Table 3 plus reproduction table |
 | Table 5 | Ensemble comparison | exists | NS Table 4 |
@@ -165,7 +165,7 @@ Full-mixing flow tracing computes, from the cell-by-cell flows of a groundwater 
 1. **Quadrature analysis scripts are missing.** NS §3 says the five-layout analysis of the +1.8 % excess "was a one-off analysis; its scripts are not in the repository". Add them (or drop the claim) before the paper cites it.
 2. **Threshold guidance on Neversink against a non-stopping reference.** The paper wants to say whether F ≥ 0.1 is a conservative envelope on a real model. Compute coverage of the thinned-PRT P > 0.5 zone by F ≥ 0.1 and F ≥ 0.5 from existing PRT outputs (no new runs; `prt_volume_thin1`).
 3. **Gross vs net on Neversink.** Key message 1 rests on a tutorial example. Run net mode on the calibrated model and report the over-attribution at the partial-capture wells (U___7 takes 44 % of its cell's outflow, SV_487 69 %). One trace, seconds.
-4. **Verification table and figure.** No script collects the closure, duality and GWT errors into one table; the numbers are spread over PLAN notes and test tolerances. Write a small collector over the test models.
+4. **Verification table and figure.** Done: `studies/paper/verification.py` collects the checks over test models 1–9 (Table 2, Fig. 2); all pass, the largest round-off error is 1.5e-15.
 5. **Travel time on Neversink.** The published MODPATH runs have travel times and PRT agrees with them within 1 % (NS §3), but Eulerian mean times were not compared. Needed only if the paper keeps travel time in scope.
 6. **Inferred mechanisms.** Leakage staying on flow lines to the wells (NS §7) and the narrow-path reading of Fig. 7 (NS §6) are inferred. Either trace one reach cell by cell or word them as interpretation.
 7. **Transient scope.** No real-model transient application. Either limit the paper to steady state and ensembles (recommended) or add one.
