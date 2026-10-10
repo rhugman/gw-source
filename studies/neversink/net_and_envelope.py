@@ -5,27 +5,41 @@ flow field of workflow.py (output/optimal) and without new MF6 or PRT runs.
 
 Net against gross. Net accounting (the reference method [FB13]; PLAN §2.4) uses only the
 intercell flows: s_i = O^edges_i - I^edges_i, throughflow T_i = I^edges_i + max(s_i, 0), the
-destination cells absorb (f = 1) and elsewhere f_i = sum_j q_ij f_j / T_i. The water attributed
-to a group is the throughflow of its cells (destination_inflow), against the wells' own pumping
-under gross accounting. F differs between the modes only in the destination cells and in cells
-with both source and sink terms (O_gross = I^edges + sources there, T = max(I^edges, O^edges));
-elsewhere the row equations are the same and the difference is inherited from downstream.
+destination cells absorb (f = 1) and elsewhere f_i = sum_j q_ij f_j / T_i. The net attribution
+of a group is its net volume from, sum_i f_i max(s_i, 0), set against the wells' own pumping under
+gross accounting. The library's net destination_inflow is the sum of the destination cells'
+throughflows; for a group of several cells it counts water that passes between them more than
+once (net_dest_throughflow_sum below). F differs between the modes locally only in the
+destination cells and in cells with both source and sink terms (O_gross = I^edges + sources
+there, T = max(I^edges, O^edges)). Elsewhere the row equations are the same up to the cell budget
+error (gross normalises by O = I - r, net by T = I^edges), and the difference is otherwise
+inherited from downstream.
 
 Net closure. Summing f_i T_i = sum_j q_ij f_j over the non-destination cells gives, with D the
 destination cells and s+ = max(s, 0),
 
     sum_i f_i s+_i = sum_{d in D} T_d - sum_{D->D} q - sum_{D->not D} q_ij f_j
 
-The left side is the net volume from (volume_from); the two subtracted terms are water that
-passes from one destination cell to another (counted in both throughflows) and water that leaves
-a destination cell and reaches another destination cell further on. Net mode uses edges only,
-so there is no budget-residual term.
+The left side sums over all cells, destination cells included, and is the net volume from
+(volume_from). The two subtracted terms are water that passes from one destination cell to
+another (counted in both throughflows) and water that leaves a destination cell and reaches the
+group again. Net mode uses edges only, so there is no budget-residual term. The check confirms
+the solve and the consistency of s+ and T; tests/test_fb13_example.py is what validates net
+accounting itself, and tests/test_assemble.py checks this identity on a group of two cells. This
+identity and the gross closure are both asserted to 1e-9 of the group's flow.
 
 Envelope. docs/dispersion_study.md found that F >= 0.1 contained the non-stopping particle
 reference zone in every synthetic run. Here the reference is the thinned flux-weighted PRT run
 released over the cell volume (output/prt_volume_thin1; NS Table 3): P is the flow-weighted share
 of the water released in a cell that reaches the priority wells. Both are evaluated on the start
-cells of the published particles (uppermost active layer), as in workflow.compare_masks.
+cells of the published particles (uppermost active layer), as in workflow.compare_masks, with
+strict thresholds (F > t, P > z) as in NS. PRT was seeded from the source terms of cells with
+F > 1e-6 (PrtConfig.fraction_threshold); start cells with 0 < F <= 1e-6 or without a source term
+got no particles and are given P = 0. Every start cell with F > 0.1 is seeded (asserted; counts
+in envelope_prt_notes.csv). The thinned particles lose weight at every weak sink by the
+full-mixing shares (gwsource.prt.weak_sink_survival, destination_share), so the reference
+inherits full mixing at the sinks and is not an independent advective zone: the comparison
+measures only the spreading that full mixing adds between sinks.
 
 Run with the project environment after workflow.py (it needs output/optimal and the PRT run):
 
@@ -58,7 +72,11 @@ REGIONS = ("all", *wf.MP7_REGIONS)
 
 
 def trace_both(ws: Path) -> tuple[gs.FlowStep, dict, dict[str, gs.BackwardResult], dict]:
-    """Read the step and trace the well groups with gross and net accounting; return run times."""
+    """Read the step and trace the well groups with gross and net accounting; return run times.
+
+    The net closure terms assume that net mode used every connection; with no cycles (so no
+    cycle removal and no closed loops) it does, which is asserted.
+    """
     step = gs.read_step(ws, boundnames=True)
     groups = wf.well_groups(step)
     results, seconds = {}, {}
@@ -66,14 +84,17 @@ def trace_both(ws: Path) -> tuple[gs.FlowStep, dict, dict[str, gs.BackwardResult
         t0 = time.perf_counter()
         results[mode] = gs.backward(step, groups, gs.TraceConfig(accounting=mode))
         seconds[mode] = time.perf_counter() - t0
+    net = results["net"]
+    assert not net.cycles and not net.closed_loops, "net mode did not use every connection"
     return step, groups, results, seconds
 
 
 def net_closure(edges: gs.Edges, dest: np.ndarray, f: np.ndarray, throughflow: float) -> dict:
     """Return the terms of the net closure identity (module docstring) for one group."""
     from_dest, to_dest = dest[edges.src], dest[edges.dst]
+    onward = from_dest & ~to_dest
     dest_to_dest = float(edges.q[from_dest & to_dest].sum())
-    dest_onward = float(np.sum(edges.q[from_dest & ~to_dest] * f[edges.dst[from_dest & ~to_dest]]))
+    dest_onward = float(np.sum(edges.q[onward] * f[edges.dst[onward]]))
     return {
         "dest_to_dest_flow": dest_to_dest,
         "dest_onward_to_dest": dest_onward,
@@ -82,10 +103,14 @@ def net_closure(edges: gs.Edges, dest: np.ndarray, f: np.ndarray, throughflow: f
 
 
 def well_cell_budget(step: gs.FlowStep, sel: gs.Selection, budget: gs.CellBudget) -> dict:
-    """Return the summed budget of a group's cells and the share of their outflow the wells take."""
+    """Return the summed budget of a group's cells and the share of their outflow the wells take.
+
+    The share is left blank (NaN) for a group of several cells.
+    """
     cells = sel.cells
     pumping = float(-step.term_flow[sel.terms].sum())
     outflow = float(budget.outflow[cells].sum())
+    single = int(cells.sum()) == 1
     return {
         "well_cells": int(cells.sum()),
         "pumping": pumping,
@@ -94,30 +119,42 @@ def well_cell_budget(step: gs.FlowStep, sel: gs.Selection, budget: gs.CellBudget
         "cell_face_outflow": float(budget.edge_out[cells].sum()),
         "cell_other_sinks": float(budget.sink[cells].sum()) - pumping,
         "cell_outflow": outflow,
-        "well_share_of_outflow": pumping / outflow,
+        "well_share_of_outflow": pumping / outflow if single else np.nan,
     }
 
 
 def accounting_table(
-    step: gs.FlowStep, groups: dict, results: dict[str, gs.BackwardResult], seconds: dict
+    step: gs.FlowStep,
+    groups: dict,
+    results: dict[str, gs.BackwardResult],
+    seconds: dict,
+    edges: gs.Edges,
+    budget: gs.CellBudget,
+    tol: float = 1e-9,
 ) -> pd.DataFrame:
-    """Return, per group, pumping, the net-mode attribution, their ratio and the closure terms."""
-    edges = gs.flow_edges(step)
-    budget = gs.cell_budget(step, edges)
+    """Return, per group, pumping, the net attribution, their ratio and the closure terms.
+
+    Both closure errors are asserted below tol x the group's flow.
+    """
     gross, net = results["gross"], results["net"]
     rows = []
     for group, sel in groups.items():
         row = {"group": group, **well_cell_budget(step, sel, budget)}
         assert np.isclose(row["pumping"], gross.destination_inflow[group], rtol=1e-12)
         check = gs.diagnostics.backward_closure(step, gross, group)
+        assert abs(check.error) <= tol * row["pumping"], f"gross closure fails for {group}"
         row["gross_volume_from"] = float(gross.volume_from[group].sum())
         row["gross_closure_error"] = check.error
-        row["net_attributed"] = net.destination_inflow[group]
+        row["net_dest_throughflow_sum"] = net.destination_inflow[group]
         row["net_volume_from"] = float(net.volume_from[group].sum())
-        row.update(net_closure(edges, sel.cells, net.fraction_through[group], row["net_attributed"]))
+        f = net.fraction_through[group]
+        row.update(net_closure(edges, sel.cells, f, row["net_dest_throughflow_sum"]))
         row["net_closure_error"] = row["net_volume_from"] - row["net_closure_rhs"]
-        row["ratio_net_attributed"] = row["net_attributed"] / row["pumping"]
+        scale = row["net_dest_throughflow_sum"]
+        assert abs(row["net_closure_error"]) <= tol * scale, f"net closure fails for {group}"
         row["ratio_net_volume_from"] = row["net_volume_from"] / row["pumping"]
+        row["ratio_net_dest_throughflow"] = row["net_dest_throughflow_sum"] / row["pumping"]
+        row["n_cycles"] = len(net.cycles)
         row["gross_seconds"], row["net_seconds"] = seconds["gross"], seconds["net"]
         rows.append(row)
     return pd.DataFrame(rows)
@@ -149,17 +186,17 @@ def class_table(
     results: dict[str, gs.BackwardResult],
     dest: np.ndarray,
     start: np.ndarray,
+    edges: gs.Edges,
+    budget: gs.CellBudget,
     group: str = "priority",
 ) -> pd.DataFrame:
     """Return F and volume from per cell class, gross and net, for one group.
 
-    local_amplification is the mean of O_gross / T_net over the mixed cells of the class that
-    reach the group in either mode: the factor by which net mode raises F in that cell for the
-    same F downstream.
+    local_amplification is the mean of O_gross / T_net over the mixed non-destination cells of
+    the class that reach the group in either mode: the factor by which net mode raises F in that
+    cell for the same F downstream. It is NaN for the destination cells, where net F is 1.
     """
     label, mixed = cell_classes(step, dest)
-    edges = gs.flow_edges(step)
-    budget = gs.cell_budget(step, edges)
     _, throughflow = gs.assemble.net_balance(step.n_cells, edges)
     f = {m: r.fraction_through[group] for m, r in results.items()}
     reached = (f["gross"] > 0) | (f["net"] > 0)
@@ -168,9 +205,9 @@ def class_table(
     rows = []
     for cls in ("priority well", "SFR", "other WEL/CHD", "rest"):
         in_cls = label == cls
-        mix = in_cls & mixed & reached & (throughflow > 0)
+        mix = in_cls & mixed & reached & (throughflow > 0) & ~dest
         row = {"class": cls, "cells_reached": int(np.sum(in_cls & reached))}
-        row["mixed_cells_reached"] = int(mix.sum())
+        row["mixed_cells_reached"] = int(np.sum(in_cls & mixed & reached))
         ratio = budget.outflow[mix] / throughflow[mix]
         row["local_amplification"] = float(ratio.mean()) if mix.any() else np.nan
         row["start_cells"] = int(np.sum(in_cls & is_start))
@@ -178,7 +215,8 @@ def class_table(
             row[f"{m}_volume_from"] = float(r.volume_from[group][in_cls].sum())
             row[f"{m}_sum_F_start"] = float(f[m][in_cls & is_start].sum())
             row[f"{m}_start_F>0.5"] = int(np.sum(in_cls & is_start & (f[m] > 0.5)))
-        row["start_net_minus_gross>0.1"] = int(np.sum(in_cls & is_start & (f["net"] - f["gross"] > 0.1)))
+        raised = in_cls & is_start & (f["net"] - f["gross"] > 0.1)
+        row["start_net_minus_gross>0.1"] = int(raised.sum())
         rows.append(row)
     return pd.DataFrame(rows)
 
@@ -187,24 +225,55 @@ def class_table(
 
 
 def start_cell_values(
-    step: gs.FlowStep, result: gs.BackwardResult, endpoints: pd.DataFrame, p: np.ndarray
+    step: gs.FlowStep,
+    result: gs.BackwardResult,
+    endpoints: pd.DataFrame,
+    p: np.ndarray,
+    group: str = "priority",
+    packages: tuple[str, str] = wf.SOURCE_PACKAGES,
 ) -> pd.DataFrame:
-    """Return F, P, recharge, SFR leakage and all source inflow of the start cells (priority)."""
+    """Return F, P, recharge, stream leakage and all source inflow of the start cells.
+
+    packages names the recharge and the stream package. seeded marks start cells that got
+    particles; P is NaN in the others and set to 0.
+    """
     start = endpoints["node0"].to_numpy()
     assert len(np.unique(start)) == len(start), "a start cell appears twice"
     by_package = gs.metrics.per_cell_by_package(step, sign=+1)
+    assert all(pkg in by_package for pkg in packages), f"source packages {packages} not all found"
+    recharge, stream = packages
     source, _ = gs.assemble.term_totals(step)
     return pd.DataFrame(
         {
             "node": start,
             "region": endpoints["region"].to_numpy(),
-            "F": result.fraction_through["priority"][start],
+            "F": result.fraction_through[group][start],
             "P": np.nan_to_num(p[start]),
-            "recharge": by_package["RCHA"][start],
-            "sfr": by_package["SFR_0"][start],
+            "seeded": np.isfinite(p[start]),
+            "recharge": by_package[recharge][start],
+            "sfr": by_package[stream][start],
             "source": source[start],
         }
     )
+
+
+def seeding_notes(cells: pd.DataFrame, threshold: float, envelope: float = 0.1) -> pd.DataFrame:
+    """Return the seeding counts of the PRT reference on the start cells (one row)."""
+    f, seeded, source = cells["F"], cells["seeded"], cells["source"]
+    unseeded_envelope = int(np.sum((f > envelope) & ~seeded))
+    assert unseeded_envelope == 0, f"a start cell with F > {envelope} has no particles"
+    row = {
+        "fraction_threshold": threshold,
+        "start_cells": len(cells),
+        "start_cells_F>0": int(np.sum(f > 0)),
+        "seeded_start_cells": int(seeded.sum()),
+        "unseeded_0<F<=threshold": int(np.sum((f > 0) & (f <= threshold))),
+        "unseeded_F>threshold_no_source": int(np.sum((f > threshold) & ~seeded)),
+        "seeded_without_source": int(np.sum(seeded & (source <= 0))),
+        f"start_cells_F>{envelope:g}": int(np.sum(f > envelope)),
+        f"unseeded_F>{envelope:g}": unseeded_envelope,
+    }
+    return pd.DataFrame([row])
 
 
 def f_zones(f: np.ndarray, n_matched: int, thresholds: tuple[float, ...]) -> dict:
@@ -219,17 +288,18 @@ def f_zones(f: np.ndarray, n_matched: int, thresholds: tuple[float, ...]) -> dic
 def zone_row(cells: pd.DataFrame, f_zone: np.ndarray, p_zone: np.ndarray) -> dict:
     """Return coverage, area ratio, missed recharge and the reverse check of one F zone."""
     missed = p_zone & ~f_zone
-    rch, src, p = cells["recharge"].to_numpy(), cells["source"].to_numpy(), cells["P"].to_numpy()
+    f, p = cells["F"].to_numpy(), cells["P"].to_numpy()
+    rch, src = cells["recharge"].to_numpy(), cells["source"].to_numpy()
     n_p, n_f = int(p_zone.sum()), int(f_zone.sum())
     return {
         "prt_cells": n_p,
         "f_cells": n_f,
-        "min_F_in_zone": float(cells["F"].to_numpy()[f_zone].min()) if n_f else np.nan,
+        "min_F_in_zone": float(f[f_zone].min()) if n_f else np.nan,
         "area_ratio": n_f / n_p if n_p else np.nan,
         "coverage": float(np.sum(p_zone & f_zone) / n_p) if n_p else np.nan,
         "missed_cells": int(missed.sum()),
         "missed_cells_sfr": int(np.sum(missed & (cells["sfr"].to_numpy() > 0))),
-        "median_F_missed": float(np.median(cells["F"].to_numpy()[missed])) if missed.any() else np.nan,
+        "median_F_missed": float(np.median(f[missed])) if missed.any() else np.nan,
         "recharge_prt_zone": float(rch[p_zone].sum()),
         "recharge_missed": float(rch[missed].sum()),
         "source_missed": float(src[missed].sum()),
@@ -258,29 +328,43 @@ def envelope_table(
     return pd.DataFrame(rows)
 
 
-def main(run_net: bool = True, run_envelope: bool = True, out: Path = wf.OUT) -> None:
-    """Run the selected checks; tables go to out."""
-    ws = out / "optimal"
+def main(
+    run_net: bool = True,
+    run_envelope: bool = True,
+    ws: Path = wf.OUT / "optimal",
+    prt_dir: Path = wf.OUT / PRT_RUN,
+    mp_dir: Path = wf.MP7_OUT,
+    out: Path = wf.OUT,
+) -> None:
+    """Run the selected checks on the model in ws; tables go to out.
+
+    prt_dir holds the PRT run's cell_capture_fraction.npy, mp_dir the published endpoint files.
+    """
     t0 = time.perf_counter()
+    out.mkdir(parents=True, exist_ok=True)
     step, groups, results, seconds = trace_both(ws)
-    endpoints = wf.read_endpoints()
+    edges = gs.flow_edges(step)
+    budget = gs.cell_budget(step, edges)
+    endpoints = wf.read_endpoints(mp_dir)
     print(f"read and traced in {time.perf_counter() - t0:.1f} s ({seconds})")
     if run_net:
-        accounting_table(step, groups, results, seconds).to_csv(
+        accounting_table(step, groups, results, seconds, edges, budget).to_csv(
             out / "net_vs_gross_wells.csv", index=False
         )
         mask_table(results, endpoints).to_csv(out / "net_vs_gross_mp7.csv", index=False)
         dest, start = groups["priority"].cells, endpoints["node0"].to_numpy()
-        class_table(step, results, dest, start).to_csv(
+        class_table(step, results, dest, start, edges, budget).to_csv(
             out / "net_vs_gross_cell_classes.csv", index=False
         )
     if run_envelope:
-        p = np.load(out / PRT_RUN / "cell_capture_fraction.npy").astype(float)
+        p = np.load(prt_dir / "cell_capture_fraction.npy").astype(float)
         assert len(p) == step.n_cells, "the PRT run is on a different grid"
         cells = start_cell_values(step, results["gross"], endpoints, p)
+        threshold = gs.PrtConfig(porosity=wf.MP7_POROSITY).fraction_threshold
+        seeding_notes(cells, threshold).to_csv(out / "envelope_prt_notes.csv", index=False)
         envelope_table(cells).to_csv(out / "envelope_prt.csv", index=False)
     print(f"done in {time.perf_counter() - t0:.1f} s")
 
 
 if __name__ == "__main__":
-    main()
+    main(run_net=True, run_envelope=True)
