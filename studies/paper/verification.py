@@ -22,10 +22,10 @@ Checks and error measures (one row per model and check in the CSV):
 - tracking_vs_gwt: transient tracking (volume_mode "gwt") against MF6 GWT unit concentrations;
   max |c - C| over all steps and active cells (and SFR reaches on model 7), largest over the
   tagging cases of tests/test_tracking_mf6.py. Tolerance 1e-8.
-- prt_capture: captured flux-weighted PRT particle flow against the destination inflow,
+- prt_capture: captured flow-weighted PRT particle flow against the destination inflow,
   |captured / inflow - 1|. Tolerance 0.01 (models 1, 3) and 0.02 (model 2), as in tests/test_prt.py;
   the error is quadrature (release points), not round-off.
-- reference_example: net mode on the 3x3 worked example of [FB13]; max |value - published| over
+- reference_example: net accounting on the 3x3 example of [FB13]; max |value - published| over
   fraction, volume through and volume from. Tolerance 1e-14 (tests/test_fb13_example.py).
 
 Models 7 to 9 are read as package networks (SFR; MAW; LAK and UZF nodes) and every saved step
@@ -72,9 +72,9 @@ TOLERANCES = {
     "reference_example": 1e-14,
 }
 MEASURES = {
-    "backward_closure": "relative to destination inflow (absolute in m3/d below 1 m3/d)",
-    "forward_closure": "relative to source inflow (absolute in m3/d below 1 m3/d)",
-    "duality": "relative to forward S->D flow (absolute in m3/d below 1 m3/d)",
+    "backward_closure": "relative to destination inflow (absolute in m³/d below 1 m³/d)",
+    "forward_closure": "relative to source inflow (absolute in m³/d below 1 m³/d)",
+    "duality": "relative to forward source-to-destination flow (absolute in m³/d below 1 m³/d)",
     "boundary_control": "absolute (fraction)",
     "dis_vs_disu": "relative to output maximum",
     "split_vs_single": "relative to output maximum",
@@ -352,7 +352,7 @@ def reference_example_row() -> dict:
                           (res.volume_from["A"], fb.EXPECTED_V_FROM)):
         errors += [abs(float(got[fb.LABELS.index(k)]) - v) for k, v in expected.items()]
     return record("fb13_example", "reference_example", max(errors), len(errors),
-                  time.perf_counter() - start, note="net mode, 9 cells x 3 outputs")
+                  time.perf_counter() - start, note="net accounting, 9 cells x 3 outputs")
 
 
 # ---------------------------------------------------------------- collection and tables
@@ -385,7 +385,7 @@ def collect(work: Path, exes: Exes, run_identities: bool = True, run_disu: bool 
 
 
 MODEL_LABELS = {
-    "fb13_example": "[FB13] worked example",
+    "fb13_example": "[FB13] worked example, net accounting",
     "m1_dis": "1 DIS",
     "m2_dis3lay": "2 DIS, 3 layers, weak sink",
     "m3_disv": "3 DISV Voronoi",
@@ -400,12 +400,12 @@ MODEL_LABELS = {
 CHECK_LABELS = {
     "backward_closure": "backward closure",
     "forward_closure": "forward closure",
-    "duality": "duality",
+    "duality": "forward–backward",
     "boundary_control": "boundary control",
     "dis_vs_disu": "DISU vs DIS",
     "split_vs_single": "split vs single",
     "tracking_vs_gwt": "tracking vs GWT",
-    "prt_capture": "PRT capture",
+    "prt_capture": "PRT flow to the well",
     "reference_example": "[FB13] example",
 }
 

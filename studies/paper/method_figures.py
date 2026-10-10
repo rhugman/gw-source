@@ -247,7 +247,7 @@ def draw_graph_legend(ax, inflow: float) -> None:
 
 
 def draw_gross_net(ax, numbers: dict[str, float]) -> None:
-    """Panel (c): the weak well's cell, and the water attributed to it by gross and net mode."""
+    """Panel (c): the weak well's cell, and the water attributed to it in both accountings."""
     red, blue = OKABE_ITO["vermillion"], OKABE_ITO["blue"]
     cell_box(ax, (0.0, 1.45), 0.9)
     ax.plot(0.0, 1.45, marker="v", color=red, ms=6)
@@ -370,7 +370,8 @@ def make_fig2(out_dir: Path, table: pd.DataFrame, model_labels: dict,
     ax.set_xlabel("error reached (measure per check in Table 2)")
     ax.tick_params(axis="y", length=0)
     eps = plt.Line2D([], [], color=INK, ls="--", lw=0.9, label="machine epsilon")
-    tol = plt.Line2D([], [], color=MUTED, lw=2.2, label="test tolerance")
+    tol = plt.Line2D([], [], color=MUTED, ls="none", marker="|", ms=9, mew=2.2,
+                     label="test tolerance")
     fig.legend(handles=[*handles, eps, tol], loc="center left", bbox_to_anchor=(0.73, 0.55),
                title="test model", title_fontsize=7, handletextpad=0.3, labelspacing=0.45)
     return save(fig, out_dir, "fig2_verification")
@@ -518,8 +519,9 @@ def main(
         print(ver.summary_by_check(table).to_string(index=False))
     if fig2:
         table = pd.read_csv(out_dir / "verification_table.csv")
-        print("wrote", make_fig2(out_dir, table, ver.MODEL_LABELS, ver.CHECK_LABELS,
-                                 ver.CHECK_ORDER))
+        # the [FB13] label of Table 2 is too long for one legend line
+        labels = {**ver.MODEL_LABELS, "fb13_example": "[FB13] worked example,\nnet accounting"}
+        print("wrote", make_fig2(out_dir, table, labels, ver.CHECK_LABELS, ver.CHECK_ORDER))
     if fig3:
         print("wrote", make_fig3(out_dir, dispersion_out))
     print(f"done in {time.perf_counter() - start:.1f} s")

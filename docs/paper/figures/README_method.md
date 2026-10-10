@@ -14,7 +14,7 @@ Numbers in (b) and (c) are computed on each run: (b) from the hand-built `FlowSt
 
 `verification_table.csv` (long format: model, check, error, tolerance, measure, number of compared values, status, seconds, note), `verification_table.md` (models × checks, plus the largest error per check), `fig2_verification.png` / `.pdf`.
 
-*Figure 2. Errors reached by the verification checks on the synthetic test models (markers) against machine epsilon (dashed) and the tolerance each check is tested to (grey bars). Closure (the traced volumes add up to the destination or source inflow), duality (backward and forward tracing give the same volume between a source and a destination) and boundary control (in every cell the fractions to all sinks add up to 1) are exact identities of the method; their errors are round-off (≤ 1.8 × 10⁻¹⁵) on every model, including the transient model (13 steps, storage as source and sink terms) and the stream, multi-aquifer-well, lake and unsaturated-zone networks. DISU builds of model 1 give the DIS results exactly, and simulations split into 2 to 4 models with GWF-GWF exchanges agree with the single model to ≤ 7.4 × 10⁻¹⁰, the MF6 solver tolerance. Transient tracking matches MF6 GWT unit concentrations to ≤ 1.0 × 10⁻¹⁴. Flux-weighted MF6 PRT particles capture the well inflow to within 0.6 %, an error from the finite number of release points. Net mode reproduces the worked example of [FB13] exactly. "Exact" marks errors of zero. Error measures are given in Table 2.*
+*Figure 2. Errors reached by the verification checks on the synthetic test models (markers) against machine epsilon (dashed) and the tolerance each check is tested to (grey bars). The closure checks (the traced volumes add up to the destination or source inflow), the forward–backward check (backward and forward tracing give the same volume between a source and a destination) and the boundary-control check (in every cell the fractions to all sinks add up to 1) test exact identities of the method; their errors are round-off (≤ 1.8 × 10⁻¹⁵) on every model, including the transient model (13 steps, storage as source and sink terms) and the stream, multi-aquifer-well, lake and unsaturated-zone networks. DISU builds of model 1 give the DIS results exactly, and simulations split into 2 to 4 models with GWF-GWF exchanges agree with the single model to ≤ 7.4 × 10⁻¹⁰, the MF6 solver tolerance. Transient tracking matches MF6 GWT unit concentrations to ≤ 1.0 × 10⁻¹⁴. The flow that flow-weighted, weight-losing PRT particles deliver to the well matches the well inflow to within 0.6 %, a release-point error (finite number of release points). Net accounting reproduces the worked example of [FB13] exactly. "Exact" marks errors of zero. Error measures are given in Table 2.*
 
 Largest error per check (tolerance in brackets):
 
@@ -22,20 +22,20 @@ Largest error per check (tolerance in brackets):
 |---|---|---|
 | backward closure | 1.3e-15 (1e-10) | 6 transient |
 | forward closure | 1.1e-15 (1e-10) | 6 transient |
-| duality | 1.5e-15 (1e-10) | 7 SFR + MVR network |
+| forward–backward | 1.5e-15 (1e-10) | 7 SFR + MVR network |
 | boundary control | 1.8e-15 (1e-12) | 6 transient |
 | DISU vs DIS | 0 (1e-12) | 4, both variants |
 | split vs single | 7.4e-10 (1e-8) | 1 DIS, three models |
 | tracking vs GWT | 1.0e-14 (1e-8) | 7 SFR + MVR vs SFT + MVT |
-| PRT capture | 5.9e-3 (2e-2) | 2 DIS, 3 layers (402.6 of 405 m³/d) |
-| [FB13] example | 0 (1e-14) | worked example, net mode |
+| PRT flow to the well | 5.9e-3 (2e-2) | 2 DIS, 3 layers (402.6 of 405 m³/d) |
+| [FB13] example | 0 (1e-14) | worked example, net accounting |
 
 Every check ran; none was skipped. Error measures:
-- closure and duality: |lhs − residual term − rhs| / max(|rhs|, 1 m³/d), one group per package, the largest over groups, all destination/source pairs and all steps;
+- closure and forward–backward: |lhs − cell budget error term − rhs| / max(|rhs|, 1 m³/d), one group per package, the largest over groups, all destination/source pairs and all steps;
 - boundary control: max |Σ_g F_g − 1| over cells with outflow, one group per sink term;
 - DISU vs DIS and split vs single: max |a − b| / max |a| per output, the largest over all backward, forward and (split) travel-time outputs;
 - tracking vs GWT: max |c − C_GWT| over all steps and active cells (and reaches), the largest over the tagging cases of `tests/test_tracking_mf6.py`;
-- PRT capture: |captured particle flow / destination inflow − 1|;
+- PRT flow to the well: |particle flow reaching the well / destination inflow − 1|;
 - [FB13] example: max |value − published| over fraction, volume through and volume from.
 
 ## Fig. 3. Numerical dispersion
