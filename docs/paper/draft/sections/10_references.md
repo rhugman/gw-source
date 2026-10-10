@@ -12,7 +12,7 @@ Bedekar, V., C. Neville, M.J. Tonkin, R.D. Bartlett, and P. Plato. 2024. A unit-
 
 Black, A., and C. Foley. 2013. Flow Source: A program to efficiently delineate volumetric capture areas, pathways and source areas in groundwater models. In *Proceedings of MODFLOW and More 2013: Translating Science into Practice*, Golden, Colorado, June 2–5, 2013, 652–663. Golden, Colorado: IGWMC, Colorado School of Mines. https://groundwater-science.co.uk/wp-content/uploads/2013_FSv6_ApplicationPaper.pdf <!-- title contains product name; check --> <!-- pages from a secondary citation (bibliography.md, after Maurice et al. 2021); [check: pages] -->
 
-Black, A., C. Foley, and W. Witterick. 2021. Advances in capture zone delineation and visualisation: 'Flow Source20' for MODFLOW6. Slide presentation, 11 slides. https://groundwater-science.co.uk/wp-content/uploads/2021_FS20.pdf [check: details: venue or publisher] <!-- title contains product name; check -->
+Black, A., C. Foley, and W. Witterick. 2021. Advances in capture zone delineation and visualisation: 'Flow Source20' for MODFLOW6. Slide presentation, 11 slides. [check: URL; the file name holds the product name, so it is left out here] [check: details: venue or publisher] <!-- title contains product name; check -->
 
 Campana, M.E., and E.S. Simpson. 1984. Groundwater residence times and recharge rates using a discrete-state compartment model and C-14 data. *Journal of Hydrology* 72: 171–185. [check: details: issue, DOI] <!-- not in bibliography.md; from the reference list of references/docs/text/2011_Partington_etal_hydraulic_mixing_cell.txt -->
 

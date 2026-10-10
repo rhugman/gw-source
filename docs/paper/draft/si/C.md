@@ -38,6 +38,8 @@ Errors are the largest over groups, group pairs and time steps of each model; Fi
 
 <!-- docs/paper/figures/verification_table.md ("Largest error per check") and verification_table.csv notes; README_method.md error measures; PLAN Phase 5 notes (model 10, 30 growing steps) -->
 
+On model 1 the flow-weighted mean time for the water reaching the well to enter its cell is 9,574 d, against 9,590 d for weight-losing PRT particles, which stop on entering it. The mean travel time of §2.6, $m/F$, includes the residence in the well cell and is 9,607 d ({SI: travel-time identity}). <!-- PLAN Phase 3 notes; tests/test_prt.py -->
+
 The split simulations divide model 1 into three models (7.4 × 10⁻¹⁰), model 3 (1.4 × 10⁻¹⁰) and model 6 (1.5 × 10⁻¹²); model 6 split into four models also passes the transient forward–backward check (4.5 × 10⁻¹⁶). <!-- verification_table.md per-model tables -->
 
 ### Steady and snapshot checks, per model
@@ -79,12 +81,12 @@ Error measures. **tracking vs GWT**: absolute (fraction). **transient forward–
 
 Maps of the delineations for problem A (analytical capture zone, flow along and at 30° to the grid rows) and problem B (PRT on the 12.5 m grid), and the time-step test of problem B, are in Figs 1, 3 and 5 of the dispersion study (docs/figures/dispersion_analytic_maps.png, dispersion_model1_maps.png, dispersion_transient_substeps.png). <!-- DS Figs 1, 3, 5 -->
 
-Across cell sizes the transition band was 1.2 to 12 cells wide, and the fitted narrowing rates were 0.4 to 0.6. <!-- DS §2 -->
+Across cell sizes the transition band was 1.2–12 cells wide, and the fitted narrowing rates were 0.4–0.6. <!-- DS §2 -->
 
-Problem B was also run with 2000-day flow steps. With one transport step per flow step, the first-step share of new water was roughly doubled, 0.18 against 0.09 for the particles. Sixteen sub-steps of 125 d removed this, leaving a difference of about 0.001 at 12.5 m. <!-- DS §3 -->
+Problem B was also run with 2,000-day flow steps. With one transport step per flow step, the first-step share of new water was roughly doubled, 0.18 against 0.09 for the particles. Sixteen sub-steps of 125 d removed this, leaving a difference of about 0.001 at 12.5 m. <!-- DS §3 -->
 
 ## {SI: transient checks on tutorial 08}
 
 All values are for tutorial 08 (§4.4). Forward tracking and backward tracking in time gave the same tagged volumes to ≤ 4.3 × 10⁻¹⁶ for every tag. With GWT's water volumes ("gwt") and one transport step per flow step, the tracked recharge fraction matched a GWT unit-concentration run on the same flows to 9.8 × 10⁻¹⁴. <!-- tutorial 08 §§6, 8; README_method.md Fig. 4 notes --> The backward fractions to the well, to the river and still stored added up to 1 in every cell to within 2.5 × 10⁻¹¹, the backward closure error was 0, and the tagged-water balances closed to 8.0 × 10⁻¹⁶ with one transport step per flow step. <!-- tutorial 08 §§5, 6 -->
 
-With 1, 4 and 16 transport sub-steps per flow step, the river's share of the well's water in the last season of year 1 was 3.6, 3.1 and 3.0 %, and the initial water's share was 96.9, 97.6 and 97.8 %. <!-- tutorial 08 §9 --> With "gwt" volumes, about 5,300 m³ of the 45.6 million m³ of initial water is lost over 30 years, so the year-30 share of initial water is 0.5166 against 0.5167 with "flow" volumes. <!-- tutorial 08 §7 -->
+With one, four and 16 transport sub-steps per flow step, the river's share of the well's water in the last season of year 1 was 3.6, 3.1 and 3.0 %, and the initial water's share was 96.9, 97.6 and 97.8 %. From four sub-steps to 16, the year-1 shares moved by at most 0.2 percentage points; Fig. 4 uses four. <!-- tutorial 08 §9; README_method.md Fig. 4 notes --> With "gwt" volumes, about 5,300 m³ of the 45.6 million m³ of initial water is lost over 30 years, so the year-30 share of initial water is 0.5166 against 0.5167 with "flow" volumes. <!-- tutorial 08 §7 -->
