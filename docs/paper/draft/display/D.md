@@ -1,6 +1,6 @@
 ## Figure 5
 
-**Figure 5.** The Neversink/Rondout model (Fienen et al. 2022; Corson-Dosch et al. 2022). Grey: active model area. Blue lines: SFR reaches, each joined to its downstream reach. Dashed: the three regions (NE, W, S) of the published MODPATH 7 runs, whose particles start in the uppermost active cells. Black: the published contributing cells of the eight priority wells, calibrated model. The wells form the U cluster (4 wells, within about 1 km of each other), SV_W (3) and SV_S (1); well names are those of the published model. Coordinates are km from the grid origin (EPSG:5070); true north is 12.9° west of grid north. <!-- figures/README.md Fig. 5; NS §1 -->
+**Figure 5.** The Neversink/Rondout model (Fienen et al. 2022; Corson-Dosch et al. 2022). Grey: active model area. Blue lines: SFR reaches, each joined to its downstream reach. Dashed: the three regions (NE, W, S) of the published MODPATH 7 runs, whose particles start in the uppermost active cells. Black: the published contributing cells of the eight priority wells, calibrated model. The wells form the U cluster (four wells, within about 1 km of each other), SV_W (3) and SV_S (1); well names are those of the published model. Coordinates are km from the grid origin (EPSG:5070); true north is 12.9° west of grid north. <!-- figures/README.md Fig. 5; NS §1 -->
 
 ## Figure 6
 

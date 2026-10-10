@@ -1,6 +1,6 @@
 ## {SI: delineations on one flow field}
 
-**Table.** Delineations of the eight priority wells' contributing area on one flow field (calibrated Neversink model, streams as cells), against the 980 published contributing cells. Formerly Table 3 of the main text; Fig. 7 shows the overlaps.
+**Table.** Delineations of the eight priority wells' contributing area on one flow field (calibrated Neversink model, streams as cells), against the 980 published contributing cells. Fig. 7 shows the overlaps.
 
 | method | delineation | overlap | expected area (cells) | flow credited to the wells (m³/d) |
 |---|---|---|---|---|
