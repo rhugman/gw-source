@@ -28,23 +28,37 @@ Checks and error measures (one row per model and check in the CSV):
 - reference_example: net accounting on the 3x3 example of [FB13]; max |value - published| over
   fraction, volume through and volume from. Tolerance 1e-14 (tests/test_fb13_example.py).
 
-Transient tracking checks (tests/test_tracking_mf6.py, tests/test_tracking.py; the collector
-calls the tests' own helpers, which also assert the test tolerances):
+- steady_g_vs_gwt: steady forward fraction G against MF6 GWT unit concentrations run to
+  equilibrium (1e7 d, ADV upstream, no dispersion, FLOW_IMBALANCE_CORRECTION) on the steady
+  flows of models 1, 2 and 7 (SFR nodes + MVR vs SFT + MVT); max |C - G| over active cells (and
+  reaches), the largest over the tagging cases of tests/test_gwt_equilibrium.py. Tolerance
+  1e-10 (models 1, 2) and 1e-7 (model 7 with the test model's flow solver settings; the note
+  gives the value with the flow model solved about 100 times tighter).
+
+Transient tracking checks (tests/test_tracking_mf6.py, tests/test_tracking.py). The collectors
+call the tests' own helpers, which assert the test tolerances, and record() refuses an "ok"
+row whose error exceeds its tolerance:
+
+- tracking_vs_gwt (above).
 
 - tracking_duality: forward tracking against backward tracking in time, |tagged outflow
   forward - adjoint inner product| / forward outflow, the largest over both volume options, all
   source (and initial-water) and destination pairs, on models 6 (1 and 5 transport sub-steps),
   6 split into 4 models, 7 (SFR + MVR) and 9 (LAK + UZF, transient period). Tolerance 1e-10.
-- water_balance, tagged_balance: "flow" volumes on models 6 and 9; the largest per-step water
-  balance error relative to the largest stored volume, and the largest tagged-water balance
-  error relative to the group's largest balance term. Tolerance 1e-10.
-- steady_limit_g, steady_limit_f: model 10 (model 1's flows held 4e5 d); max |c - G| at the
-  end and max |w - F| at the start over active cells and groups. Tolerances 1e-6 and 1e-5.
+- water_balance: "flow" volumes on models 6 and 9; each cell's water balance error relative to
+  that cell's water volume, max_i |V^new - V^old - dt (I - O - r)| / max(V^old, V^new), the
+  largest over cells and steps. Tolerance 1e-10.
+- tagged_balance: "flow" volumes on models 6 and 9; for each tagged group (initial water
+  included), the model-wide balance of tagged water in every step (change in tagged storage
+  against tagged inflow minus outflow), its largest error relative to the group's largest
+  balance term. Tolerance 1e-10.
+- steady_limit_g, steady_limit_f: model 10 (model 1's flows held 4e5 d in 120 equal steps);
+  max |c - G| at the end and max |w - F| at the start over active cells and groups. Tolerances
+  1e-11 and 1e-8.
 - substeps: m = 3 transport sub-steps against a flow model with 3 times more steps of the same
-  flows (hand-built 15-cell network with flow loops, 6 steps); every fraction, outflow and
-  volume, max |a - b| / max |b| per output. Tolerance 1e-12.
-- steady_g_vs_gwt: steady forward fraction against GWT run to equilibrium; a slot marked
-  "pending" until that run exists.
+  flows (hand-built 15-cell network with flow loops and no storage, not an MF6 model, 6
+  steps); every fraction, outflow and volume, max |a - b| / max |b| per output. The test
+  itself asserts elementwise (rtol 1e-12, atol 1e-14). Tolerance 1e-12.
 
 Models 7 to 9 are read as package networks (SFR; MAW; LAK and UZF nodes) and every saved step
 is checked; model 6 is checked on every time step with storage as source and sink terms.
@@ -91,34 +105,41 @@ TOLERANCES = {
     "tracking_duality": 1e-10,
     "water_balance": 1e-10,
     "tagged_balance": 1e-10,
-    "steady_limit_g": 1e-6,
-    "steady_limit_f": 1e-5,
+    "steady_limit_g": 1e-11,
+    "steady_limit_f": 1e-8,
     "substeps": 1e-12,
-    "steady_g_vs_gwt": np.nan,
+    "steady_g_vs_gwt": 1e-10,
 }
 MEASURES = {
     "backward_closure": "relative to destination inflow (absolute in m³/d below 1 m³/d)",
     "forward_closure": "relative to source inflow (absolute in m³/d below 1 m³/d)",
     "duality": "relative to forward source-to-destination flow (absolute in m³/d below 1 m³/d)",
+    "steady_g_vs_gwt": "absolute (fraction)",
     "boundary_control": "absolute (fraction)",
     "dis_vs_disu": "relative to output maximum",
     "split_vs_single": "relative to output maximum",
     "tracking_vs_gwt": "absolute (fraction)",
     "prt_capture": "relative to destination inflow",
     "reference_example": "absolute (published values)",
-    "tracking_duality": "relative to forward source-to-destination volume",
-    "water_balance": "relative to largest stored water volume",
+    "tracking_duality": "relative to forward source-to-destination volume (absolute when zero)",
+    "water_balance": "relative to the cell's water volume",
     "tagged_balance": "relative to largest term of the tagged-water balance",
     "steady_limit_g": "absolute (fraction)",
     "steady_limit_f": "absolute (fraction)",
     "substeps": "relative to output maximum",
-    "steady_g_vs_gwt": "pending",
 }
-CHECK_ORDER = tuple(MEASURES)
-CHECK_GROUPS = {  # Table 2 parts and Fig. 2 blocks
-    "steady and snapshot checks": CHECK_ORDER[:9],
-    "transient tracking checks": CHECK_ORDER[9:],
+CHECK_GROUPS = {  # Table 2 parts and Fig. 2 blocks, in table order
+    "steady and snapshot checks": (
+        "backward_closure", "forward_closure", "duality", "boundary_control", "steady_g_vs_gwt",
+        "dis_vs_disu", "split_vs_single", "prt_capture", "reference_example",
+    ),
+    "transient tracking checks": (
+        "tracking_vs_gwt", "tracking_duality", "water_balance", "tagged_balance",
+        "steady_limit_g", "steady_limit_f", "substeps",
+    ),
 }
+CHECK_ORDER = tuple(c for checks in CHECK_GROUPS.values() for c in checks)
+assert sorted(CHECK_ORDER) == sorted(MEASURES), "every check belongs to exactly one group"
 SUBSTEPS = 3  # transport sub-steps of the sub-step check (tests/test_tracking.py)
 
 
@@ -175,8 +196,9 @@ class ModelCache:
 
 def record(model: str, check: str, error: float, n: int, seconds: float, tol=None,
            status: str = "ok", note: str = "") -> dict:
-    """Return one row of the verification table."""
+    """Return one row of the verification table; an "ok" row must be within its tolerance."""
     tol = TOLERANCES.get(check) if tol is None else tol
+    assert not (status == "ok" and error > tol), f"{model} {check}: {error:.2e} > {tol:.0e}"
     return {"model": model, "check": check, "error": error, "tolerance": tol,
             "measure": MEASURES[check], "n_compared": n, "status": status, "seconds": seconds,
             "note": note}
@@ -417,9 +439,8 @@ def balance_rows(cache: ModelCache) -> list[dict]:
     for key, (reader, sources, destinations) in cases.items():
         start = time.perf_counter()
         fwd = ttm.check_flow_mode(reader, sources, destinations)["flow"][0]
+        water = float(ttm.cell_water_balance_errors(reader, fwd.config).max())
         seconds = time.perf_counter() - start
-        volume_scale = max(b["storage_end"].max() for b in fwd.balance.values())
-        water = float(fwd.water_balance_error.max()) / volume_scale
         tagged = max(tr.forward_balance_error(fwd, g) for g in fwd.groups)
         note = f"{len(fwd.steps)} steps"
         rows.append(record(key, "water_balance", water, len(fwd.steps), seconds, note=note))
@@ -436,12 +457,14 @@ def steady_limit_rows(cache: ModelCache) -> list[dict]:
     reader = gs.open_model(cache.get("m10_constant").ws)
     errors = steady_limit_errors(reader)
     seconds = time.perf_counter() - start
-    n = len(reader.steps)
+    n, groups = len(reader.steps), errors["n_groups"]
     return [
-        record("m10_constant", "steady_limit_g", errors["g_end"], 2, seconds,
-               note=f"{n} steps; c vs G at the end (at the start: {errors['g_start']:.1e})"),
-        record("m10_constant", "steady_limit_f", errors["f_start"], 2, seconds,
-               note=f"{n} steps; w vs F at the start (at the end: {errors['f_end']:.1e})"),
+        record("m10_constant", "steady_limit_g", errors["g_end"], groups, seconds,
+               note=f"{n} steps; c vs G at the end (at the start: at least "
+                    f"{errors['g_start']:.2f})"),
+        record("m10_constant", "steady_limit_f", errors["f_start"], groups, seconds,
+               note=f"{n} steps; w vs F at the start (at the end: at least "
+                    f"{errors['f_end']:.2f})"),
     ]
 
 
@@ -451,16 +474,64 @@ def substep_rows(m: int = SUBSTEPS) -> list[dict]:
 
     start = time.perf_counter()
     pairs = substep_refinement_pairs(m)
-    error = max(output_error(fine, coarse) for _, coarse, fine in pairs)
+    error = max(output_error(fine, coarse) for _, coarse, fine, _ in pairs)
     return [record("substep_network", "substeps", error, len(pairs),
                    time.perf_counter() - start,
                    note=f"{m} sub-steps vs {m}x flow steps, {len(pairs)} outputs")]
 
 
-def pending_rows() -> list[dict]:
-    """Return the slot of the steady forward fraction against GWT at equilibrium (pending)."""
-    return [record("gwt_equilibrium", "steady_g_vs_gwt", np.nan, 0, 0.0, status="pending",
-                   note="steady forward fraction vs GWT run to equilibrium; run not yet made")]
+# ---------------------------------------------------------------- steady G vs GWT at equilibrium
+
+
+def gwt_equilibrium_cell_rows(cache: ModelCache) -> list[dict]:
+    """Return max |C - G| at equilibrium per model over the cell cases (models 1 and 2)."""
+    import test_gwt_equilibrium as teq
+
+    by_model = {}
+    for case, (key, pname, selection) in teq.CELL_CASES.items():
+        start = time.perf_counter()
+        run = cache.get(key)
+        step = gs.read_step(run.ws)
+        fraction = teq.steady_fraction(step, selection)
+        conc, previous = teq.run_to_equilibrium(run, cache.work / f"gwt_eq_{case}",
+                                                cache.exes.mf6, (pname,), teq.EQUILIBRIUM_DAYS)
+        change = float(np.abs(conc - previous)[step.active].max())
+        assert change < teq.EQUILIBRIUM_TOL, f"{case}: not at equilibrium ({change:.1e})"
+        error = float(np.abs(conc - fraction)[step.active].max())
+        worst, cases, seconds = by_model.get(key, (0.0, [], 0.0))
+        by_model[key] = (max(worst, error), [*cases, f"{case} {error:.1e}"],
+                         seconds + time.perf_counter() - start)
+    return [record(key, "steady_g_vs_gwt", worst, len(cases), seconds, tol=teq.GWT_ATOL,
+                   note="; ".join(cases))
+            for key, (worst, cases, seconds) in by_model.items()]
+
+
+def gwt_equilibrium_network_row(cache: ModelCache) -> dict:
+    """Return max |C - G| at equilibrium on model 7 (cells and reaches), default and tight flow."""
+    import test_gwt_equilibrium as teq
+    from models.mover import build_mover_dis
+
+    start = time.perf_counter()
+    ws = cache.work / "m7_tight"
+    ws.mkdir(parents=True, exist_ok=True)
+    tight_run = build_mover_dis(ws, cache.exes.mf6, ims_kwargs=teq.TIGHT_FLOW_IMS)
+    default, tight = 0.0, 0.0
+    for case in teq.NETWORK_CASES:
+        default = max(default, *teq.network_errors(cache.get("m7_mover"),
+                                                   cache.work / f"gwt_eq_m7_{case}",
+                                                   cache.exes.mf6, case))
+        tight = max(tight, *teq.network_errors(tight_run, cache.work / f"gwt_eq_m7t_{case}",
+                                               cache.exes.mf6, case))
+    assert tight < teq.GWT_ATOL, tight
+    return record("m7_mover", "steady_g_vs_gwt", default, 2 * len(teq.NETWORK_CASES),
+                  time.perf_counter() - start, tol=teq.NETWORK_ATOL,
+                  note=f"cells and reaches; flow model solved about 100 times tighter: "
+                       f"{tight:.1e}")
+
+
+def gwt_equilibrium_rows(cache: ModelCache) -> list[dict]:
+    """Return the steady G vs GWT at equilibrium rows (models 1, 2 and 7)."""
+    return [*gwt_equilibrium_cell_rows(cache), gwt_equilibrium_network_row(cache)]
 
 
 # ---------------------------------------------------------------- particles and worked example
@@ -507,7 +578,7 @@ def reference_example_row() -> dict:
 
 def collect(work: Path, exes: Exes, run_identities: bool = True, run_disu: bool = True,
             run_split: bool = True, run_gwt: bool = True, run_prt: bool = True,
-            run_tracking: bool = True) -> pd.DataFrame:
+            run_tracking: bool = True, run_gwt_equilibrium: bool = True) -> pd.DataFrame:
     """Run every selected check and return the long table (one row per model and check)."""
     add_tests_to_path()
     rows = [reference_example_row()]
@@ -535,10 +606,12 @@ def collect(work: Path, exes: Exes, run_identities: bool = True, run_disu: bool 
             for c in ("water_balance", "tagged_balance")]
          + [("m10_constant", "steady_limit_g"), ("m10_constant", "steady_limit_f"),
             ("substep_network", "substeps")]),
+        (run_gwt_equilibrium, lambda: gwt_equilibrium_rows(cache),
+         [(k, "steady_g_vs_gwt") for k in ("m1_dis", "m2_dis3lay", "m7_mover")]),
     )
     for enabled, func, keys in gates:
         rows += func() if enabled else [not_run(k, c, "switched off") for k, c in keys]
-    return pd.DataFrame(rows + pending_rows())
+    return pd.DataFrame(rows)
 
 
 MODEL_LABELS = {
@@ -554,9 +627,8 @@ MODEL_LABELS = {
     "m7_mover": "7 SFR + MVR network",
     "m8_maw": "8 MAW network",
     "m9_lak_uzf": "9 LAK + UZF + MVR network",
-    "m10_constant": "10 model 1 flows, held 4e5 d",
-    "substep_network": "hand-built network (sub-steps)",
-    "gwt_equilibrium": "steady model, GWT to equilibrium",
+    "m10_constant": "10 model 1 flows, held 4 × 10⁵ d",
+    "substep_network": "hand-built 15-cell network (not MF6)",
 }
 CHECK_LABELS = {
     "backward_closure": "backward closure",
@@ -574,7 +646,7 @@ CHECK_LABELS = {
     "steady_limit_g": "steady limit, c to G",
     "steady_limit_f": "steady limit, w to F",
     "substeps": "sub-steps vs refined steps",
-    "steady_g_vs_gwt": "steady G vs GWT equilibrium",
+    "steady_g_vs_gwt": "steady G vs GWT at equilibrium",
 }
 
 
@@ -638,7 +710,7 @@ def write_tables(table: pd.DataFrame, out_dir: Path) -> tuple[Path, Path]:
         "# Table 2. Verification checks on the synthetic test models\n\n"
         "Generated by `studies/paper/method_figures.py` (`studies/paper/verification.py`); "
         "errors are the largest over groups, group pairs and time steps of each model. "
-        "'–': check not applicable to the model; 'pending': check not yet run.\n"
+        "'–': check not applicable to the model.\n"
         + parts
         + "\n## Largest error per check\n\n| check | largest error | model | tolerance |\n"
         "|---|---|---|---|\n" + "\n".join(lines) + "\n"

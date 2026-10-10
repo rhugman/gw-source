@@ -12,7 +12,6 @@
   synthetic test models 1 to 10 (and the hand-built network of the sub-step test) and records
   the error reached per model and check; Fig. 2 plots them on a log scale with machine epsilon
   and the test tolerances, in two blocks: steady and snapshot checks, transient tracking checks.
-  A check whose run is not yet made is shown as "pending".
 - Fig. 3, numerical dispersion. The two convergence figures of docs/dispersion_study.md
   (problem A, analytical reference; problem B, PRT reference) are merged into one figure of two
   rows: the band width carries the h^0.5 message, the F >= 0.1 area error the "conservative
@@ -294,7 +293,7 @@ def water_cell(ax, xy: tuple[float, float], size: float, level: float, shade: fl
     ax.text(xy[0], y0 + 0.6 * level * size, text, ha="center", va="center", fontsize=7)
 
 
-def draw_snapshot_cell(ax, xy: tuple[float, float] = (2.4, 1.75), size: float = 1.0) -> None:
+def draw_snapshot_cell(ax, xy: tuple[float, float] = (2.4, 1.9), size: float = 1.0) -> None:
     """Panel (d), left: one step traced on its own flows, storage release as a source term."""
     blue, red = OKABE_ITO["blue"], OKABE_ITO["vermillion"]
     x, y, h = xy[0], xy[1], size / 2
@@ -305,53 +304,55 @@ def draw_snapshot_cell(ax, xy: tuple[float, float] = (2.4, 1.75), size: float = 
     arrow(ax, (x + h, y), (x + h + 0.75, y))
     ax.text(x + h + 0.38, y + 0.08, "$q_{ik}$", ha="center", va="bottom", fontsize=7)
     arrow(ax, (x - 0.25, y + h + 0.6), (x - 0.25, y + h), blue, width=1.4)
-    ax.text(x - 0.37, y + h + 0.35, "recharge (source)", ha="right", va="center",
-            fontsize=7, color=blue)
+    ax.text(x - 0.37, y + h + 0.42, "tagged source $s_i$\n(recharge)", ha="right",
+            va="center", fontsize=7, color=blue)
     arrow(ax, (x + 0.25, y + h), (x + 0.25, y + h + 0.6), red, width=1.4)
     ax.text(x + 0.37, y + h + 0.35, "well", ha="left", va="center", fontsize=7, color=red)
     arrow(ax, (x, y - h - 0.65), (x, y - h), MUTED, width=2.2)
-    ax.text(x + 0.15, y - h - 0.38, "storage release:\na source term,\norigin unknown",
+    ax.text(x + 0.15, y - h - 0.38, "storage release:\na source term\nof unknown origin",
             ha="left", va="center", fontsize=7, color=MUTED)
-    ax.text(0.2, y - h - 0.33, "no water carried\nbetween steps", ha="left", va="center",
+    ax.text(0.2, y - h - 0.38, "no water carried\nbetween steps", ha="left", va="center",
             fontsize=7)
     ax.text(0.2, 0.12, "$G_i = (\\Sigma_j\\, q_{ji}\\, G_j + s_i)\\, /\\, I_i$",
             ha="left", va="center", fontsize=7.5)
 
 
-def draw_tracking_cells(ax, x0: float = 6.4, y: float = 1.75, size: float = 1.0,
+def draw_tracking_cells(ax, x0: float = 6.4, y: float = 1.9, size: float = 1.0,
                         gap: float = 2.4) -> None:
-    """Panel (d), right: the stored water at the end of step n is mixed with the inflows of step
-    n+1; outflows and the water stored at the end of step n+1 carry the mixture."""
+    """Panel (d), right: the same cell i at three times. The water stored at the end of step n
+    is mixed with the inflows of step n+1; outflows and the water stored at the end of step n+1
+    carry the mixture."""
     blue, red = OKABE_ITO["blue"], OKABE_ITO["vermillion"]
     xa, xb, xc, h = x0, x0 + gap, x0 + 2 * gap, size / 2
     water_cell(ax, (xa, y), size, 0.6, 0.25)
-    water_cell(ax, (xb, y), size, 0.85, 0.42, "mixed")
+    water_cell(ax, (xb, y), size, 0.55, 0.42, "mixed")
     water_cell(ax, (xc, y), size, 0.5, 0.42)
-    low = y - h + 0.2
-    arrow(ax, (xa + h, low), (xb - h, low), MUTED, width=2.2)
-    arrow(ax, (xb + h, low), (xc - h, low), MUTED, width=2.2)
+    low = y - h + 0.15
+    for x_from, x_to in ((xa + h, xb - h), (xb + h, xc - h)):
+        arrow(ax, (x_from, low), (x_to, low), MUTED, width=2.2)
+        ax.text(0.5 * (x_from + x_to), low + 0.07, "stored water\ncarried on", ha="center",
+                va="bottom", fontsize=7, color=MUTED)
     arrow(ax, (xc + h, low), (xc + h + 0.6, low), MUTED, width=2.2, linestyle=(0, (2, 1.5)))
     ax.text(xc + h + 0.65, low, "step $n$+2", ha="left", va="center", fontsize=7, color=MUTED)
-    ax.text(0.5 * (xa + xb), low - 0.1, "storage", ha="center", va="top", fontsize=7,
-            color=MUTED)
-    ax.text(0.5 * (xb + xc), low - 0.1, "storage", ha="center", va="top", fontsize=7,
-            color=MUTED)
-    high = y + 0.28
+    time_y = y - h - 0.12
+    arrow(ax, (xa - h, time_y), (xc + h + 0.6, time_y), MUTED, width=0.6)
+    ax.text(xc + h + 0.65, time_y, "time", ha="left", va="center", fontsize=7, color=MUTED)
+    high = y + 0.36
     arrow(ax, (xb - h - 0.75, high), (xb - h, high))
-    ax.text(xb - h - 0.38, high + 0.08, "$q_{ji}\\, c_j$", ha="center", va="bottom",
+    ax.text(xb - h - 0.38, high + 0.08, "$q_{ji}\\, c_j^{n+1}$", ha="center", va="bottom",
             fontsize=7)
     arrow(ax, (xb + h, high), (xb + h + 0.85, high))
     ax.text(xb + h + 0.5, high + 0.08, "$q_{ik}\\, c_i^{n+1}$", ha="center", va="bottom",
             fontsize=7)
     arrow(ax, (xb - 0.25, y + h + 0.6), (xb - 0.25, y + h), blue, width=1.4)
-    ax.text(xb - 0.37, y + h + 0.35, "recharge (tagged)", ha="right", va="center", fontsize=7,
-            color=blue)
+    ax.text(xb - 0.37, y + h + 0.42, "tagged source $s_i$\n(recharge)", ha="right",
+            va="center", fontsize=7, color=blue)
     arrow(ax, (xb + 0.25, y + h), (xb + 0.25, y + h + 0.6), red, width=1.4)
     ax.text(xb + 0.37, y + h + 0.35, "well", ha="left", va="center", fontsize=7, color=red)
     for x, text in ((xa, "end of step $n$\n$V_i^{n},\\ c_i^{n}$"),
                     (xb, "during step $n$+1"),
                     (xc, "end of step $n$+1\n$V_i^{n+1},\\ c_i^{n+1}$")):
-        ax.text(x, y - h - 0.38, text, ha="center", va="top", fontsize=7)
+        ax.text(x, y - h - 0.28, text, ha="center", va="top", fontsize=7)
     ax.text(xb, 0.12, "$V_i^{n+1}\\, c_i^{n+1} = V_i^{n}\\, c_i^{n} + \\Delta t\\, (\\Sigma_j\\,"
             " q_{ji}\\, c_j^{n+1} + s_i - O_i\\, c_i^{n+1})$", ha="center", va="center",
             fontsize=7.5)
@@ -362,8 +363,10 @@ def draw_transient(ax) -> None:
     draw_snapshot_cell(ax)
     ax.plot([5.0, 5.0], [0.0, 3.3], color=GRID, lw=0.8)
     ax.text(0.2, 3.3, "snapshot, step $n$+1", ha="left", va="top", fontsize=7.5)
-    ax.text(5.3, 3.3, "transient tracking, step $n$ to $n$+1 (shading: tagged fraction $c$)",
+    ax.text(5.3, 3.3, "transient tracking: the same cell $i$ from step $n$ to $n$+1",
             ha="left", va="top", fontsize=7.5)
+    ax.text(13.9, 2.95, "shading: tagged fraction $c$", ha="right", va="top", fontsize=7,
+            color=MUTED)
     draw_tracking_cells(ax)
     blank_axes(ax, (0.0, 14.0), (-0.1, 3.35))
 
@@ -410,7 +413,7 @@ MODEL_STYLES = {  # model: (colour, marker)
     "substep_network": (OKABE_ITO["purple"], "X"),
     "fb13_example": (INK, "*"),
 }
-ZERO_AT = 1e-20  # where exact zeros are drawn on the log axis (balances reach 1e-19)
+ZERO_AT = 1e-18  # where exact zeros are drawn on the log axis
 
 
 def model_offsets(models: list[str], spread: float = 0.32) -> dict[str, float]:
@@ -462,11 +465,10 @@ def draw_errors(ax, table: pd.DataFrame, rows: dict, labels: dict) -> list:
     return handles
 
 
-def draw_pending(ax, table: pd.DataFrame, rows: dict) -> None:
-    """Write 'pending' across the row of each check whose run is not yet made."""
-    for check in sorted(set(table[table.status == "pending"].check)):
-        ax.text(1e-12, rows[check], "pending", ha="center", va="center", fontsize=7,
-                color=MUTED, style="italic")
+def axis_break(ax, x: float = 1e-17) -> None:
+    """Mark the break in the x axis between the 'exact' slot and the first decade."""
+    ax.text(x, 0.0, "//", transform=ax.get_xaxis_transform(), ha="center", va="center",
+            fontsize=7, color=MUTED, backgroundcolor="white", zorder=5, clip_on=False)
 
 
 def make_fig2(out_dir: Path, table: pd.DataFrame, model_labels: dict,
@@ -477,14 +479,14 @@ def make_fig2(out_dir: Path, table: pd.DataFrame, model_labels: dict,
     n_rows = len(rows) + len(headings)
     fig, ax = plt.subplots(figsize=(FULL_WIDTH, 5.0))
     fig.subplots_adjust(left=0.235, right=0.71, top=0.985, bottom=0.085)
-    ax.axvspan(3e-21, 3e-20, color="#f2f2f2", zorder=0)
+    ax.axvspan(3e-19, 3e-18, color="#f2f2f2", zorder=0)
     ax.axvline(MACHINE_EPS, color=INK, ls="--", lw=0.9, zorder=1)
     draw_tolerances(ax, table, rows)
     handles = draw_errors(ax, table, rows, model_labels)
-    draw_pending(ax, table, rows)
     ax.set_xscale("log")
-    ax.set_xlim(3e-21, 1.0)
-    ticks = [1e-20, 1e-18, 1e-16, 1e-14, 1e-12, 1e-10, 1e-8, 1e-6, 1e-4, 1e-2, 1.0]
+    ax.set_xlim(3e-19, 1.0)
+    axis_break(ax)
+    ticks = [1e-18, 1e-16, 1e-14, 1e-12, 1e-10, 1e-8, 1e-6, 1e-4, 1e-2, 1.0]
     ax.set_xticks(ticks, ["exact"] + [f"$10^{{{int(np.log10(t))}}}$" for t in ticks[1:]])
     ax.set_xticks([], minor=True)
     ax.set_yticks(list(rows.values()), [check_labels[c] for c in rows])
@@ -649,8 +651,9 @@ def main(
         print(ver.summary_by_check(table).to_string(index=False))
     if fig2:
         table = pd.read_csv(out_dir / "verification_table.csv")
-        # the [FB13] label of Table 2 is too long for one legend line
-        labels = {**ver.MODEL_LABELS, "fb13_example": "[FB13] worked example,\nnet accounting"}
+        # two Table 2 labels are too long for one legend line
+        labels = {**ver.MODEL_LABELS, "fb13_example": "[FB13] worked example,\nnet accounting",
+                  "substep_network": "hand-built 15-cell\nnetwork (not MF6)"}
         print("wrote", make_fig2(out_dir, table, labels, ver.CHECK_LABELS, ver.CHECK_ORDER,
                                  ver.CHECK_GROUPS))
     if fig3:
