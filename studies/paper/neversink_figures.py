@@ -400,12 +400,11 @@ def map_windows(fields: dict, outline: np.ndarray, wells: dict) -> dict:
 
 
 def map_grid(
-    fields: dict, outline: np.ndarray, wells: dict, height: float, bar_label: str
+    fields: dict, outline: np.ndarray, wells: dict, windows: dict, height: float, bar_label: str
 ) -> plt.Figure:
-    """Return a figure of F-type maps: one row per field, one column per well cluster."""
+    """Return a figure of F-type maps: one row per field, one column per well cluster window."""
     nrow, ncol = outline.shape
     wells_ij = list(well_ij(wells, (nrow, ncol)).values())
-    windows = map_windows(fields, outline, wells)
     fig, axes = plt.subplots(
         len(fields), len(windows), figsize=(DOUBLE, height), constrained_layout=True, squeeze=False
     )
@@ -438,17 +437,25 @@ def capture_fields(idomain: np.ndarray, out: Path = OUT) -> dict:
     }
 
 
-def capture_maps(fig_dir: Path, idomain: np.ndarray, wells: dict, mask: np.ndarray) -> Path:
+def capture_windows(idomain: np.ndarray, wells: dict, mask: np.ndarray, out: Path = OUT) -> dict:
+    """Return the map windows of Fig. 5, which Figs 7 and S1 reuse."""
+    return map_windows(capture_fields(idomain, out), mask, wells)
+
+
+def capture_maps(
+    fig_dir: Path, idomain: np.ndarray, wells: dict, mask: np.ndarray, windows: dict
+) -> Path:
     """Fig. 5: F of the uppermost active cell, streams as cells and as a network."""
     paper_style()
-    fig = map_grid(capture_fields(idomain), mask, wells, 3.6, "F, uppermost active cell")
+    fields = capture_fields(idomain)
+    fig = map_grid(fields, mask, wells, windows, 3.6, "F, uppermost active cell")
     return save(fig, fig_dir, "fig5_capture_maps")
 
 
 def probability_maps(
-    fig_dir: Path, wells: dict, maps_file: Path = ENS_DIR / "probability_maps.npz"
+    fig_dir: Path, wells: dict, windows: dict, maps_file: Path = ENS_DIR / "probability_maps.npz"
 ) -> Path:
-    """Fig. 7: published probability against ensemble mean F, base pumping."""
+    """Fig. 7: published probability against ensemble mean F, base pumping (Fig. 5 windows)."""
     paper_style()
     maps = np.load(maps_file)
     fields = {
@@ -456,7 +463,7 @@ def probability_maps(
         "mean F, cells": maps["cells:mean_F"],
         "mean F, network": maps["network:mean_F"],
     }
-    fig = map_grid(fields, maps["mp7"] > 0.5, wells, 5.2, "probability or mean F")
+    fig = map_grid(fields, maps["mp7"] > 0.5, wells, windows, 5.2, "probability or mean F")
     return save(fig, fig_dir, "fig7_probability_maps")
 
 
@@ -493,15 +500,15 @@ GROUPS = {
 }
 
 
-def agreement_table(out: Path = OUT) -> pd.DataFrame:
+def agreement_table(out: Path = OUT, mixing_rows: tuple = MIXING_ROWS) -> pd.DataFrame:
     """Return group, key, label and overlap (Jaccard index) of every method with the published
     contributing cells; full mixing with gross and net accounting."""
     rows = []
     mixing = pd.read_csv(out / "agreement_with_mp7.csv").set_index("method")["jaccard"]
-    for key, label, _ in MIXING_ROWS:
+    for key, label, _ in mixing_rows:
         rows.append(("full mixing", key, label, mixing[f"full mixing, {key}"]))
     modes = pd.read_csv(out / "net_vs_gross_mp7.csv").set_index(["group", "accounting"])
-    for key, label, column in MIXING_ROWS:
+    for key, label, column in mixing_rows:
         gross = modes.loc[("priority", "gross"), column]
         assert np.isclose(gross, mixing[f"full mixing, {key}"], rtol=1e-12), f"gross {key}"
         rows.append(("full mixing, net", key, label, modes.loc[("priority", "net"), column]))
@@ -797,8 +804,9 @@ def main(
     idomain = wf.grid_idomain(MODEL_DIR)
     shape = idomain.shape[1:]
     wells = wf.PRIORITY_WELLS
-    if fig4 or fig5:
+    if fig4 or fig5 or fig7:
         mask = published_mask(shape)
+        windows = capture_windows(idomain, wells, mask)
     if fig4:
         regions = region_grids(wf.read_endpoints(columns=("node0",)), shape)
         segments = stream_segments(
@@ -810,11 +818,11 @@ def main(
         north = true_north_angle(x0 + shape[1] * 25.0, y0 + shape[0] * 25.0)
         paths.append(location_map(fig_dir, idomain, wells, mask, regions, segments, north))
     if fig5:
-        paths.append(capture_maps(fig_dir, idomain, wells, mask))
+        paths.append(capture_maps(fig_dir, idomain, wells, mask, windows))
     if fig6:
         paths.append(agreement_chart(fig_dir, agreement_table()))
     if fig7:
-        paths.append(probability_maps(fig_dir, wells))
+        paths.append(probability_maps(fig_dir, wells, windows))
     if fig8:
         paths.append(growth_chart(fig_dir, growth_table()))
     if fig9:

@@ -370,7 +370,8 @@ def make_fig2(out_dir: Path, table: pd.DataFrame, model_labels: dict,
     ax.set_xlabel("error reached (measure per check in Table 2)")
     ax.tick_params(axis="y", length=0)
     eps = plt.Line2D([], [], color=INK, ls="--", lw=0.9, label="machine epsilon")
-    tol = plt.Line2D([], [], color=MUTED, lw=2.2, label="test tolerance")
+    tol = plt.Line2D([], [], color=MUTED, ls="none", marker="|", ms=9, mew=2.2,
+                     label="test tolerance")
     fig.legend(handles=[*handles, eps, tol], loc="center left", bbox_to_anchor=(0.73, 0.55),
                title="test model", title_fontsize=7, handletextpad=0.3, labelspacing=0.45)
     return save(fig, out_dir, "fig2_verification")

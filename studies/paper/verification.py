@@ -72,9 +72,9 @@ TOLERANCES = {
     "reference_example": 1e-14,
 }
 MEASURES = {
-    "backward_closure": "relative to destination inflow (absolute in m3/d below 1 m3/d)",
-    "forward_closure": "relative to source inflow (absolute in m3/d below 1 m3/d)",
-    "duality": "relative to forward S->D flow (absolute in m3/d below 1 m3/d)",
+    "backward_closure": "relative to destination inflow (absolute in m³/d below 1 m³/d)",
+    "forward_closure": "relative to source inflow (absolute in m³/d below 1 m³/d)",
+    "duality": "relative to forward source-to-destination flow (absolute in m³/d below 1 m³/d)",
     "boundary_control": "absolute (fraction)",
     "dis_vs_disu": "relative to output maximum",
     "split_vs_single": "relative to output maximum",

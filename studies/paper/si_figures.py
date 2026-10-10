@@ -13,8 +13,9 @@ output/prt_volume_thin1/cell_capture_fraction.npy); nothing is traced or rerun.
   terms, not the sum of the per-well values, which counts water passing between well cells
   twice).
 - (b-d) On the start cells of the published particles (uppermost active layer), in the windows
-  of Figs 5 and 7: the F > 0.1 and F > 0.5 zones (gross), the outline of the PRT zone P > 0.5
-  (weight-losing particles released over the cell volume) and the PRT-zone cells with F <= 0.1.
+  of Fig. 5 (which Fig. 7 reuses): the F > 0.1 and F > 0.5 zones (gross), the outline of the PRT
+  zone P > 0.5 (weight-losing particles released over the cell volume) and the PRT-zone cells
+  with F <= 0.1, filled and marked so that single cells show.
 
 The plotted numbers are asserted against the CSVs and against the values the caption quotes
 (QUOTED). Sizes and conventions follow studies/paper/neversink_figures.py: double column 7 in,
@@ -40,6 +41,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 import net_and_envelope as nae  # noqa: E402
 import workflow as wf  # noqa: E402
 from matplotlib.colors import ListedColormap  # noqa: E402
+from matplotlib.legend_handler import HandlerTuple  # noqa: E402
 from matplotlib.patches import Patch  # noqa: E402
 
 OUT = nfig.OUT
@@ -68,15 +70,14 @@ QUOTED = {
     "missed NE": 86,
     "missed S": 2,
     "missed W": 1,
+    "missed published": 74,
+    "missed NE published": 72,
 }
-ZONE_COLORS = (nfig.ACTIVE_FILL, "#86b6ef", "#1c5cab", nfig.COLORS["prt"])  # codes 0 to 3
-ZONE_LABELS = (
-    "other start cells",
-    "0.1 < F ≤ 0.5",
-    "F > 0.5",
-    "P > 0.5 and F ≤ 0.1",
-)
+MISSED = nfig.COLORS["prt"]
+ZONE_COLORS = (nfig.ACTIVE_FILL, "#86b6ef", "#1c5cab", MISSED)  # codes 0 to 3
+ZONE_LABELS = ("other start cells", "0.1 < F ≤ 0.5", "F > 0.5", "P > 0.5 and F ≤ 0.1")
 GROSS, NET = nfig.COLORS["cells"], nfig.COLORS["cells"]  # net drawn hollow, as in Fig. 6
+SOURCE_LABEL = "water from the source terms (m³/d)"
 
 
 def assert_quoted(value: float, key: str, quoted: dict = QUOTED) -> None:
@@ -92,14 +93,13 @@ def assert_quoted(value: float, key: str, quoted: dict = QUOTED) -> None:
 
 
 def accounting_table(out: Path = OUT, wells: tuple = WELL_ORDER) -> pd.DataFrame:
-    """Return pumping, net volume from, share of cell outflow and net / gross per well and group."""
+    """Return gross and net volume from, share of cell outflow and net / gross per well, group."""
     table = pd.read_csv(out / "net_vs_gross_wells.csv").set_index("group")
     table = table.loc[[*wells, "priority"]]
     assert np.allclose(table["gross_volume_from"], table["pumping"], rtol=1e-5), "gross closure"
     table["ratio"] = table["net_volume_from"] / table["pumping"]
-    for name in ("ratio_net_volume_from", "ratio_net_attribution"):
-        if name in table:
-            assert np.allclose(table["ratio"], table[name], rtol=1e-12), name
+    assert np.allclose(table["ratio"], table["ratio_net_volume_from"], rtol=1e-12), "net ratio"
+    assert (table["n_cycles"] == 0).all(), "the caption says there are no flow loops"
     assert_quoted(table.loc["priority", "pumping"], "pumping")
     assert_quoted(table.loc["priority", "net_volume_from"], "net_volume_from")
     assert_quoted(table.loc["U___7", "well_share_of_outflow"], "share U___7")
@@ -108,8 +108,6 @@ def accounting_table(out: Path = OUT, wells: tuple = WELL_ORDER) -> pd.DataFrame
         assert_quoted(table.loc[well, "ratio"], f"ratio {well}")
     assert_quoted(table.loc[list(wells), "net_volume_from"].sum(), "net per-well sum")
     assert_quoted(table.loc["SV_227", "cell_source_terms"], "source SV_227")
-    if "n_cycles" in table:
-        assert (table["n_cycles"] == 0).all(), "the caption says there are no flow loops"
     return table
 
 
@@ -127,18 +125,20 @@ def well_positions(wells: tuple = WELL_ORDER, clusters: dict = nfig.CLUSTERS,
 
 
 def paired_bars(ax: plt.Axes, y: np.ndarray, gross: np.ndarray, net: np.ndarray,
-                height: float = 0.36) -> None:
+                height: float = 0.36, gross_color: str = GROSS, net_color: str = NET) -> None:
     """Draw a filled bar (gross) above a hollow bar (net) per row."""
-    ax.barh(y - height / 2 - 0.02, gross, height, color=GROSS, lw=0)
-    ax.barh(y + height / 2 + 0.02, net, height, facecolor=nfig.SURFACE, edgecolor=NET, lw=1.0)
+    ax.barh(y - height / 2 - 0.02, gross, height, color=gross_color, lw=0)
+    ax.barh(y + height / 2 + 0.02, net, height, facecolor=nfig.SURFACE, edgecolor=net_color,
+            lw=1.0)
 
 
-def draw_wells(ax: plt.Axes, table: pd.DataFrame, x_max: float = 1300.0) -> None:
-    """Panel (a), left: pumping and net volume from per well, share and ratio as text columns."""
+def draw_wells(ax: plt.Axes, table: pd.DataFrame, x_max: float = 1300.0,
+               xlabel: str = SOURCE_LABEL) -> None:
+    """Panel (a), left: gross and net volume from per well, share and ratio as text columns."""
     wells = [w for w in table.index if w != "priority"]
     y = well_positions(tuple(wells))
     part = table.loc[wells]
-    paired_bars(ax, y, part["pumping"].to_numpy(), part["net_volume_from"].to_numpy())
+    paired_bars(ax, y, part["gross_volume_from"].to_numpy(), part["net_volume_from"].to_numpy())
     columns = ((1.10 * x_max, "well share of\ncell outflow"), (1.38 * x_max, "net /\ngross"))
     for x, head in columns:
         ax.text(x, y[0] - 0.75, head, ha="center", va="bottom", fontsize=7, color=nfig.MUTED)
@@ -155,11 +155,11 @@ def draw_wells(ax: plt.Axes, table: pd.DataFrame, x_max: float = 1300.0) -> None
     ax.set_axisbelow(True)
     ax.tick_params(axis="y", length=0)
     ax.spines[["left", "top", "right"]].set_visible(False)
-    ax.set_xlabel("water attributed to the well (m³/d)", loc="left")
+    ax.set_xlabel(xlabel, loc="left")
     ax.set_title("(a) per well", loc="left")
 
 
-def draw_group(ax: plt.Axes, table: pd.DataFrame) -> None:
+def draw_group(ax: plt.Axes, table: pd.DataFrame, xlabel: str = SOURCE_LABEL) -> None:
     """Panel (a), right: volume from the source terms of the eight wells together."""
     row = table.loc["priority"]
     paired_bars(ax, np.array([0.0]), np.array([row["gross_volume_from"]]),
@@ -175,51 +175,64 @@ def draw_group(ax: plt.Axes, table: pd.DataFrame) -> None:
     ax.set_axisbelow(True)
     ax.tick_params(axis="y", length=0)
     ax.spines[["left", "top", "right"]].set_visible(False)
-    ax.set_xlabel("volume from source terms (m³/d)", loc="left")
+    ax.set_xlabel(xlabel.replace(" (", "\n("), loc="left")
     ax.set_title("eight wells together", loc="left")
 
 
 # ---------------------------------------------------------------- (b-d) zones on the start cells
 
 
-def start_cells(out: Path = OUT) -> pd.DataFrame:
-    """Return node, region, F (gross) and P (weight-losing PRT) of every published start cell."""
+def start_cells(out: Path = OUT, prt_run: str = nae.PRT_RUN) -> pd.DataFrame:
+    """Return node, region, F (gross), P (weight-losing PRT) and published contribution of every
+    published start cell."""
     endpoints = wf.read_endpoints(columns=("node0",))
     f = np.load(out / "fractions_cells.npz")["priority"]
-    p = np.load(out / nae.PRT_RUN / "cell_capture_fraction.npy").astype(float)
+    p = np.load(out / prt_run / "cell_capture_fraction.npy").astype(float)
     assert len(p) == len(f), "the PRT run is on a different grid"
+    mp7 = np.load(out / "mp7_priority.npz")
+    published = pd.Series(mp7["captured"], index=mp7["node0"])
     node = endpoints["node0"].to_numpy()
     return pd.DataFrame({"node": node, "region": endpoints["region"].to_numpy(), "F": f[node],
-                         "P": np.nan_to_num(p[node])})
+                         "P": np.nan_to_num(p[node]),
+                         "published": published.loc[node].to_numpy().astype(bool)})
 
 
-def zone_codes(cells: pd.DataFrame) -> np.ndarray:
-    """Return a zone code per start cell: 0 F <= 0.1, 1 0.1 < F <= 0.5, 2 F > 0.5, 3 missed."""
+def zone_codes(cells: pd.DataFrame, f_low: float = F_LOW, f_high: float = F_HIGH,
+               p_zone: float = P_ZONE) -> np.ndarray:
+    """Return a zone code per start cell: 0 F <= f_low, 1 f_low < F <= f_high, 2 F > f_high,
+    3 in the PRT zone (P > p_zone) with F <= f_low."""
     f, p = cells["F"].to_numpy(), cells["P"].to_numpy()
-    code = np.where(f > F_HIGH, 2, np.where(f > F_LOW, 1, 0))
-    return np.where((p > P_ZONE) & (f <= F_LOW), 3, code)
+    code = np.where(f > f_high, 2, np.where(f > f_low, 1, 0))
+    return np.where((p > p_zone) & (f <= f_low), 3, code)
 
 
-def check_zones(cells: pd.DataFrame, codes: np.ndarray, out: Path = OUT) -> pd.Series:
-    """Assert the zone counts against envelope_prt.csv; return the missed cells per region."""
+def check_zones(cells: pd.DataFrame, codes: np.ndarray, out: Path = OUT, f_low: float = F_LOW,
+                f_high: float = F_HIGH, p_zone: float = P_ZONE,
+                quoted: dict = QUOTED) -> pd.Series:
+    """Assert the zone counts against envelope_prt.csv and the caption; return the missed cells
+    per region."""
     env = pd.read_csv(out / "envelope_prt.csv").set_index(["region", "prt_zone", "f_zone"])
-    row = env.loc[("all", f"P>{P_ZONE:g}", f"F>{F_LOW:g}")]
-    p_zone = cells["P"].to_numpy() > P_ZONE
-    assert row["prt_cells"] == p_zone.sum() == QUOTED["prt_cells"], "PRT zone"
-    assert row["f_cells"] == np.isin(codes, (1, 2)).sum() == QUOTED["F>0.1 cells"], "F > 0.1"
-    assert_quoted(row["coverage"], "coverage")
-    high = env.loc[("all", f"P>{P_ZONE:g}", f"F>{F_HIGH:g}")]
-    assert high["f_cells"] == np.sum(codes == 2) == QUOTED["F>0.5 cells"], "F > 0.5"
-    assert_quoted(high["f_zone_inside_prt"], "F>0.5 inside PRT zone")
+    row = env.loc[("all", f"P>{p_zone:g}", f"F>{f_low:g}")]
+    in_zone = cells["P"].to_numpy() > p_zone
+    assert row["prt_cells"] == in_zone.sum() == quoted["prt_cells"], "PRT zone"
+    assert row["f_cells"] == np.isin(codes, (1, 2)).sum() == quoted["F>0.1 cells"], "F > 0.1"
+    assert_quoted(row["coverage"], "coverage", quoted)
+    high = env.loc[("all", f"P>{p_zone:g}", f"F>{f_high:g}")]
+    assert high["f_cells"] == np.sum(codes == 2) == quoted["F>0.5 cells"], "F > 0.5"
+    assert_quoted(high["f_zone_inside_prt"], "F>0.5 inside PRT zone", quoted)
     notes = pd.read_csv(out / "envelope_prt_notes.csv").iloc[0]
-    assert notes["seeded_start_cells"] == QUOTED["seeded start cells"], "seeded start cells"
-    assert notes["start_cells_F>0.1"] == QUOTED["F>0.1 cells"], "F > 0.1 start cells"
+    assert notes["seeded_start_cells"] == quoted["seeded start cells"], "seeded start cells"
+    assert notes["start_cells_F>0.1"] == quoted["F>0.1 cells"], "F > 0.1 start cells"
     assert notes["unseeded_F>0.1"] == 0, "the caption says every F > 0.1 start cell is seeded"
-    missed = pd.Series(codes == 3).groupby(cells["region"].to_numpy()).sum()
-    assert row["missed_cells"] == missed.sum() == QUOTED["missed"], "missed cells"
-    for region, n in missed.items():
-        assert env.loc[(region, f"P>{P_ZONE:g}", f"F>{F_LOW:g}"), "missed_cells"] == n, region
-        assert n == QUOTED[f"missed {region}"], region
+    region = cells["region"].to_numpy()
+    missed = pd.Series(codes == 3).groupby(region).sum()
+    assert row["missed_cells"] == missed.sum() == quoted["missed"], "missed cells"
+    for name, n in missed.items():
+        assert env.loc[(name, f"P>{p_zone:g}", f"F>{f_low:g}"), "missed_cells"] == n, name
+        assert n == quoted[f"missed {name}"], name
+    published = (codes == 3) & cells["published"].to_numpy()
+    assert published.sum() == quoted["missed published"], "missed published cells"
+    assert np.sum(published & (region == "NE")) == quoted["missed NE published"], "NE published"
     return missed
 
 
@@ -233,17 +246,23 @@ def cell_grid(nodes: np.ndarray, values: np.ndarray, shape: tuple) -> np.ndarray
 
 
 def draw_zone_map(ax: plt.Axes, codes: np.ndarray, p_zone: np.ndarray, wells_ij: list,
-                  window: tuple, title: str) -> None:
-    """Draw the zone codes, the PRT-zone outline and the wells in one cluster window."""
+                  window: tuple, title: str, colors: tuple = ZONE_COLORS,
+                  missed_color: str = MISSED) -> None:
+    """Draw the zone codes, the missed cells marked, the PRT-zone outline and the wells in one
+    cluster window."""
     r0, r1, c0, c1 = window
     nrow = codes.shape[0]
     km = nf.CELL_KM
     extent = (c0 * km, (c1 + 1) * km, (nrow - r1 - 1) * km, (nrow - r0) * km)
-    ax.imshow(codes[r0 : r1 + 1, c0 : c1 + 1], cmap=ListedColormap(ZONE_COLORS), vmin=-0.5,
-              vmax=3.5, extent=extent, interpolation="nearest")
+    part = codes[r0 : r1 + 1, c0 : c1 + 1]
+    ax.imshow(part, cmap=ListedColormap(colors), vmin=-0.5, vmax=len(colors) - 0.5,
+              extent=extent, interpolation="nearest")
     yy, xx = np.mgrid[r0 : r1 + 1, c0 : c1 + 1]
     ax.contour((xx + 0.5) * km, (nrow - yy - 0.5) * km, p_zone[r0 : r1 + 1, c0 : c1 + 1],
-               levels=[0.5], colors=nfig.COLORS["prt"], linewidths=0.8)
+               levels=[0.5], colors=missed_color, linewidths=0.8)
+    rows, cols = np.nonzero(part == 3)
+    ax.plot((cols + c0 + 0.5) * km, (nrow - rows - r0 - 0.5) * km, "s", ms=4, mfc="none",
+            mec=missed_color, mew=0.7)
     for i, j in wells_ij:
         if r0 <= i <= r1 and c0 <= j <= c1:
             ax.plot((j + 0.5) * km, (nrow - i - 0.5) * km, "o", ms=4, mfc=nfig.INK,
@@ -262,25 +281,34 @@ def window_counts(codes: np.ndarray, windows: dict) -> dict:
 # ---------------------------------------------------------------- figure
 
 
-def map_legend_handles() -> list:
-    """Return the legend entries of the zone maps."""
+def map_legend_handles(colors: tuple = ZONE_COLORS, labels: tuple = ZONE_LABELS,
+                       missed_color: str = MISSED) -> tuple[list, list]:
+    """Return the legend entries of the zone maps (the missed cells filled and marked)."""
     handles = [Patch(facecolor=c, edgecolor="none", label=lab)
-               for c, lab in zip(ZONE_COLORS, ZONE_LABELS)]
-    handles.append(plt.Line2D([], [], color=nfig.COLORS["prt"], lw=0.9,
-                              label="PRT zone, P > 0.5 (outline)"))
-    handles.append(plt.Line2D([], [], ls="", marker="o", ms=4, mfc=nfig.INK, mec=nfig.SURFACE,
-                              label="priority wells"))
-    return handles
+               for c, lab in zip(colors[:-1], labels[:-1])]
+    marker = plt.Line2D([], [], ls="", marker="s", ms=4, mfc="none", mec=missed_color, mew=0.7)
+    handles.append((Patch(facecolor=colors[-1], edgecolor="none"), marker))
+    handles.append(Patch(facecolor=nfig.SURFACE, edgecolor=nfig.MUTED, lw=0.4))
+    handles.append(plt.Line2D([], [], color=missed_color, lw=0.9))
+    handles.append(plt.Line2D([], [], ls="", marker="o", ms=4, mfc=nfig.INK, mec=nfig.SURFACE))
+    names = [*labels, "no published start cell", "PRT zone, P > 0.5 (outline)", "priority wells"]
+    return handles, names
 
 
-def accounting_legend_handles() -> list:
+def accounting_legend_handles(gross_color: str = GROSS, net_color: str = NET) -> list:
     """Return the legend entries of panel (a)."""
-    return [Patch(facecolor=GROSS, edgecolor="none", label="gross accounting (= pumping)"),
-            Patch(facecolor=nfig.SURFACE, edgecolor=NET, lw=1.0, label="net accounting")]
+    return [Patch(facecolor=gross_color, edgecolor="none", label="gross accounting (= pumping)"),
+            Patch(facecolor=nfig.SURFACE, edgecolor=net_color, lw=1.0, label="net accounting")]
+
+
+def map_title(letter: str, name: str, n: int) -> str:
+    """Return a map panel title such as '(b) U wells: 86 cells missed'."""
+    return f"({letter}) {name} wells: {n} cell{'s' if n != 1 else ''} missed"
 
 
 def make_figS1(fig_dir: Path, table: pd.DataFrame, codes: np.ndarray, p_zone: np.ndarray,
-               windows: dict, wells: dict, missed: pd.Series) -> Path:
+               windows: dict, wells: dict, missed: pd.Series,
+               cluster_region: dict = CLUSTER_REGION) -> Path:
     """Fig. S1: (a) gross and net accounting per well; (b-d) F zones against the PRT zone."""
     nfig.paper_style()
     fig = plt.figure(figsize=(nfig.DOUBLE, 5.0), layout="constrained")
@@ -293,35 +321,34 @@ def make_figS1(fig_dir: Path, table: pd.DataFrame, codes: np.ndarray, p_zone: np
     axes = bottom.subplots(1, len(windows))
     wells_ij = list(nfig.well_ij(wells, codes.shape).values())
     for ax, letter, (name, window) in zip(axes, "bcd", windows.items()):
-        n = missed[CLUSTER_REGION[name]]
-        title = f"({letter}) {name}: F > 0.1 misses {n}"
+        title = map_title(letter, name, missed[cluster_region[name]])
         draw_zone_map(ax, codes, p_zone, wells_ij, window, title)
         ax.set_xlabel("x from grid origin (km)")
     axes[0].set_ylabel("y (km)")
-    bottom.legend(handles=map_legend_handles(), loc="outside lower center", ncol=3,
-                  handlelength=1.4, columnspacing=1.2)
+    handles, names = map_legend_handles()
+    bottom.legend(handles, names, loc="outside lower center", ncol=4, handlelength=2.2,
+                  columnspacing=1.2, handler_map={tuple: HandlerTuple(ndivide=None, pad=0.4)})
     return nfig.save(fig, fig_dir, "figS1_net_and_envelope")
 
 
-def main(fig_dir: Path = FIG_DIR, out: Path = OUT) -> Path:
+def main(fig_dir: Path = FIG_DIR, out: Path = OUT, cluster_region: dict = CLUSTER_REGION,
+         p_zone: float = P_ZONE) -> Path:
     """Make Fig. S1 in fig_dir from the outputs in out; return the PNG path."""
     idomain = wf.grid_idomain(out / "optimal")
     shape = idomain.shape[1:]
     wells = wf.PRIORITY_WELLS
     table = accounting_table(out)
     cells = start_cells(out)
-    codes = zone_codes(cells)
-    missed = check_zones(cells, codes, out)
+    codes = zone_codes(cells, p_zone=p_zone)
+    missed = check_zones(cells, codes, out, p_zone=p_zone)
     nodes = cells["node"].to_numpy()
     code_grid = cell_grid(nodes, codes, shape)
-    p_grid = cell_grid(nodes, (cells["P"].to_numpy() > P_ZONE).astype(float), shape)
-    windows = nfig.map_windows(nfig.capture_fields(idomain, out), nfig.published_mask(shape, out),
-                               wells)
-    in_windows = window_counts(code_grid, windows)
-    for name, n in in_windows.items():
-        assert n == missed[CLUSTER_REGION[name]], f"{name}: {n} missed cells in the window"
+    p_grid = cell_grid(nodes, (cells["P"].to_numpy() > p_zone).astype(float), shape)
+    windows = nfig.capture_windows(idomain, wells, nfig.published_mask(shape, out), out)
+    for name, n in window_counts(code_grid, windows).items():
+        assert n == missed[cluster_region[name]], f"{name}: {n} missed cells in the window"
     return make_figS1(fig_dir, table, code_grid, np.nan_to_num(p_grid) > 0, windows, wells,
-                      missed)
+                      missed, cluster_region)
 
 
 if __name__ == "__main__":
