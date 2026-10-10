@@ -60,3 +60,25 @@ Mechanical checks:
 ## Naming test
 
 `PYTHONPATH=src ~/miniforge3/envs/gw-source/bin/python -m pytest -q tests/test_naming.py`: 2 passed in 0.06 s, after all edits.
+
+## Fixes applied
+
+1. si/C.md: the SI initial-water shares (96.9, 97.6, 97.8 %) are the share of all water pumped so far after 1 year, not the last season; now said so. The river shares (3.6, 3.1, 3.0 %) are the last season. Source: README_method.md Fig. 4 notes and tutorial 08 §§3–4, 9. Main text unchanged.
+2. sections/06_discussion.md and si/F_editor.md: SV_407 added to the wells where net accounting is above the published count (37 against 32). In §6.2, the other five wells are all below it (Table S2).
+3. sections/00_front.md: abstract now says full mixing "lies within" the spread, as §5.2 and §8 do.
+4. sections/02, 03, 07: one form, SAVE BUDGET ALL; "Output Control (OC)" spelled out at first use (§2.8), "OC" after that.
+5. sections/06_discussion.md: "by about 0.33" changed to "by 0.33–0.35"; "weight loss at weak sinks" changed to "weight loss at the other sinks".
+6. display/C.md: Fig. 4 caption now says "add up to 1 to within the flow-error correction".
+7. sections/05_neversink.md §5.3: added "The F > 0.5 area covers 59 % of the PRT area" (envelope_prt.csv, coverage 0.590), which §6.5 relies on.
+8. Two-model split confirmed (model 3 split into two: tests/test_multimodel.py labels_for; studies/paper/verification.py says "2 to 4 models"). Main text kept as is; si/C.md now gives the count for each split model.
+9. sections/07_limitations.md: the sentence now says what the reading explains (weight-losing particles give a smaller area at base pumping and so grow faster) and points to {SI: faster growth of weight-losing particles}, which holds it.
+10. sections/05_neversink.md §5.4: "all" confirmed (sources_sfr_network.csv: RCHA 3,671.0 m³/d, CHD 0, SFR external inflow 0); added "none to constant heads or to the streams' external inflow".
+11. sections/04_verification.md §4.4: the snapshot remainder is now named ("the rest river leakage"). No number added: the river mean is not quoted in transient_figure.py or the tutorial.
+13. sections/01_introduction.md: Pryet et al. (2022) now cited in the flux-based-alternatives paragraph (outline §1, brief move 3), in one sentence on particle source shares weighted by cell-budget mixing ratios. Reference kept.
+15. sections/00_front.md: cut "run from the end of the simulation to its start". The abstract is now 249 words, without the heading and the HTML comments.
+17. sections/05_neversink.md §5.6: two sentences now. Dropped "so more of the pumping is recharge"; the mechanism stays in {SI: growth mechanism}.
+18. si/D.md: deleted "Formerly Fig. 10 of the main text (…)" and the repository path. si/numbering.md not changed.
+19. SI ranges changed to the en-dash style in si/D.md, si/E.md and si/F_editor.md, with no values changed. Not converted: "from X to Y" changes (e.g. 94 to 214 cells), "between … and …", page ranges in si/A.md (pp. 1–1 to 1–8, where an en dash would be ambiguous), and HTML comments.
+21. Not a typo: these are different runs. Table S6 runs one particle per published start, seeded where F > 0 (growth_mechanisms.py; NS Table 6 note). §5.3 uses flow-weighted release in cells with F > 10⁻⁶ (NS Table 3 note). The Table S6 caption now says so.
+
+Naming test after these fixes: 2 passed.
