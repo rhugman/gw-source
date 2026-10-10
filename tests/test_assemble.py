@@ -88,6 +88,7 @@ def test_net_two_cell_group_closure():
     sends 2 to cell 3 (pumps 5) and 1 to cell 4 (other sink). Net mode gives f = (1, 1, 2/3, 1, 0).
     The throughflow sum (10 + 5) counts the 3 passing 1 -> 3 twice and the 2 passing 1 -> 2 -> 3
     twice; the volume from (10) does not: sum f s+ = sum T_D - q(D->D) - sum q(D->not D) f.
+    destination_inflow is the 10, destination_throughflow the 15.
     """
     edges = [(0, 1, 10.0), (1, 3, 3.0), (1, 2, 3.0), (2, 3, 2.0), (2, 4, 1.0)]
     terms = [(0, 10.0, 0), (1, -4.0, 1), (3, -5.0, 1), (4, -1.0, 1)]
@@ -96,7 +97,8 @@ def test_net_two_cell_group_closure():
     net = gs.backward(step, groups, gs.TraceConfig(accounting="net"))
     f = net.fraction_through["wells"]
     np.testing.assert_allclose(f, [1.0, 1.0, 2.0 / 3.0, 1.0, 0.0], rtol=1e-14)
-    assert net.destination_inflow["wells"] == pytest.approx(15.0)
+    assert net.destination_inflow["wells"] == pytest.approx(10.0, rel=1e-14)
+    assert net.destination_throughflow["wells"] == pytest.approx(15.0, rel=1e-14)
     assert net.volume_from["wells"].sum() == pytest.approx(10.0)
     e = gs.flow_edges(step)
     dest = groups["wells"].cells
@@ -104,8 +106,10 @@ def test_net_two_cell_group_closure():
     onward = dest[e.src] & ~dest[e.dst]
     dest_onward = np.sum(e.q[onward] * f[e.dst[onward]])
     assert (dest_to_dest, dest_onward) == pytest.approx((3.0, 2.0))
-    rhs = net.destination_inflow["wells"] - dest_to_dest - dest_onward
+    rhs = net.destination_throughflow["wells"] - dest_to_dest - dest_onward
     assert net.volume_from["wells"].sum() == pytest.approx(rhs, rel=1e-14)
+    check = backward_closure(step, net, "wells")
+    assert check.residual_term == 0.0 and abs(check.error) < 1e-13
     gross = gs.backward(step, {"wells": gs.select(step, package="WEL", cells=[1, 3])})
     assert gross.volume_from["wells"].sum() == pytest.approx(9.0)
 
@@ -202,30 +206,19 @@ def test_net_forward_on_reversed_graph():
     np.testing.assert_allclose(res.volume_to["c0"], [0.0, 0.0, 4.0])
 
 
-def test_net_destination_inflow_counts_each_passage_once():
-    """Net destination inflow is the throughflow sum less the water it counts twice.
+def test_net_destination_inflow_return_flow():
+    """Net destination inflow of one cell less the water that leaves it and comes back.
 
-    Two-cell group: source 10 -> well cell 1, which sends 3 to well cell 3 and 3 to cell 2; cell 2
-    sends 2 to cell 3 and 1 to cell 4. T_1 + T_3 = 15 counts the 3 passing 1 -> 3 and the 2
-    passing 1 -> 2 -> 3 twice; the inflow is 15 - 3 - 3 x 2/3 = 10 = the net volume from.
-    Single cell with return flow (cycle_step, group cell 2): T_2 = 12, of which 5 leaves for
-    cell 1 (f = 0.8) and comes back, so the inflow is 12 - 5 x 0.8 = 8.
+    cycle_step, group cell 2: T_2 = 12, of which 5 leaves for cell 1 (f = 0.8) and comes back, so
+    the inflow is 12 - 5 x 0.8 = 8 = the net volume from (10 x 0.8).
     """
-    net = gs.TraceConfig(accounting="net")
-    edges = [(0, 1, 10.0), (1, 3, 3.0), (1, 2, 3.0), (2, 3, 2.0), (2, 4, 1.0)]
-    terms = [(0, 10.0, 0), (1, -4.0, 1), (3, -5.0, 1), (4, -1.0, 1)]
-    step = graph(5, edges, terms)
-    res = gs.backward(step, {"wells": gs.select_cells(step, [1, 3])}, net)
-    assert res.destination_inflow["wells"] == pytest.approx(10.0, rel=1e-14)
-    assert res.destination_throughflow["wells"] == pytest.approx(15.0, rel=1e-14)
-    check = backward_closure(step, res, "wells")
-    assert check.residual_term == 0.0 and abs(check.error) < 1e-13
     step = cycle_step()
-    res = gs.backward(step, {"c2": gs.select_cells(step, [2])}, net)
+    res = gs.backward(step, {"c2": gs.select_cells(step, [2])}, gs.TraceConfig(accounting="net"))
     np.testing.assert_allclose(res.fraction_through["c2"], [0.8, 0.8, 1.0], rtol=1e-14)
     assert res.destination_inflow["c2"] == pytest.approx(8.0, rel=1e-14)
     assert res.destination_throughflow["c2"] == pytest.approx(12.0, rel=1e-14)
-    assert abs(backward_closure(step, res, "c2").error) < 1e-13
+    check = backward_closure(step, res, "c2")
+    assert check.residual_term == 0.0 and abs(check.error) < 1e-13
     gross = gs.backward(step, {"c2": gs.select(step, package="WEL", bounds=[2])})
     assert gross.destination_throughflow == {}
 

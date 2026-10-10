@@ -7,13 +7,14 @@ Net against gross. Net accounting (the reference method [FB13]; PLAN §2.4) uses
 intercell flows: s_i = O^edges_i - I^edges_i, throughflow T_i = I^edges_i + max(s_i, 0), the
 destination cells absorb (f = 1) and elsewhere f_i = sum_j q_ij f_j / T_i. The net attribution
 of a group is its net volume from, sum_i f_i max(s_i, 0), set against the wells' own pumping under
-gross accounting. The library's net destination_inflow is the sum of the destination cells'
-throughflows; for a group of several cells it counts water that passes between them more than
-once (net_dest_throughflow_sum below). F differs between the modes locally only in the
-destination cells and in cells with both source and sink terms (O_gross = I^edges + sources
-there, T = max(I^edges, O^edges)). Elsewhere the row equations are the same up to the cell budget
-error (gross normalises by O = I - r, net by T = I^edges), and the difference is otherwise
-inherited from downstream.
+gross accounting. The library's net destination_inflow counts each passage into the group once
+and equals the net volume from (identity below); its destination_throughflow is the sum of the
+destination cells' throughflows, which for a group of several cells counts water that passes
+between them more than once (net_dest_throughflow_sum below). F differs between the modes
+locally only in the destination cells and in cells with both source and sink terms
+(O_gross = I^edges + sources there, T = max(I^edges, O^edges)). Elsewhere the row equations
+are the same up to the cell budget error (gross normalises by O = I - r, net by T = I^edges),
+and the difference is otherwise inherited from downstream.
 
 Net closure. Summing f_i T_i = sum_j q_ij f_j over the non-destination cells gives, with D the
 destination cells and s+ = max(s, 0),
@@ -23,10 +24,13 @@ destination cells and s+ = max(s, 0),
 The left side sums over all cells, destination cells included, and is the net volume from
 (volume_from). The two subtracted terms are water that passes from one destination cell to
 another (counted in both throughflows) and water that leaves a destination cell and reaches the
-group again. Net mode uses edges only, so there is no budget-residual term. The check confirms
-the solve and the consistency of s+ and T; tests/test_fb13_example.py is what validates net
-accounting itself, and tests/test_assemble.py checks this identity on a group of two cells. This
-identity and the gross closure are both asserted to 1e-9 of the group's flow.
+group again (gwsource.assemble.net_double_count). Net mode uses edges only, so there is no
+budget-residual term. The right side is the library's net destination_inflow (net_closure_rhs);
+the throughflow sum is its destination_throughflow. The check
+(gwsource.diagnostics.backward_closure) confirms the solve and the consistency of s+ and T;
+tests/test_fb13_example.py is what validates net accounting itself, and tests/test_assemble.py
+checks this identity on a group of two cells. This identity and the gross closure are both
+asserted to 1e-9 of the group's flow.
 
 Envelope. docs/dispersion_study.md found that F >= 0.1 contained the non-stopping particle
 reference zone in every synthetic run. Here the reference is the thinned flux-weighted PRT run
@@ -89,19 +93,6 @@ def trace_both(ws: Path) -> tuple[gs.FlowStep, dict, dict[str, gs.BackwardResult
     return step, groups, results, seconds
 
 
-def net_closure(edges: gs.Edges, dest: np.ndarray, f: np.ndarray, throughflow: float) -> dict:
-    """Return the terms of the net closure identity (module docstring) for one group."""
-    from_dest, to_dest = dest[edges.src], dest[edges.dst]
-    onward = from_dest & ~to_dest
-    dest_to_dest = float(edges.q[from_dest & to_dest].sum())
-    dest_onward = float(np.sum(edges.q[onward] * f[edges.dst[onward]]))
-    return {
-        "dest_to_dest_flow": dest_to_dest,
-        "dest_onward_to_dest": dest_onward,
-        "net_closure_rhs": throughflow - dest_to_dest - dest_onward,
-    }
-
-
 def well_cell_budget(step: gs.FlowStep, sel: gs.Selection, budget: gs.CellBudget) -> dict:
     """Return the summed budget of a group's cells and the share of their outflow the wells take.
 
@@ -145,11 +136,12 @@ def accounting_table(
         assert abs(check.error) <= tol * row["pumping"], f"gross closure fails for {group}"
         row["gross_volume_from"] = float(gross.volume_from[group].sum())
         row["gross_closure_error"] = check.error
-        row["net_dest_throughflow_sum"] = net.destination_inflow[group]
+        row["net_dest_throughflow_sum"] = net.destination_throughflow[group]
         row["net_volume_from"] = float(net.volume_from[group].sum())
-        f = net.fraction_through[group]
-        row.update(net_closure(edges, sel.cells, f, row["net_dest_throughflow_sum"]))
-        row["net_closure_error"] = row["net_volume_from"] - row["net_closure_rhs"]
+        double = gs.assemble.net_double_count(edges, sel.cells, net.fraction_through[group])
+        row["dest_to_dest_flow"], row["dest_onward_to_dest"] = double
+        row["net_closure_rhs"] = net.destination_inflow[group]
+        row["net_closure_error"] = gs.diagnostics.backward_closure(step, net, group).error
         scale = row["net_dest_throughflow_sum"]
         assert abs(row["net_closure_error"]) <= tol * scale, f"net closure fails for {group}"
         row["ratio_net_volume_from"] = row["net_volume_from"] / row["pumping"]
