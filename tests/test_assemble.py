@@ -81,6 +81,35 @@ def test_weak_sink_net_absorbs_whole_cell():
     assert res.volume_from["well"].sum() == pytest.approx(10.0)
 
 
+def test_net_two_cell_group_closure():
+    """A group of two well cells, one feeding the other directly and through a third cell.
+
+    Source 10 -> well cell 1 (pumps 4), which sends 3 to well cell 3 and 3 to cell 2; cell 2
+    sends 2 to cell 3 (pumps 5) and 1 to cell 4 (other sink). Net mode gives f = (1, 1, 2/3, 1, 0).
+    The throughflow sum (10 + 5) counts the 3 passing 1 -> 3 twice and the 2 passing 1 -> 2 -> 3
+    twice; the volume from (10) does not: sum f s+ = sum T_D - q(D->D) - sum q(D->not D) f.
+    """
+    edges = [(0, 1, 10.0), (1, 3, 3.0), (1, 2, 3.0), (2, 3, 2.0), (2, 4, 1.0)]
+    terms = [(0, 10.0, 0), (1, -4.0, 1), (3, -5.0, 1), (4, -1.0, 1)]
+    step = graph(5, edges, terms)
+    groups = {"wells": gs.select_cells(step, [1, 3])}
+    net = gs.backward(step, groups, gs.TraceConfig(accounting="net"))
+    f = net.fraction_through["wells"]
+    np.testing.assert_allclose(f, [1.0, 1.0, 2.0 / 3.0, 1.0, 0.0], rtol=1e-14)
+    assert net.destination_inflow["wells"] == pytest.approx(15.0)
+    assert net.volume_from["wells"].sum() == pytest.approx(10.0)
+    e = gs.flow_edges(step)
+    dest = groups["wells"].cells
+    dest_to_dest = e.q[dest[e.src] & dest[e.dst]].sum()
+    onward = dest[e.src] & ~dest[e.dst]
+    dest_onward = np.sum(e.q[onward] * f[e.dst[onward]])
+    assert (dest_to_dest, dest_onward) == pytest.approx((3.0, 2.0))
+    rhs = net.destination_inflow["wells"] - dest_to_dest - dest_onward
+    assert net.volume_from["wells"].sum() == pytest.approx(rhs, rel=1e-14)
+    gross = gs.backward(step, {"wells": gs.select(step, package="WEL", cells=[1, 3])})
+    assert gross.volume_from["wells"].sum() == pytest.approx(9.0)
+
+
 def cycle_step() -> gs.FlowStep:
     """Source 10 -> cell 1 <-> cell 2 (12 forward, 5 back); sinks 3 at cell 1 and 7 at cell 2."""
     edges = [(0, 1, 10.0), (1, 2, 12.0), (2, 1, 5.0)]
