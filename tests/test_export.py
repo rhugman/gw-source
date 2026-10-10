@@ -66,16 +66,18 @@ def test_netcdf_forward_result(model_run, tmp_path):
 def test_dataset_net_inflow_and_throughflow(model_run):
     """Net results export the inflow under a net label and the throughflow sum beside it."""
     step = gs.read_step(model_run("m1_dis").ws)
-    groups = {"wel": gs.select(step, package="WEL")}
     net = gs.TraceConfig(accounting="net")
-    back, fwd = gs.backward(step, groups, net), gs.forward(step, groups, net)
-    results = {"destination": back, "source": fwd}
-    for prefix, res in results.items():
+    back = gs.backward(step, {"wel": gs.select(step, package="WEL")}, net)
+    fwd = gs.forward(step, {"rch": gs.select(step, package="RCH")}, net)
+    results = {"destination": (back, "wel"), "source": (fwd, "rch")}
+    for prefix, (res, group) in results.items():
         ds = gs.export.to_dataset(step, res)
-        inflow = getattr(res, f"{prefix}_inflow")["wel"]
-        throughflow = getattr(res, f"{prefix}_throughflow")["wel"]
-        assert float(ds[f"{prefix}_inflow"].sel(group="wel")) == inflow
-        assert float(ds[f"{prefix}_throughflow"].sel(group="wel")) == throughflow
+        inflow = getattr(res, f"{prefix}_inflow")[group]
+        throughflow = getattr(res, f"{prefix}_throughflow")[group]
+        assert inflow > 0.0
+        assert throughflow > 0.0
+        assert float(ds[f"{prefix}_inflow"].sel(group=group)) == inflow
+        assert float(ds[f"{prefix}_throughflow"].sel(group=group)) == throughflow
         assert "each passage counted once" in ds[f"{prefix}_inflow"].attrs["long_name"]
 
 

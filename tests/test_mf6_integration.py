@@ -103,6 +103,31 @@ def test_net_forward_recharge_skips_zero_flow_chd_cells(model_run):
     )
 
 
+def test_net_forward_zone_recharge_matches_restricted_package(model_run):
+    """Model 2: select_zone(package="RCH") fixes the zone's flowing recharge cells only.
+
+    It equals select(package="RCH") restricted to the zone; a zone over every cell gives the
+    package selection's source inflow (1159.73), not every cell at g = 1.
+    """
+    step = gs.read_step(model_run("m2_dis3lay").ws)
+    net = gs.TraceConfig(accounting="net")
+    zones = np.zeros((3, 15, 25), dtype=int)
+    zones[:, :, :12] = 1
+    in_zone = zones.ravel()[step.term_cell] == 1
+    groups = {
+        "zone": gs.select_zone(step, zones, 1, package="RCH"),
+        "restricted": gs.select(step, package="RCH", term_mask=in_zone),
+        "all_cells": gs.select_zone(step, np.ones_like(zones), 1, package="RCH"),
+    }
+    res = gs.forward(step, groups, net)
+    g = res.source_fraction
+    np.testing.assert_array_equal(g["zone"], g["restricted"])
+    assert res.source_inflow["zone"] == res.source_inflow["restricted"]
+    assert res.source_inflow["zone"] == pytest.approx(934.728254, rel=1e-8)
+    assert res.source_inflow["all_cells"] == pytest.approx(1159.728254, rel=1e-8)
+    assert g["all_cells"].min() == 0.0
+
+
 def test_net_backward_river_skips_losing_cells(model_run):
     """Model 1: losing river cells (RIV a source) are not destinations in a net backward trace."""
     step = gs.read_step(model_run("m1_dis").ws)

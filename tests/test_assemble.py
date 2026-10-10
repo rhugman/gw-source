@@ -320,6 +320,17 @@ def test_net_fixed_cells_follow_the_traced_direction():
     by_cell = gs.select_cells(step, [1])
     for sign in (-1, +1):
         assert gs.trace.net_fixed_cells(step, by_cell, sign).tolist() == [False, True, False]
+    cells_and_package = gs.select(step, package="RCH", cells=[0, 1])
+    assert by_cell.term_criteria is False and cells_and_package.term_criteria is True
+    assert gs.trace.net_fixed_cells(step, cells_and_package, +1).tolist() == [True, False, False]
+    with pytest.raises(AssertionError, match="sign"):
+        gs.trace.net_fixed_cells(step, both, 0)
+    # any selected entry flowing in the traced direction fixes the cell: +3 and -4 fix it both ways
+    packages = [gs.Package("RIV", "RIV"), gs.Package("WEL", "WEL")]
+    mixed = graph(2, [(1, 0, 1.0)], [(0, 3.0, 0), (0, -4.0, 1), (1, 1.0, 0)], packages)
+    sel = gs.select(mixed, term_mask=mixed.term_cell == 0)
+    for sign in (-1, +1):
+        assert gs.trace.net_fixed_cells(mixed, sel, sign).tolist() == [True, False]
 
 
 def zero_drain_step() -> gs.FlowStep:
@@ -341,6 +352,18 @@ def test_net_backward_skips_zero_flow_destination_cells():
     alone = gs.backward(step, {"c2": gs.select_cells(step, [2])}, config)
     assert res.destination_inflow["drn"] == alone.destination_inflow["c2"] == pytest.approx(6.0)
     assert abs(backward_closure(step, res, "drn").error) < 1e-13
+
+
+def test_net_group_with_no_flowing_entry_fixes_nothing():
+    """A group whose selected entries are all at 0.0 fixes no cell: every value is 0, no NaN."""
+    step = zero_drain_step()
+    idle = gs.select(step, package="DRN", term_mask=step.term_flow == 0.0)
+    res = gs.backward(step, {"idle": idle}, gs.TraceConfig(accounting="net"))
+    np.testing.assert_array_equal(res.fraction_through["idle"], 0.0)
+    assert res.destination_inflow["idle"] == 0.0
+    assert res.destination_throughflow["idle"] == 0.0
+    assert backward_closure(step, res, "idle").error == 0.0
+    assert not np.isnan(res.fraction_from_total["idle"]).any()
 
 
 def test_net_cell_selection_keeps_its_cells():

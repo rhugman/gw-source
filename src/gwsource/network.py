@@ -776,7 +776,7 @@ def result_view(result: BackwardResult | ForwardResult, step: FlowStep, model: s
     sl = slice(block.offset, block.offset + block.n)
     terms = term_index(step, block)
     selections = {
-        g: Selection(terms=s.terms[terms], cells=s.cells[sl], cells_from_terms=s.cells_from_terms)
+        g: Selection(terms=s.terms[terms], cells=s.cells[sl], term_criteria=s.term_criteria)
         for g, s in result.selections.items()
     }
     changes = {"selections": selections, "factor": None}

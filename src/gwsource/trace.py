@@ -143,11 +143,13 @@ def _net_edges(
 def net_fixed_cells(step: FlowStep, sel: Selection, sign: int) -> np.ndarray:
     """Return the cells fixed at 1: sel.cells, or the cells where selected terms flow with sign.
 
-    Groups selected by cells or zone keep their cells. Groups selected by term criteria fix only
-    the cells where a selected entry flows in the traced direction: sign -1 (sinks) backward,
-    +1 (sources) forward, as term_flow is positive into the cell.
+    A pure cell or zone selection keeps its cells. A selection with term criteria fixes a cell
+    if any selected entry in it flows in the traced direction: sign -1 (a sink) backward, +1 (a
+    source) forward, as term_flow is positive into the cell. A cell with selected entries of
+    both signs is fixed in both directions; a group with no such entry fixes no cell.
     """
-    if not sel.cells_from_terms:
+    assert sign in (-1, 1), "sign must be -1 (backward, sinks) or +1 (forward, sources)"
+    if not sel.term_criteria:
         return sel.cells
     fixed = np.zeros(step.n_cells, dtype=bool)
     fixed[step.term_cell[sel.terms & (sign * step.term_flow > 0.0)]] = True

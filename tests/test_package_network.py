@@ -93,6 +93,21 @@ def test_aquifer_records_become_edges(model_run):
     assert edges.q[out_of_reach].sum() == pytest.approx(losses, rel=1e-12)
 
 
+def test_net_package_selection_fixes_only_flowing_nodes(model_run):
+    """Net backward select(package="SFR") fixes only the reach nodes with a sink record.
+
+    On model 7 that is the outlet reach (EXT-OUTFLOW), so the net inflow equals the gross inflow
+    (22.913).
+    """
+    step = gs.read_network(model_run("m7_mover").ws, package_nodes=("SFR",))
+    groups = {"sfr": gs.select(step, package="SFR")}
+    net = gs.backward(step, groups, gs.TraceConfig(accounting="net"))
+    gross = gs.backward(step, groups)
+    assert gs.trace.net_fixed_cells(step, groups["sfr"], -1).sum() == 1
+    assert gross.destination_inflow["sfr"] == pytest.approx(22.913140, rel=1e-6)
+    assert net.destination_inflow["sfr"] == pytest.approx(gross.destination_inflow["sfr"], rel=1e-8)
+
+
 @pytest.mark.parametrize("kstpkper", [(0, 0), (0, 1)])
 def test_mover_routes_drained_water_to_the_well(kstpkper, model_run):
     """With SFR nodes, drained water reaches the well through MVR, the stream and the aquifer."""
