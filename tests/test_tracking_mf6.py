@@ -145,13 +145,16 @@ def test_flow_mode_exact_balances_package_network(model_run):
     check_flow_mode(reader, NETWORK_SOURCES, NETWORK_DESTINATIONS)
 
 
-def check_duality(reader, sources: dict, destinations: dict, substeps: int = 1) -> None:
+def check_duality(reader, sources: dict, destinations: dict, substeps: int = 1) -> dict:
     """Assert the forward/adjoint duality and the backward closure in both volume modes.
 
     The closure needs volumes consistent with the storage flows, which the SFT rule of gwt
-    mode breaks for SFR reaches; it is then checked in flow mode only.
+    mode breaks for SFR reaches; it is then checked in flow mode only. Returns the largest
+    relative errors reached ("duality", "closure") and the number of duality pairs checked
+    (studies/paper/verification.py records them in Table 2).
     """
     has_sfr = tr.sfr_nodes(reader.read(reader.steps[0])).any()
+    worst = {"duality": 0.0, "closure": 0.0, "n_duality": 0}
     for mode in tr.VOLUME_MODES:
         config = tr.TrackingConfig(porosity=POROSITY, volume_mode=mode,
                                    initial_water={"init": "all"}, substeps=substeps)
@@ -159,11 +162,16 @@ def check_duality(reader, sources: dict, destinations: dict, substeps: int = 1) 
         bwd = tr.track_backward(reader, destinations, config, sources=sources)
         for d in destinations:
             if mode == "flow" or not has_sfr:
-                assert tr.backward_closure(bwd, d).relative_error < EXACT
+                closure = tr.backward_closure(bwd, d).relative_error
+                assert closure < EXACT
+                worst["closure"] = max(worst["closure"], closure)
             for s in [*sources, "init"]:
                 check = tr.tracking_duality(fwd, s, bwd, d)
                 assert check.relative_error < EXACT, (mode, s, d, check)
+                worst["duality"] = max(worst["duality"], check.relative_error)
+                worst["n_duality"] += 1
             assert tr.tracking_duality(fwd, "init", bwd, d).rhs > 0.0
+    return worst
 
 
 def test_duality_model6(model_run):
@@ -208,21 +216,23 @@ def test_duality_package_network_transient(model_run):
     check_duality(reader, NETWORK_SOURCES, NETWORK_DESTINATIONS)
 
 
+MOVER_SOURCES = {"rch": {"package": "RCH"}, "stream": {"package": "SFR", "term": "EXT-INFLOW"}}
+MOVER_DESTINATIONS = {
+    "east": {"boundnames": ["well_east"]},
+    "outlet": {"package": "SFR", "term": "EXT-OUTFLOW"},
+}
+
+
 def test_duality_mover_network(model_run):
     """Model 7 with SFR nodes and MVR edges (two steady periods, the well list changes)."""
-    sources = {"rch": {"package": "RCH"}, "stream": {"package": "SFR", "term": "EXT-INFLOW"}}
-    destinations = {
-        "east": {"boundnames": ["well_east"]},
-        "outlet": {"package": "SFR", "term": "EXT-OUTFLOW"},
-    }
     reader = gs.open_simulation(model_run("m7_mover").ws, package_nodes=("SFR",), boundnames=True)
-    check_duality(reader, sources, destinations)
+    check_duality(reader, MOVER_SOURCES, MOVER_DESTINATIONS)
 
 
-def test_constant_flows_converge_to_steady_snapshot(model_run):
-    """Model 10 (model 1's flows held for 4e5 days): forward c tends to the steady
-    source_fraction at the end, adjoint f at the start to the steady fraction_through."""
-    reader = gs.open_model(model_run("m10_constant").ws)
+def steady_limit_errors(reader) -> dict[str, float]:
+    """Return max |transient - steady| over active cells for model 10: forward c at the end and
+    adjoint f at the start (largest over groups), and forward c at the start and adjoint f at
+    the end (smallest over groups), against the steady source_fraction and fraction_through."""
     step = reader.read(reader.steps[-1])
     sources = {"rch": {"package": "RCH"}, "riv": {"package": "RIV"}}
     destinations = {"wel": {"package": "WEL"}, "riv": {"package": "RIV"}}
@@ -232,14 +242,24 @@ def test_constant_flows_converge_to_steady_snapshot(model_run):
     fwd = tr.track_forward(reader, sources, config)
     bwd = tr.track_backward(reader, destinations, config)
     active = step.active
-    for g in sources:
-        start_error = np.abs(fwd.source_fraction[g][0] - steady_fwd.source_fraction[g])[active]
-        error = np.abs(fwd.source_fraction[g][-1] - steady_fwd.source_fraction[g])[active]
-        assert error.max() < 1e-6 < start_error.max()
-    for g in destinations:
-        error = np.abs(bwd.fraction_through[g][0] - steady_bwd.fraction_through[g])[active]
-        end_error = np.abs(bwd.fraction_through[g][-1] - steady_bwd.fraction_through[g])[active]
-        assert error.max() < 1e-5 < end_error.max()
+
+    def per_group(series: dict, steady: dict, index: int) -> list[float]:
+        return [float(np.abs(series[g][index] - steady[g])[active].max()) for g in series]
+
+    return {
+        "g_end": max(per_group(fwd.source_fraction, steady_fwd.source_fraction, -1)),
+        "g_start": min(per_group(fwd.source_fraction, steady_fwd.source_fraction, 0)),
+        "f_start": max(per_group(bwd.fraction_through, steady_bwd.fraction_through, 0)),
+        "f_end": min(per_group(bwd.fraction_through, steady_bwd.fraction_through, -1)),
+    }
+
+
+def test_constant_flows_converge_to_steady_snapshot(model_run):
+    """Model 10 (model 1's flows held for 4e5 days): forward c tends to the steady
+    source_fraction at the end, adjoint f at the start to the steady fraction_through."""
+    errors = steady_limit_errors(gs.open_model(model_run("m10_constant").ws))
+    assert errors["g_end"] < 1e-6 < errors["g_start"]
+    assert errors["f_start"] < 1e-5 < errors["f_end"]
 
 
 def test_tracking_exports(model_run, tmp_path):

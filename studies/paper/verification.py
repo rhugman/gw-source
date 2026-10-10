@@ -28,6 +28,24 @@ Checks and error measures (one row per model and check in the CSV):
 - reference_example: net accounting on the 3x3 example of [FB13]; max |value - published| over
   fraction, volume through and volume from. Tolerance 1e-14 (tests/test_fb13_example.py).
 
+Transient tracking checks (tests/test_tracking_mf6.py, tests/test_tracking.py; the collector
+calls the tests' own helpers, which also assert the test tolerances):
+
+- tracking_duality: forward tracking against backward tracking in time, |tagged outflow
+  forward - adjoint inner product| / forward outflow, the largest over both volume options, all
+  source (and initial-water) and destination pairs, on models 6 (1 and 5 transport sub-steps),
+  6 split into 4 models, 7 (SFR + MVR) and 9 (LAK + UZF, transient period). Tolerance 1e-10.
+- water_balance, tagged_balance: "flow" volumes on models 6 and 9; the largest per-step water
+  balance error relative to the largest stored volume, and the largest tagged-water balance
+  error relative to the group's largest balance term. Tolerance 1e-10.
+- steady_limit_g, steady_limit_f: model 10 (model 1's flows held 4e5 d); max |c - G| at the
+  end and max |w - F| at the start over active cells and groups. Tolerances 1e-6 and 1e-5.
+- substeps: m = 3 transport sub-steps against a flow model with 3 times more steps of the same
+  flows (hand-built 15-cell network with flow loops, 6 steps); every fraction, outflow and
+  volume, max |a - b| / max |b| per output. Tolerance 1e-12.
+- steady_g_vs_gwt: steady forward fraction against GWT run to equilibrium; a slot marked
+  "pending" until that run exists.
+
 Models 7 to 9 are read as package networks (SFR; MAW; LAK and UZF nodes) and every saved step
 is checked; model 6 is checked on every time step with storage as source and sink terms.
 """
@@ -70,6 +88,13 @@ TOLERANCES = {
     "split_vs_single": 1e-8,
     "tracking_vs_gwt": 1e-8,
     "reference_example": 1e-14,
+    "tracking_duality": 1e-10,
+    "water_balance": 1e-10,
+    "tagged_balance": 1e-10,
+    "steady_limit_g": 1e-6,
+    "steady_limit_f": 1e-5,
+    "substeps": 1e-12,
+    "steady_g_vs_gwt": np.nan,
 }
 MEASURES = {
     "backward_closure": "relative to destination inflow (absolute in m³/d below 1 m³/d)",
@@ -81,8 +106,20 @@ MEASURES = {
     "tracking_vs_gwt": "absolute (fraction)",
     "prt_capture": "relative to destination inflow",
     "reference_example": "absolute (published values)",
+    "tracking_duality": "relative to forward source-to-destination volume",
+    "water_balance": "relative to largest stored water volume",
+    "tagged_balance": "relative to largest term of the tagged-water balance",
+    "steady_limit_g": "absolute (fraction)",
+    "steady_limit_f": "absolute (fraction)",
+    "substeps": "relative to output maximum",
+    "steady_g_vs_gwt": "pending",
 }
 CHECK_ORDER = tuple(MEASURES)
+CHECK_GROUPS = {  # Table 2 parts and Fig. 2 blocks
+    "steady and snapshot checks": CHECK_ORDER[:9],
+    "transient tracking checks": CHECK_ORDER[9:],
+}
+SUBSTEPS = 3  # transport sub-steps of the sub-step check (tests/test_tracking.py)
 
 
 @dataclass
@@ -113,6 +150,7 @@ class ModelCache:
         self.work = Path(work)
         self.exes = exes
         self.runs = {}
+        self.splits = {}
 
     def get(self, key: str):
         """Return the ModelRun of a test model, building it on first use."""
@@ -123,6 +161,16 @@ class ModelCache:
             ws.mkdir(parents=True, exist_ok=True)
             self.runs[key] = build_model(key, ws, self.exes.mf6, self.exes.triangle)
         return self.runs[key]
+
+    def split(self, key: str):
+        """Return (workspace, splitter) of a test model split with Mf6Splitter, run once."""
+        from test_multimodel import split_and_run
+
+        if key not in self.splits:
+            ws = self.work / f"{key}_split"
+            ws.mkdir(parents=True, exist_ok=True)
+            self.splits[key] = (ws, split_and_run(self.get(key), key, ws, self.exes.mf6))
+        return self.splits[key]
 
 
 def record(model: str, check: str, error: float, n: int, seconds: float, tol=None,
@@ -226,15 +274,13 @@ def disu_rows(cache: ModelCache) -> list[dict]:
 
 def split_rows(cache: ModelCache) -> list[dict]:
     """Return the split vs single-model rows (Mf6Splitter, every output and travel time)."""
-    from test_multimodel import achieved_agreement, split_and_run
+    from test_multimodel import achieved_agreement
 
     rows = []
     for key, steps in SPLIT_MODELS.items():
         start = time.perf_counter()
         run = cache.get(key)
-        ws = cache.work / f"{key}_split"
-        ws.mkdir(parents=True, exist_ok=True)
-        splitter = split_and_run(run, key, ws, cache.exes.mf6)
+        ws, splitter = cache.split(key)
         errors = []
         for ks in steps:
             single = gs.read_step(run.ws, kstpkper=ks)
@@ -316,6 +362,107 @@ def gwt_rows(cache: ModelCache) -> list[dict]:
     return rows
 
 
+# ---------------------------------------------------------------- transient tracking checks
+
+
+def tracking_readers(cache: ModelCache) -> dict:
+    """Return (reader, sources, destinations, sub-step counts) per model of the duality check."""
+    import test_tracking_mf6 as ttm
+
+    m6 = (ttm.MODEL6_SOURCES, ttm.MODEL6_DESTINATIONS)
+    net = (ttm.NETWORK_SOURCES, ttm.NETWORK_DESTINATIONS)
+    mover = (ttm.MOVER_SOURCES, ttm.MOVER_DESTINATIONS)
+    return {
+        "m6_transient": (gs.open_model(cache.get("m6_transient").ws), *m6, (1, 5)),
+        "m6_split": (gs.open_simulation(cache.split("m6_transient")[0]), *m6, (1,)),
+        "m7_mover": (gs.open_simulation(cache.get("m7_mover").ws, package_nodes=("SFR",),
+                                        boundnames=True), *mover, (1,)),
+        "m9_lak_uzf": (gs.open_simulation(cache.get("m9_lak_uzf").ws,
+                                          package_nodes=("LAK", "UZF")), *net, (1,)),
+    }
+
+
+def tracking_duality_rows(cache: ModelCache) -> list[dict]:
+    """Return the transient forward-backward rows (both volume options, all source pairs)."""
+    from test_tracking_mf6 import check_duality
+
+    rows = []
+    for key, (reader, sources, destinations, substeps) in tracking_readers(cache).items():
+        start = time.perf_counter()
+        results = [check_duality(reader, sources, destinations, m) for m in substeps]
+        error = max(r["duality"] for r in results)
+        n = sum(r["n_duality"] for r in results)
+        note = f"{len(reader.steps)} steps, both volume options"
+        if len(substeps) > 1:
+            note += ", 1 and 5 transport sub-steps"
+        rows.append(record(key, "tracking_duality", error, n, time.perf_counter() - start,
+                           note=note))
+    return rows
+
+
+def balance_rows(cache: ModelCache) -> list[dict]:
+    """Return the water and tagged-water balance rows of "flow" volumes (models 6 and 9)."""
+    import test_tracking_mf6 as ttm
+
+    from gwsource import tracking as tr
+
+    cases = {
+        "m6_transient": (gs.open_model(cache.get("m6_transient").ws),
+                         ttm.MODEL6_SOURCES, ttm.MODEL6_DESTINATIONS),
+        "m9_lak_uzf": (gs.open_simulation(cache.get("m9_lak_uzf").ws,
+                                          package_nodes=("LAK", "UZF")),
+                       ttm.NETWORK_SOURCES, ttm.NETWORK_DESTINATIONS),
+    }
+    rows = []
+    for key, (reader, sources, destinations) in cases.items():
+        start = time.perf_counter()
+        fwd = ttm.check_flow_mode(reader, sources, destinations)["flow"][0]
+        seconds = time.perf_counter() - start
+        volume_scale = max(b["storage_end"].max() for b in fwd.balance.values())
+        water = float(fwd.water_balance_error.max()) / volume_scale
+        tagged = max(tr.forward_balance_error(fwd, g) for g in fwd.groups)
+        note = f"{len(fwd.steps)} steps"
+        rows.append(record(key, "water_balance", water, len(fwd.steps), seconds, note=note))
+        rows.append(record(key, "tagged_balance", tagged, len(fwd.groups), seconds,
+                           note=note + f", {len(fwd.groups)} tagged groups incl. initial water"))
+    return rows
+
+
+def steady_limit_rows(cache: ModelCache) -> list[dict]:
+    """Return model 10's steady-limit rows: c at the end against G, w at the start against F."""
+    from test_tracking_mf6 import steady_limit_errors
+
+    start = time.perf_counter()
+    reader = gs.open_model(cache.get("m10_constant").ws)
+    errors = steady_limit_errors(reader)
+    seconds = time.perf_counter() - start
+    n = len(reader.steps)
+    return [
+        record("m10_constant", "steady_limit_g", errors["g_end"], 2, seconds,
+               note=f"{n} steps; c vs G at the end (at the start: {errors['g_start']:.1e})"),
+        record("m10_constant", "steady_limit_f", errors["f_start"], 2, seconds,
+               note=f"{n} steps; w vs F at the start (at the end: {errors['f_end']:.1e})"),
+    ]
+
+
+def substep_rows(m: int = SUBSTEPS) -> list[dict]:
+    """Return the sub-step row: m sub-steps against m times more flow steps of the same flows."""
+    from test_tracking import substep_refinement_pairs
+
+    start = time.perf_counter()
+    pairs = substep_refinement_pairs(m)
+    error = max(output_error(fine, coarse) for _, coarse, fine in pairs)
+    return [record("substep_network", "substeps", error, len(pairs),
+                   time.perf_counter() - start,
+                   note=f"{m} sub-steps vs {m}x flow steps, {len(pairs)} outputs")]
+
+
+def pending_rows() -> list[dict]:
+    """Return the slot of the steady forward fraction against GWT at equilibrium (pending)."""
+    return [record("gwt_equilibrium", "steady_g_vs_gwt", np.nan, 0, 0.0, status="pending",
+                   note="steady forward fraction vs GWT run to equilibrium; run not yet made")]
+
+
 # ---------------------------------------------------------------- particles and worked example
 
 
@@ -359,7 +506,8 @@ def reference_example_row() -> dict:
 
 
 def collect(work: Path, exes: Exes, run_identities: bool = True, run_disu: bool = True,
-            run_split: bool = True, run_gwt: bool = True, run_prt: bool = True) -> pd.DataFrame:
+            run_split: bool = True, run_gwt: bool = True, run_prt: bool = True,
+            run_tracking: bool = True) -> pd.DataFrame:
     """Run every selected check and return the long table (one row per model and check)."""
     add_tests_to_path()
     rows = [reference_example_row()]
@@ -378,10 +526,19 @@ def collect(work: Path, exes: Exes, run_identities: bool = True, run_disu: bool 
         (run_gwt, lambda: gwt_rows(cache),
          [("m6_transient", "tracking_vs_gwt"), ("m7_mover", "tracking_vs_gwt")]),
         (run_prt, lambda: prt_rows(cache), [(k, "prt_capture") for k in PRT_MODELS]),
+        (run_tracking,
+         lambda: (tracking_duality_rows(cache) + balance_rows(cache) + steady_limit_rows(cache)
+                  + substep_rows()),
+         [(k, "tracking_duality") for k in ("m6_transient", "m6_split", "m7_mover",
+                                            "m9_lak_uzf")]
+         + [(k, c) for k in ("m6_transient", "m9_lak_uzf")
+            for c in ("water_balance", "tagged_balance")]
+         + [("m10_constant", "steady_limit_g"), ("m10_constant", "steady_limit_f"),
+            ("substep_network", "substeps")]),
     )
     for enabled, func, keys in gates:
         rows += func() if enabled else [not_run(k, c, "switched off") for k, c in keys]
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows + pending_rows())
 
 
 MODEL_LABELS = {
@@ -393,9 +550,13 @@ MODEL_LABELS = {
     "m4_disu_novert": "4 DISU (no vertices)",
     "m5_xt3d": "5 XT3D, cycles",
     "m6_transient": "6 transient (STO)",
+    "m6_split": "6 transient, split into 4 models",
     "m7_mover": "7 SFR + MVR network",
     "m8_maw": "8 MAW network",
     "m9_lak_uzf": "9 LAK + UZF + MVR network",
+    "m10_constant": "10 model 1 flows, held 4e5 d",
+    "substep_network": "hand-built network (sub-steps)",
+    "gwt_equilibrium": "steady model, GWT to equilibrium",
 }
 CHECK_LABELS = {
     "backward_closure": "backward closure",
@@ -407,6 +568,13 @@ CHECK_LABELS = {
     "tracking_vs_gwt": "tracking vs GWT",
     "prt_capture": "PRT flow to the well",
     "reference_example": "[FB13] example",
+    "tracking_duality": "transient forward–backward",
+    "water_balance": "water balance (\"flow\")",
+    "tagged_balance": "tagged-water balance (\"flow\")",
+    "steady_limit_g": "steady limit, c to G",
+    "steady_limit_f": "steady limit, w to F",
+    "substeps": "sub-steps vs refined steps",
+    "steady_g_vs_gwt": "steady G vs GWT equilibrium",
 }
 
 
@@ -419,10 +587,10 @@ def format_error(error: float, status: str) -> str:
     return "0" if error == 0.0 else f"{error:.1e}"
 
 
-def pivot_markdown(table: pd.DataFrame) -> str:
+def pivot_markdown(table: pd.DataFrame, check_order: tuple = CHECK_ORDER) -> str:
     """Return the table as markdown: models as rows, checks as columns, plus tolerances."""
-    checks = [c for c in CHECK_ORDER if c in set(table.check)]
-    models = [m for m in MODEL_LABELS if m in set(table.model)]
+    checks = [c for c in check_order if c in set(table.check)]
+    models = [m for m in MODEL_LABELS if m in set(table[table.check.isin(checks)].model)]
     lines = ["| model | " + " | ".join(CHECK_LABELS[c] for c in checks) + " |",
              "|---|" + "---|" * len(checks)]
     for model in models:
@@ -435,7 +603,7 @@ def pivot_markdown(table: pd.DataFrame) -> str:
     tols = []
     for check in checks:
         values = sorted(set(table[table.check == check].tolerance.dropna()))
-        tols.append(" / ".join(f"{v:.0e}" for v in values))
+        tols.append(" / ".join(f"{v:.0e}" for v in values) or "–")
     lines.append("| *test tolerance* | " + " | ".join(tols) + " |")
     measures = " ".join(f"**{CHECK_LABELS[c]}**: {MEASURES[c]}." for c in checks)
     return "\n".join(lines) + "\n\nError measures. " + measures + "\n"
@@ -462,12 +630,16 @@ def write_tables(table: pd.DataFrame, out_dir: Path) -> tuple[Path, Path]:
     lines = [f"| {CHECK_LABELS[r.check]} | {format_error(r.largest_error, 'ok')} | "
              f"{MODEL_LABELS[r.model]} | "
              f"{r.tolerance:.0e} |" for r in worst.itertuples()]
+    parts = "".join(
+        f"\n## {name.capitalize()}\n\n" + pivot_markdown(table, checks)
+        for name, checks in CHECK_GROUPS.items()
+    )
     text = (
         "# Table 2. Verification checks on the synthetic test models\n\n"
         "Generated by `studies/paper/method_figures.py` (`studies/paper/verification.py`); "
         "errors are the largest over groups, group pairs and time steps of each model. "
-        "'–': check not applicable to the model.\n\n"
-        + pivot_markdown(table)
+        "'–': check not applicable to the model; 'pending': check not yet run.\n"
+        + parts
         + "\n## Largest error per check\n\n| check | largest error | model | tolerance |\n"
         "|---|---|---|---|\n" + "\n".join(lines) + "\n"
     )

@@ -297,27 +297,36 @@ def steady_reader(seed: int, repeat: int) -> ListReader:
     return ListReader(steps, deltas)
 
 
-def test_substeps_equal_refined_flow_steps():
-    """Sub-steps give the same result as a flow model with m times more steps of equal flows."""
-    m = 3
+def substep_refinement_pairs(m: int = 3) -> list[tuple[str, np.ndarray, np.ndarray]]:
+    """Return (output, with m sub-steps, with m times more flow steps) for every compared output.
+
+    The coarse run uses m transport sub-steps per flow step; the fine run a flow model with m
+    times more steps of the same flows. Fractions are compared at the end of each coarse step,
+    outflows and volumes summed over the m fine steps.
+    """
     coarse, fine = steady_reader(9, 1), steady_reader(9, m)
     config = tr.TrackingConfig(porosity=1.0, initial_water={"init": "all"}, substeps=m)
     plain = tr.TrackingConfig(porosity=1.0, initial_water={"init": "all"})
     fwd_c = tr.track_forward(coarse, SOURCES, config, sinks=DESTINATIONS)
     fwd_f = tr.track_forward(fine, SOURCES, plain, sinks=DESTINATIONS)
+    pairs = []
     for g in fwd_c.groups:
-        np.testing.assert_allclose(
-            fwd_c.source_fraction[g], fwd_f.source_fraction[g][m - 1 :: m], rtol=1e-12, atol=1e-14
-        )
+        pairs.append((f"c {g}", fwd_c.source_fraction[g], fwd_f.source_fraction[g][m - 1 :: m]))
         for d in DESTINATIONS:
             per_step = fwd_f.outflow_to[d][g].reshape(-1, m).sum(axis=1)
-            np.testing.assert_allclose(fwd_c.outflow_to[d][g], per_step, rtol=1e-12)
+            pairs.append((f"outflow {g} to {d}", fwd_c.outflow_to[d][g], per_step))
     bwd_c = tr.track_backward(coarse, DESTINATIONS, config, sources=SOURCES)
     bwd_f = tr.track_backward(fine, DESTINATIONS, plain, sources=SOURCES)
     for d in DESTINATIONS:
-        np.testing.assert_allclose(
-            bwd_c.fraction_through[d], bwd_f.fraction_through[d][::m], rtol=1e-12, atol=1e-14
-        )
+        pairs.append((f"w {d}", bwd_c.fraction_through[d], bwd_f.fraction_through[d][::m]))
         for s in SOURCES:
             per_step = bwd_f.volume_from_group[d][s].reshape(-1, m).sum(axis=1)
-            np.testing.assert_allclose(bwd_c.volume_from_group[d][s], per_step, rtol=1e-12)
+            pairs.append((f"volume from {s} to {d}", bwd_c.volume_from_group[d][s], per_step))
+    return pairs
+
+
+def test_substeps_equal_refined_flow_steps():
+    """Sub-steps give the same result as a flow model with m times more steps of equal flows."""
+    for name, coarse, fine in substep_refinement_pairs(m=3):
+        atol = 1e-14 if name[0] in "cw" else 0.0
+        np.testing.assert_allclose(coarse, fine, rtol=1e-12, atol=atol, err_msg=name)
