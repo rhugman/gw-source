@@ -1,6 +1,5 @@
-"""Transient-tracking figure of the paper (Fig. 4; file fig10_transient_tracking until the
-figure files are renumbered): tutorial 08's seasonal model, snapshots against transient tracking
-through storage. Outline: docs/paper/outline.md §5.4 and §6; wording: docs/paper/terms.md.
+"""Transient-tracking figure of the paper (Fig. 4, file fig4_transient_tracking): tutorial 08's
+seasonal model, snapshots against transient tracking through storage. Outline: docs/paper/outline.md §5.4 and §6; wording: docs/paper/terms.md.
 
 The model is tutorial 08's (tutorials/herebedragons.py::build_transient): the tutorial aquifer
 (one layer, 40 x 40 cells of 50 m) with storage, a 1-day steady first period and four seasons a
@@ -51,7 +50,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 
 TUTORIAL_DIR = mfig.TUTORIAL_DIR
 TUTORIAL08_DIR = TUTORIAL_DIR / "08_transient_tracking"
-FIG_NAME = "fig10_transient_tracking"
+FIG_NAME = "fig4_transient_tracking"
 WELL = "supply_well"
 N_YEARS = 30
 POROSITY = 0.3

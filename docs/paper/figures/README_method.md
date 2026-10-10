@@ -50,7 +50,7 @@ The ranges in the caption are those of DS §5 (problem A includes the DISV grids
 
 ## Fig. 4. Transient tracking (tutorial 08)
 
-`fig10_transient_tracking.png` / `.pdf` (file name kept until the figure files are renumbered; the outline places this figure as Fig. 4, with the Neversink figures 5–10)
+`fig4_transient_tracking.png` / `.pdf`. The Neversink figures follow as Figs 5–10 (`README.md`).
 
 Made by `studies/paper/transient_figure.py` (`main()`; about 8 s: builds and runs the model, runs four forward tracking runs and one backward run, and one MF6 GWT model; workspaces in `studies/paper/output/`, git-ignored).
 

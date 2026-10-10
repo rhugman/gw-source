@@ -1,20 +1,20 @@
-"""Paper figures 4 to 9: the Neversink/Rondout case study, at Groundwater sizes.
+"""Paper figures 5 to 10: the Neversink/Rondout case study, at Groundwater sizes.
 
 Every figure is drawn from existing outputs of the case study (studies/neversink/output, the
 USGS sparse checkout in studies/neversink/external; both git-ignored); nothing is rerun.
 
-- Fig. 4, location map: active model area, SFR reaches as a network, the three MODPATH 7 regions
+- Fig. 5, location map: active model area, SFR reaches as a network, the three MODPATH 7 regions
   (start cells of the published runs), the published contributing cells of the calibrated model
   and the eight priority wells by cluster. Coordinates are km from the grid origin; the north
   arrow shows true north, computed from the model's EPSG:5070 grid.
-- Fig. 5, F of the uppermost active cell with streams as cells and as a network, published
+- Fig. 6, F of the uppermost active cell with streams as cells and as a network, published
   contributing cells outlined (paper-size version of docs/figures/neversink_capture_maps.png).
-- Fig. 6, overlap (Jaccard index) with the published contributing cells by method and
+- Fig. 7, overlap (Jaccard index) with the published contributing cells by method and
   convention, full mixing with gross and net accounting.
-- Fig. 7, published probability against ensemble mean F (paper-size version of
+- Fig. 8, published probability against ensemble mean F (paper-size version of
   docs/figures/neversink_probability_maps.png).
-- Fig. 8, median contributing area against pumping, relative to base.
-- Fig. 9, growth mechanism: stream share of the wells' water against pumping, and, per
+- Fig. 9, median contributing area against pumping, relative to base.
+- Fig. 10, growth mechanism: stream share of the wells' water against pumping, and, per
   realisation, the excess of area growth over pumping growth against the drop in stream share.
 
 Map conventions, colours and helpers follow studies/neversink/figures.py. Categorical colours
@@ -148,7 +148,7 @@ def well_ij(wells: dict, shape: tuple) -> dict:
     return {name: ((n % (nrow * ncol)) // ncol, n % ncol) for name, n in wells.items()}
 
 
-# ---------------------------------------------------------------- Fig. 4: location map
+# ---------------------------------------------------------------- Fig. 5: location map
 
 
 def read_dis_origin(dis_file: Path) -> tuple[float, float]:
@@ -285,7 +285,7 @@ def location_map(
     segments: np.ndarray,
     north: float,
 ) -> Path:
-    """Fig. 4: active area, streams, MODPATH regions, published cells and the priority wells."""
+    """Fig. 5: active area, streams, MODPATH regions, published cells and the priority wells."""
     paper_style()
     nrow, ncol = idomain.shape[1:]
     extent = (0, ncol * nf.CELL_KM, 0, nrow * nf.CELL_KM)
@@ -361,10 +361,10 @@ def location_map(
     ax.set_aspect("equal")
     ax.set_xlabel("x from grid origin (km)")
     ax.set_ylabel("y from grid origin (km)")
-    return save(fig, fig_dir, "fig4_location_map")
+    return save(fig, fig_dir, "fig5_location_map")
 
 
-# ---------------------------------------------------------------- Figs 5 and 7: F maps
+# ---------------------------------------------------------------- Figs 6 and 8: F maps
 
 
 def fit_aspect(window: tuple, shape: tuple, aspect: float = WINDOW_ASPECT) -> tuple:
@@ -438,24 +438,24 @@ def capture_fields(idomain: np.ndarray, out: Path = OUT) -> dict:
 
 
 def capture_windows(idomain: np.ndarray, wells: dict, mask: np.ndarray, out: Path = OUT) -> dict:
-    """Return the map windows of Fig. 5, which Figs 7 and S1 reuse."""
+    """Return the map windows of Fig. 6, which Figs 8 and S1 reuse."""
     return map_windows(capture_fields(idomain, out), mask, wells)
 
 
 def capture_maps(
     fig_dir: Path, idomain: np.ndarray, wells: dict, mask: np.ndarray, windows: dict
 ) -> Path:
-    """Fig. 5: F of the uppermost active cell, streams as cells and as a network."""
+    """Fig. 6: F of the uppermost active cell, streams as cells and as a network."""
     paper_style()
     fields = capture_fields(idomain)
     fig = map_grid(fields, mask, wells, windows, 3.6, "F, uppermost active cell")
-    return save(fig, fig_dir, "fig5_capture_maps")
+    return save(fig, fig_dir, "fig6_capture_maps")
 
 
 def probability_maps(
     fig_dir: Path, wells: dict, windows: dict, maps_file: Path = ENS_DIR / "probability_maps.npz"
 ) -> Path:
-    """Fig. 7: published probability against ensemble mean F, base pumping (Fig. 5 windows)."""
+    """Fig. 8: published probability against ensemble mean F, base pumping (Fig. 6 windows)."""
     paper_style()
     maps = np.load(maps_file)
     fields = {
@@ -464,10 +464,10 @@ def probability_maps(
         "mean F, network": maps["network:mean_F"],
     }
     fig = map_grid(fields, maps["mp7"] > 0.5, wells, windows, 5.2, "probability or mean F")
-    return save(fig, fig_dir, "fig7_probability_maps")
+    return save(fig, fig_dir, "fig8_probability_maps")
 
 
-# ---------------------------------------------------------------- Fig. 6: overlap
+# ---------------------------------------------------------------- Fig. 7: overlap
 
 FLUX_LABELS = {  # prt_comparison.csv (release, thin_weak_sinks) -> label
     ("volume", True): "cell volume, weight-losing",
@@ -526,7 +526,7 @@ def agreement_table(out: Path = OUT, mixing_rows: tuple = MIXING_ROWS) -> pd.Dat
 
 
 def agreement_chart(fig_dir: Path, table: pd.DataFrame) -> Path:
-    """Fig. 6: dot chart of the overlap, grouped by method and convention.
+    """Fig. 7: dot chart of the overlap, grouped by method and convention.
 
     Net accounting is drawn as open circles, everything else as filled markers.
     """
@@ -578,10 +578,10 @@ def agreement_chart(fig_dir: Path, table: pd.DataFrame) -> Path:
     ax.set_xlabel("overlap with the\npublished contributing cells")
     for side in ("top", "right", "left"):
         ax.spines[side].set_visible(False)
-    return save(fig, fig_dir, "fig6_agreement")
+    return save(fig, fig_dir, "fig7_agreement")
 
 
-# ---------------------------------------------------------------- Fig. 8: area growth
+# ---------------------------------------------------------------- Fig. 9: area growth
 
 
 def growth_table(scenario_dir: Path = SCENARIO_DIR, mech_dir: Path = MECH_DIR) -> pd.DataFrame:
@@ -639,7 +639,7 @@ def spread_labels(values: pd.Series, gap: float = LABEL_GAP) -> pd.Series:
 
 
 def growth_chart(fig_dir: Path, table: pd.DataFrame) -> Path:
-    """Fig. 8: median contributing area relative to base pumping, with the pumping ratio dashed.
+    """Fig. 9: median contributing area relative to base pumping, with the pumping ratio dashed.
 
     The value at maximum pumping is written at the right, behind the series' own marker.
     """
@@ -667,10 +667,10 @@ def growth_chart(fig_dir: Path, table: pd.DataFrame) -> Path:
     ax.set_xlabel("pumping fraction f (0 = base, 1 = maximum)")
     ax.set_ylabel("median contributing area / base")
     ax.legend(loc="upper left", handlelength=2.2)
-    return save(fig, fig_dir, "fig8_area_growth")
+    return save(fig, fig_dir, "fig9_area_growth")
 
 
-# ---------------------------------------------------------------- Fig. 9: growth mechanism
+# ---------------------------------------------------------------- Fig. 10: growth mechanism
 
 
 def realisation_summary(
@@ -724,7 +724,7 @@ def excess_table(base: pd.DataFrame, top: pd.DataFrame) -> pd.DataFrame:
 
 
 def mechanism_chart(fig_dir: Path, bands: pd.DataFrame, excess: pd.DataFrame) -> Path:
-    """Fig. 9: (a) stream share against pumping; (b) area-growth excess against share drop."""
+    """Fig. 10: (a) stream share against pumping; (b) area-growth excess against share drop."""
     paper_style()
     fig, (ax_a, ax_b) = plt.subplots(1, 2, figsize=(DOUBLE, 2.7), constrained_layout=True)
     blue = COLORS["cells"]
@@ -778,7 +778,7 @@ def mechanism_chart(fig_dir: Path, bands: pd.DataFrame, excess: pd.DataFrame) ->
     ax_b.set_title("(b) per realisation, base to maximum pumping", loc="left")
     for ax in (ax_a, ax_b):
         ax.grid(True, color=GRID, lw=0.5)
-    return save(fig, fig_dir, "fig9_growth_mechanism")
+    return save(fig, fig_dir, "fig10_growth_mechanism")
 
 
 # ---------------------------------------------------------------- main
@@ -791,12 +791,12 @@ def published_mask(shape: tuple, out: Path = OUT) -> np.ndarray:
 
 
 def main(
-    fig4: bool = True,
     fig5: bool = True,
     fig6: bool = True,
     fig7: bool = True,
     fig8: bool = True,
     fig9: bool = True,
+    fig10: bool = True,
     fig_dir: Path = FIG_DIR,
 ) -> list[Path]:
     """Make the selected figures in fig_dir; return the PNG paths."""
@@ -804,10 +804,10 @@ def main(
     idomain = wf.grid_idomain(MODEL_DIR)
     shape = idomain.shape[1:]
     wells = wf.PRIORITY_WELLS
-    if fig4 or fig5 or fig7:
+    if fig5 or fig6 or fig8:
         mask = published_mask(shape)
         windows = capture_windows(idomain, wells, mask)
-    if fig4:
+    if fig5:
         regions = region_grids(wf.read_endpoints(columns=("node0",)), shape)
         segments = stream_segments(
             sfr_reaches(MODEL_DIR / "neversink_packagedata.dat"),
@@ -817,15 +817,15 @@ def main(
         x0, y0 = read_dis_origin(MODEL_DIR / "neversink.dis")
         north = true_north_angle(x0 + shape[1] * 25.0, y0 + shape[0] * 25.0)
         paths.append(location_map(fig_dir, idomain, wells, mask, regions, segments, north))
-    if fig5:
-        paths.append(capture_maps(fig_dir, idomain, wells, mask, windows))
     if fig6:
-        paths.append(agreement_chart(fig_dir, agreement_table()))
+        paths.append(capture_maps(fig_dir, idomain, wells, mask, windows))
     if fig7:
-        paths.append(probability_maps(fig_dir, wells, windows))
+        paths.append(agreement_chart(fig_dir, agreement_table()))
     if fig8:
-        paths.append(growth_chart(fig_dir, growth_table()))
+        paths.append(probability_maps(fig_dir, wells, windows))
     if fig9:
+        paths.append(growth_chart(fig_dir, growth_table()))
+    if fig10:
         summaries = {q: realisation_summary(q) for q in FIXED_QRATS}
         excess = excess_table(summaries["baserat"], summaries["maxrat"])
         paths.append(mechanism_chart(fig_dir, share_bands(summaries), excess))
