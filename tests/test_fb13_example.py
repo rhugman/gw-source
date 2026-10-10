@@ -57,6 +57,7 @@ def test_fb13_closure_and_outside_cells():
     assert v_from[LABELS.index("J")] == pytest.approx(6.25)
     assert res.fraction_through["A"][LABELS.index("K")] == 0.0
     assert v_from.sum() == pytest.approx(res.destination_inflow["A"]) == pytest.approx(10.0)
+    assert res.destination_throughflow["A"] == res.destination_inflow["A"] == 10.0
     assert res.fraction_from_total["A"].sum() == pytest.approx(1.0)
     assert res.fraction_from_cell_input["A"][LABELS.index("F")] == pytest.approx(0.75)
     assert np.isnan(res.fraction_from_cell_input["A"][LABELS.index("E")])

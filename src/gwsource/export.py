@@ -319,6 +319,24 @@ def _base_dataset(step: FlowStep, groups: list[str]):
     return ds
 
 
+def inflow_long_name(mode: str, accounting: str) -> str:
+    """Return the long_name of a group's destination (backward) or source (forward) inflow."""
+    names = {
+        ("backward", "gross"): "water removed by the group's sink terms",
+        ("backward", "net"): (
+            "water reaching the destination cells, each passage counted once "
+            "(net accounting; equals the net volume from)"
+        ),
+        ("forward", "gross"): "water entering through the group's source terms",
+        ("forward", "net"): (
+            "water leaving the source cells, each passage counted once "
+            "(net accounting; equals the net volume to)"
+        ),
+    }
+    assert (mode, accounting) in names, f"unknown mode/accounting {mode}/{accounting}"
+    return names[(mode, accounting)]
+
+
 def to_dataset(step: FlowStep, result: BackwardResult | ForwardResult):
     """Return an xarray Dataset of every output of a single-step result."""
     step, result = single_model(step, result)
@@ -333,25 +351,34 @@ def to_dataset(step: FlowStep, result: BackwardResult | ForwardResult):
         ds[name] = (("group", *dims), _gridded_stack(step, per_group, groups))
         ds[name].attrs = _attrs(step, name)
     for name in splits:
-        packages, data = _split_stack(step, getattr(result, name), groups)
+        by_term = getattr(result, name)
+        if not any(by_term[g] for g in groups):  # net accounting has no by-term splits
+            continue
+        packages, data = _split_stack(step, by_term, groups)
         ds = ds.assign_coords(package=np.asarray(packages, dtype=object))
         ds[name] = (("group", "package", *dims), data)
         ds[name].attrs = _attrs(step, name)
-    inflow = (
-        result.destination_inflow if isinstance(result, BackwardResult) else result.source_inflow
-    )
-    inflow_name = "destination_inflow" if isinstance(result, BackwardResult) else "source_inflow"
-    ds[inflow_name] = (("group",), np.array([inflow[g] for g in groups]))
-    ds[inflow_name].attrs = {
-        "long_name": "group sink (or source) term total",
+    backward = isinstance(result, BackwardResult)
+    prefix = "destination" if backward else "source"
+    mode = "backward" if backward else "forward"
+    inflow = result.destination_inflow if backward else result.source_inflow
+    ds[f"{prefix}_inflow"] = (("group",), np.array([inflow[g] for g in groups]))
+    ds[f"{prefix}_inflow"].attrs = {
+        "long_name": inflow_long_name(mode, result.accounting),
         "units": unit_string(step, "volume"),
     }
+    throughflow = result.destination_throughflow if backward else result.source_throughflow
+    if throughflow:
+        ds[f"{prefix}_throughflow"] = (("group",), np.array([throughflow[g] for g in groups]))
+        ds[f"{prefix}_throughflow"].attrs = {
+            "long_name": f"sum of the {prefix} cells' throughflow (net accounting)",
+            "units": unit_string(step, "volume"),
+        }
     ds["cycle_id"] = (dims, cycle_ids(step.n_cells, result.cycles).reshape(step.grid_shape))
     ds["cycle_id"].attrs = {
         "long_name": "index of the flow cycle the cell belongs to (-1: none)",
         "units": "1",
     }
-    mode = "backward" if isinstance(result, BackwardResult) else "forward"
     ds.attrs = {
         "title": f"gwsource {mode} trace",
         "provenance": provenance(
@@ -388,7 +415,7 @@ def _add_time(ds, result):
         np.column_stack([result.group_inflow[g] for g in result.groups]),
     )
     ds["group_inflow"].attrs = {
-        "long_name": "group sink (or source) term total per step",
+        "long_name": inflow_long_name(result.mode, result.trace_config.accounting) + ", per step",
         "units": unit_string(result.template, "volume"),
     }
     return ds

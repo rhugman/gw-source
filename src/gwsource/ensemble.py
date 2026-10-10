@@ -133,7 +133,9 @@ class EnsembleResult:
 
     stats names: min, max, mean, count. quantile_method is "exact" or "histogram" (bin_width
     is the histogram's bin width per output, the bound on the quantile error). group_inflow and
-    mean_transit_time hold one value per realisation.
+    mean_transit_time hold one value per realisation; group_inflow is the destination (backward)
+    or source (forward) inflow, which in net accounting counts each passage once
+    (gwsource.metrics).
     """
 
     config: EnsembleConfig

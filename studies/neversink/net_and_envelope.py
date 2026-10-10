@@ -25,12 +25,14 @@ The left side sums over all cells, destination cells included, and is the net vo
 (volume_from). The two subtracted terms are water that passes from one destination cell to
 another (counted in both throughflows) and water that leaves a destination cell and reaches the
 group again (gwsource.assemble.net_double_count). Net mode uses edges only, so there is no
-budget-residual term. The right side is the library's net destination_inflow (net_closure_rhs);
-the throughflow sum is its destination_throughflow. The check
-(gwsource.diagnostics.backward_closure) confirms the solve and the consistency of s+ and T;
-tests/test_fb13_example.py is what validates net accounting itself, and tests/test_assemble.py
-checks this identity on a group of two cells. This identity and the gross closure are both
-asserted to 1e-9 of the group's flow.
+budget-residual term. The right side is the library's net destination_inflow (net_closure_rhs),
+cross-checked against the throughflow sum (its destination_throughflow) less the two terms. It
+uses the solved f at the cells just downstream of D, so it depends on the solve and not on the
+budget alone. The closure error (gwsource.diagnostics.backward_closure) is exactly the sum of the
+un-normalised row residuals over the non-destination cells, sum_{i not in D} (T_i f_i - sum_j
+q_ij f_j): it tests the solve in sum. What net destination_inflow means is pinned by
+tests/test_fb13_example.py and the hand-built graphs of tests/test_assemble.py. This identity and
+the gross closure are both asserted to 1e-9 of the group's flow.
 
 Envelope. docs/dispersion_study.md found that F >= 0.1 contained the non-stopping particle
 reference zone in every synthetic run. Here the reference is the thinned flux-weighted PRT run
@@ -78,8 +80,9 @@ REGIONS = ("all", *wf.MP7_REGIONS)
 def trace_both(ws: Path) -> tuple[gs.FlowStep, dict, dict[str, gs.BackwardResult], dict]:
     """Read the step and trace the well groups with gross and net accounting; return run times.
 
-    The net closure terms assume that net mode used every connection; with no cycles (so no
-    cycle removal and no closed loops) it does, which is asserted.
+    The model has no flow cycles and no closed loops (asserted), so net mode solves by
+    substitution. The net closure terms use only connections into or out of the destination
+    cells, which cycle removal never drops, so they do not depend on this.
     """
     step = gs.read_step(ws, boundnames=True)
     groups = wf.well_groups(step)
@@ -143,6 +146,8 @@ def accounting_table(
         row["net_closure_rhs"] = net.destination_inflow[group]
         row["net_closure_error"] = gs.diagnostics.backward_closure(step, net, group).error
         scale = row["net_dest_throughflow_sum"]
+        recomputed = scale - row["dest_to_dest_flow"] - row["dest_onward_to_dest"]
+        assert np.isclose(row["net_closure_rhs"], recomputed, rtol=1e-12), f"net inflow, {group}"
         assert abs(row["net_closure_error"]) <= tol * scale, f"net closure fails for {group}"
         row["ratio_net_volume_from"] = row["net_volume_from"] / row["pumping"]
         row["ratio_net_dest_throughflow"] = row["net_dest_throughflow_sum"] / row["pumping"]

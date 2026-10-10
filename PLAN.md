@@ -81,7 +81,9 @@ $$
 \sum_{d \in D} T_d \;-\; \sum_{D \to D} q \;-\; \sum_{D \to \neg D} q_{ij} f_j \;=\; \sum_i f_i \max(s_i, 0).
 $$
 
-The throughflow sum alone counts water twice when it passes from one destination cell to another, or leaves a destination cell and reaches the group again; it is kept as `destination_throughflow`. For a single destination cell that no water leaves and reaches again, the two are equal. The closure check is volume from = destination inflow, with no residual term.
+The throughflow sum alone counts water twice when it passes from one destination cell to another, or leaves a destination cell and reaches the group again; it is kept as `destination_throughflow`. For a single destination cell that no water leaves and reaches again, the two are equal. Forward mode is the mirror image: the source inflow is $\sum_{s \in S} T_s - \sum_{S \to S} q - \sum_{\neg S \to S} q_{ji} g_j = \sum_i g_i \max(-s_i, 0)$, and the throughflow sum is kept as `source_throughflow`.
+
+Unlike gross accounting, the net inflow uses the solved fractions just outside the group, so it depends on the solve and not on the budget alone; its meaning is pinned by the [FB13] test and the hand-built tests. The closure check is volume from (to) = net inflow, with no residual term. Its error is exactly the sum of the un-normalised row residuals over the cells outside the group, $\sum_{i \notin D} (T_i f_i - \sum_j q_{ij} f_j)$, so it tests the solve in sum.
 
 ### 2.5 Solution strategy
 

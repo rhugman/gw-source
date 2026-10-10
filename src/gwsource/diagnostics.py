@@ -13,17 +13,19 @@ So with the residual term the checks hold to round-off; without it they hold to 
 model's budget error (|sum F r| <= sum |r|, since 0 <= F <= 1).
 
 Net accounting (the reference method [FB13]) uses intercell flows only: s_i = O^edges_i -
-I^edges_i, T_i = I^edges_i + max(s_i, 0), f = 1 in the destination cells D. Summing
-T_i f_i = sum_j q_ij f_j over the cells outside D gives, with no residual term,
+I^edges_i, T_i = I^edges_i + max(s_i, 0), f = 1 in the destination cells D (g = 1 in the source
+cells S forward). There is no residual term, and the checks are
 
-    net backward closure:  sum_i f_i max(s_i, 0) = sum_{d in D} T_d - sum_{D->D} q
-                                                   - sum_{D->not D} q_ij f_j
+    net backward closure:  sum_i f_i max(s_i, 0)  = destination inflow
+    net forward closure:   sum_i g_i max(-s_i, 0) = source inflow
 
-The right side is the net destination inflow: the destination cells' throughflow less the water
-it counts twice, water that passes from one destination cell to another and water that leaves a
-destination cell and reaches the group again (gwsource.assemble.net_double_count).
-backward_closure checks it to round-off; the right side is computed from the edges and the left
-from the net sources, so the check tests the solve.
+where the net destination inflow is sum_D T_d - sum_{D->D} q - sum_{D->not D} q_ij f_j and the
+net source inflow sum_S T_s - sum_{S->S} q - sum_{not S->S} q_ji g_j (gwsource.assemble). Both
+sides use the solved fractions, so the net inflow depends on the solve, not on the budget alone,
+and its meaning is pinned by tests/test_fb13_example.py and the hand-built tests. The error is
+exactly the sum of the un-normalised row residuals over the cells outside the group,
+sum_{i not in D} (T_i f_i - sum_j q_ij f_j) backward and sum_{i not in S} (T_i g_i - sum_j q_ji
+g_j) forward, so the check tests the solve in sum.
 
 Cycle report: cycle_report() lists every strongly connected set of the flow graph with the flow
 that goes round it (by cycle cancelling) and its share of the model throughflow; cycle_table()
@@ -100,14 +102,20 @@ def backward_closure(step: FlowStep, result: BackwardResult, group: str) -> Chec
 
 
 def forward_closure(step: FlowStep, result: ForwardResult, group: str) -> Check:
-    """Return the closure check sum(volume to) + sum(G r) = source inflow (gross only)."""
-    assert result.accounting == "gross", "closure identity is for gross accounting"
-    r = cell_residual(step)
-    g = result.source_fraction[group]
+    """Return the closure check sum(volume to) + sum(G r) = source inflow.
+
+    Net accounting uses intercell flows only, so its residual term is zero and the check is
+    sum(volume to) = source inflow (module docstring).
+    """
+    assert result.accounting in ("gross", "net"), f"unknown accounting {result.accounting}"
+    if result.accounting == "net":
+        residual_term = 0.0
+    else:
+        residual_term = -float(np.dot(result.source_fraction[group], cell_residual(step)))
     return Check(
         lhs=float(result.volume_to[group].sum()),
         rhs=result.source_inflow[group],
-        residual_term=-float(np.dot(g, r)),
+        residual_term=residual_term,
     )
 
 
