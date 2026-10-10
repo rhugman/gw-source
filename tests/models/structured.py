@@ -112,18 +112,23 @@ def build_transient_dis(ws: Path, exe: Path, spec: BaseSpec | None = None) -> Mo
     return run_model(sim, gwf, name, ws, dis_filename, notes)
 
 
-CONSTANT_FLOW_PERIODS = ((1.0, 1, 1.0), (4.0e5, 30, 1.2))
+CONSTANT_FLOW_PERIODS = ((1.0, 1, 1.0), (4.0e5, 120, 1.0))
 
 
-def build_constant_flow_dis(ws: Path, exe: Path, spec: BaseSpec | None = None) -> ModelRun:
+def build_constant_flow_dis(
+    ws: Path, exe: Path, spec: BaseSpec | None = None, ims_kwargs: dict | None = None
+) -> ModelRun:
     """Model 10: model 1's steady flows held for a long time (many steps, no storage).
 
-    A short first period, then one long period of geometrically growing steps; every step has
-    the same flows, so transient tracking must converge to the steady snapshot fractions.
+    A short first period, then 4e5 days in 120 equal steps; every step has the same flows, so
+    transient tracking must converge to the steady snapshot fractions. Equal steps flush out
+    the initial water: with 30 steps growing by 1.2, initial water not yet flushed out by the
+    last, long steps (implicit time stepping) left errors of 1.4e-8 in c and 5.9e-7 in f.
+    ims_kwargs override the solver settings (a tight solve for the steady-limit comparison).
     """
     spec = BaseSpec() if spec is None else spec
     name = "m10_constant"
-    sim, gwf = make_sim(name, ws, exe, CONSTANT_FLOW_PERIODS)
+    sim, gwf = make_sim(name, ws, exe, CONSTANT_FLOW_PERIODS, ims_kwargs)
     dis_filename = _add_base_dis(gwf, spec, name)
     add_npf_ic_oc(gwf, name, k=spec.k, icelltype=1, strt=spec.strt)
     n_periods = len(CONSTANT_FLOW_PERIODS)
