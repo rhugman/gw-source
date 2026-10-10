@@ -1,5 +1,5 @@
 model,check,error,tolerance,measure,n_compared,status,seconds,note
-fb13_example,reference_example,0.000e+00,1.000e-14,absolute (published values),27,ok,1.218e-03,"net mode, 9 cells x 3 outputs"
+fb13_example,reference_example,0.000e+00,1.000e-14,absolute (published values),27,ok,1.218e-03,"net accounting, 9 cells x 3 outputs"
 m1_dis,backward_closure,1.710e-16,1.000e-10,relative to destination inflow (absolute in m3/d below 1 m3/d),4,ok,8.032e-02,1 step(s)
 m1_dis,forward_closure,3.298e-16,1.000e-10,relative to source inflow (absolute in m3/d below 1 m3/d),4,ok,8.032e-02,1 step(s)
 m1_dis,duality,1.649e-16,1.000e-10,relative to forward S->D flow (absolute in m3/d below 1 m3/d),16,ok,8.032e-02,1 step(s)
