@@ -140,13 +140,30 @@ def _net_edges(
     return edges.subset(keep)
 
 
+def net_fixed_cells(step: FlowStep, sel: Selection, sign: int) -> np.ndarray:
+    """Return the cells fixed at 1: sel.cells, or the cells where selected terms flow with sign.
+
+    A pure cell or zone selection keeps its cells. A selection with term criteria fixes a cell
+    if any selected entry in it flows in the traced direction: sign -1 (a sink) backward, +1 (a
+    source) forward, as term_flow is positive into the cell. A cell with selected entries of
+    both signs is fixed in both directions; a group with no such entry fixes no cell.
+    """
+    assert sign in (-1, 1), "sign must be -1 (backward, sinks) or +1 (forward, sources)"
+    if not sel.term_criteria:
+        return sel.cells
+    fixed = np.zeros(step.n_cells, dtype=bool)
+    fixed[step.term_cell[sel.terms & (sign * step.term_flow > 0.0)]] = True
+    return fixed
+
+
 @dataclass
 class NetSolution:
-    """Net-mode fractions and per-cell s and T (cells, groups), the edges used per group."""
+    """Net-mode fractions, per-cell s and T and fixed cells (cells, groups), edges per group."""
 
     fraction: np.ndarray
     s: np.ndarray
     throughflow: np.ndarray
+    fixed: np.ndarray
     used: list[Edges]
     solvers: list[str]
     loops: list[np.ndarray]
@@ -155,37 +172,40 @@ class NetSolution:
 def _net_solve(
     step: FlowStep, groups: dict, edges: Edges, config: TraceConfig, backward: bool
 ) -> NetSolution:
-    """Solve net mode group by group."""
+    """Solve net mode group by group, with each group's cells fixed by net_fixed_cells."""
     n, n_groups = step.n_cells, len(groups)
     fraction, s_all, t_all = (np.zeros((n, n_groups)) for _ in range(3))
+    fixed_all = np.zeros((n, n_groups), dtype=bool)
     used_all, solvers, closed = [], [], np.zeros(n, dtype=bool)
+    sign = -1 if backward else +1
     for g, sel in enumerate(groups.values()):
-        used = _net_edges(n, edges, sel.cells, backward, config.remove_cycles)
+        fixed = net_fixed_cells(step, sel, sign)
+        used = _net_edges(n, edges, fixed, backward, config.remove_cycles)
         s, throughflow = net_balance(n, used)
-        matrix, rhs = net_system(n, used, sel.cells, throughflow, backward)
+        matrix, rhs = net_system(n, used, fixed, throughflow, backward)
         fraction[:, g], factor, loops = _solve(matrix, rhs, config)
-        s_all[:, g], t_all[:, g] = s, throughflow
+        s_all[:, g], t_all[:, g], fixed_all[:, g] = s, throughflow, fixed
         used_all.append(used)
         solvers.append(factor.kind)
         for cells in loops:
             closed[cells] = True
     loops = _loops_from_mask(n, edges, closed)
-    return NetSolution(fraction, s_all, t_all, used_all, solvers, loops)
+    return NetSolution(fraction, s_all, t_all, fixed_all, used_all, solvers, loops)
 
 
 def _net_group_inflow(
     used: list[Edges],
-    cells: np.ndarray,
+    fixed: np.ndarray,
     fraction: np.ndarray,
     throughflow: np.ndarray,
     backward: bool,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return per group (inflow with each passage counted once, the fixed cells' T sum)."""
-    t_sum = (throughflow * cells).sum(axis=0)
+    t_sum = (throughflow * fixed).sum(axis=0)
     double = np.array(
         [
-            net_double_count(used[g], cells[:, g], fraction[:, g], backward)
-            for g in range(cells.shape[1])
+            net_double_count(used[g], fixed[:, g], fraction[:, g], backward)
+            for g in range(fixed.shape[1])
         ]
     )
     return t_sum - double[:, 0] - double[:, 1], t_sum
@@ -204,12 +224,14 @@ def _net_backward(
 ) -> BackwardResult:
     """Net-mode backward trace (reference method): destination cells absorbing with f = 1.
 
+    The destination cells are net_fixed_cells(sign=-1): the group's cells, or for a group
+    selected by term criteria the cells where a selected entry is a sink.
+
     destination_inflow is the destination cells' throughflow sum less the water it counts twice
     (net_double_count); destination_throughflow keeps the throughflow sum.
     """
     sol = _net_solve(step, groups, edges, config, backward=True)
-    cells = np.column_stack([sel.cells for sel in groups.values()])
-    inflow, t_sum = _net_group_inflow(sol.used, cells, sol.fraction, sol.throughflow, True)
+    inflow, t_sum = _net_group_inflow(sol.used, sol.fixed, sol.fraction, sol.throughflow, True)
     result = backward_metrics(
         step, groups, sol.fraction, sol.throughflow, np.maximum(sol.s, 0.0), {}, inflow, "net"
     )
@@ -224,12 +246,14 @@ def _net_forward(
 ) -> ForwardResult:
     """Net-mode forward trace: source cells fixed at g = 1 on the reversed graph.
 
+    The source cells are net_fixed_cells(sign=+1): the group's cells, or for a group selected by
+    term criteria the cells where a selected entry is a source.
+
     source_inflow is the source cells' throughflow sum less the water it counts twice
     (net_double_count); source_throughflow keeps the throughflow sum.
     """
     sol = _net_solve(step, groups, edges, config, backward=False)
-    cells = np.column_stack([sel.cells for sel in groups.values()])
-    inflow, t_sum = _net_group_inflow(sol.used, cells, sol.fraction, sol.throughflow, False)
+    inflow, t_sum = _net_group_inflow(sol.used, sol.fixed, sol.fraction, sol.throughflow, False)
     result = forward_metrics(
         step, groups, sol.fraction, sol.throughflow, np.maximum(-sol.s, 0.0), {}, inflow, "net"
     )

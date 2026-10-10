@@ -11,6 +11,11 @@ packages concentration 1 through SPC files; inflows of every other package have 
 With sft_inflow set (model 7), FMI also reads the SFR and MVR budget files and the GWT model
 gets SFT (stream transport; EXT-INFLOW concentration sft_inflow) and MVT (mover transport), so
 tagged water is routed through the stream reaches and the water mover as in a package network.
+
+perioddata replaces the copied TDIS periods (same number of periods). When the flow model saved
+one time step in a period, FMI uses that step's flows for every transport step of the period,
+so a steady flow model can be carried to transport equilibrium with long, many-step periods.
+ims replaces the solver settings.
 """
 
 from pathlib import Path
@@ -29,14 +34,15 @@ GWT_IMS = {
 }
 
 
-def _copy_tdis(gwf_sim, sim) -> None:
-    """Add a TDIS with the flow simulation's periods."""
+def _copy_tdis(gwf_sim, sim, perioddata: list | None = None) -> None:
+    """Add a TDIS with the flow simulation's periods, or perioddata (same number of periods)."""
     tdis = gwf_sim.tdis
+    nper = tdis.nper.get_data()
+    if perioddata is None:
+        perioddata = [tuple(r) for r in tdis.perioddata.get_data()]
+    assert len(perioddata) == nper, f"perioddata needs {nper} periods, as the flow model"
     flopy.mf6.ModflowTdis(
-        sim,
-        nper=tdis.nper.get_data(),
-        perioddata=[tuple(r) for r in tdis.perioddata.get_data()],
-        time_units=tdis.time_units.get_data(),
+        sim, nper=nper, perioddata=perioddata, time_units=tdis.time_units.get_data()
     )
 
 
@@ -112,6 +118,8 @@ def build_gwt_fmi(
     strt: float | np.ndarray = 0.0,
     flow_imbalance_correction: bool = True,
     sft_inflow: float | None = None,
+    perioddata: list | None = None,
+    ims: dict | None = None,
 ) -> Path:
     """Build and run a GWT simulation on a DIS test model's saved flows; return the UCN file.
 
@@ -120,9 +128,9 @@ def build_gwt_fmi(
     ws = Path(ws)
     name = "gwt"
     sim = flopy.mf6.MFSimulation(sim_name=name, sim_ws=str(ws), exe_name=str(exe))
-    _copy_tdis(run.sim, sim)
+    _copy_tdis(run.sim, sim, perioddata)
     gwt = flopy.mf6.ModflowGwt(sim, modelname=name)
-    flopy.mf6.ModflowIms(sim, **GWT_IMS, filename=f"{name}.ims")
+    flopy.mf6.ModflowIms(sim, **(GWT_IMS if ims is None else ims), filename=f"{name}.ims")
     _copy_dis(run.gwf, gwt)
     flopy.mf6.ModflowGwtic(gwt, strt=strt)
     flopy.mf6.ModflowGwtmst(gwt, porosity=porosity)
