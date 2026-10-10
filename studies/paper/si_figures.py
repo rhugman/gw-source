@@ -60,6 +60,7 @@ QUOTED = {
     "source SV_227": 3.7,
     "coverage": 0.87,
     "F>0.5 inside PRT zone": 0.92,
+    "seeded start cells": 29201,
     "prt_cells": 691,
     "F>0.1 cells": 2139,
     "F>0.5 cells": 445,
@@ -107,6 +108,8 @@ def accounting_table(out: Path = OUT, wells: tuple = WELL_ORDER) -> pd.DataFrame
         assert_quoted(table.loc[well, "ratio"], f"ratio {well}")
     assert_quoted(table.loc[list(wells), "net_volume_from"].sum(), "net per-well sum")
     assert_quoted(table.loc["SV_227", "cell_source_terms"], "source SV_227")
+    if "n_cycles" in table:
+        assert (table["n_cycles"] == 0).all(), "the caption says there are no flow loops"
     return table
 
 
@@ -208,6 +211,10 @@ def check_zones(cells: pd.DataFrame, codes: np.ndarray, out: Path = OUT) -> pd.S
     high = env.loc[("all", f"P>{P_ZONE:g}", f"F>{F_HIGH:g}")]
     assert high["f_cells"] == np.sum(codes == 2) == QUOTED["F>0.5 cells"], "F > 0.5"
     assert_quoted(high["f_zone_inside_prt"], "F>0.5 inside PRT zone")
+    notes = pd.read_csv(out / "envelope_prt_notes.csv").iloc[0]
+    assert notes["seeded_start_cells"] == QUOTED["seeded start cells"], "seeded start cells"
+    assert notes["start_cells_F>0.1"] == QUOTED["F>0.1 cells"], "F > 0.1 start cells"
+    assert notes["unseeded_F>0.1"] == 0, "the caption says every F > 0.1 start cell is seeded"
     missed = pd.Series(codes == 3).groupby(cells["region"].to_numpy()).sum()
     assert row["missed_cells"] == missed.sum() == QUOTED["missed"], "missed cells"
     for region, n in missed.items():
