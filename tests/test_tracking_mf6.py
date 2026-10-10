@@ -118,6 +118,8 @@ def check_flow_mode(reader, sources: dict, destinations: dict) -> tuple:
         bwd = tr.track_backward(reader, destinations, config)
         runs[mode] = (fwd, bwd)
     fwd, bwd = runs["flow"]
+    volume_scale = max(b["storage_end"].max() for b in fwd.balance.values())
+    assert fwd.water_balance_error.max() <= EXACT * volume_scale
     assert cell_water_balance_errors(reader, fwd.config).max() < EXACT
     assert np.all(fwd.volume_jump == 0.0)
     for g in fwd.groups:
@@ -277,19 +279,19 @@ def steady_limit_errors(reader) -> dict[str, float]:
     }
 
 
-STEADY_G_ATOL = 1e-11  # reached: 1e-13 (time stepping and round-off)
-STEADY_F_ATOL = 1e-8  # reached: 7e-10, the size of the cell budget errors of the flow solve
+STEADY_G_ATOL = 1e-11  # reached: 1e-13; 1e-14 with a flow solve 100 times tighter
+STEADY_F_ATOL = 1e-8  # reached: 7e-10; 1e-11 with a flow solve 100 times tighter
 
 
 def test_constant_flows_converge_to_steady_snapshot(model_run):
     """Model 10 (model 1's flows held for 4e5 days in 120 equal steps): forward c tends to the
     steady source_fraction at the end, adjoint f at the start to the steady fraction_through.
 
-    The G error is what is left of the time-stepping tail (water still in the model from the
-    last steps); the F error is limited by the cell budget errors of the MF6 solution (about
-    the water the flow-error correction removes, 7e-10). The tolerances leave a factor of 100
-    and 15 for other MF6 versions and platforms. At the other end of the run both errors are
-    large (c at the start, f at the end), so the test cannot pass trivially.
+    Both errors are limited by the flow solver tolerance, not by round-off: with the IMS closure
+    criteria 100 times tighter (outer_dvclose 1e-11) they fall from 1e-13 to 1e-14 (G) and from
+    7e-10 to 1e-11 (F). The tolerances leave a factor of 100 and 15 for other MF6 versions and
+    platforms. At the other end of the run both errors are large (c at the start, f at the
+    end), so the test cannot pass trivially.
     """
     errors = steady_limit_errors(gs.open_model(model_run("m10_constant").ws))
     assert errors["g_end"] < STEADY_G_ATOL and errors["g_start"] > 0.1
