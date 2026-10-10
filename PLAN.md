@@ -73,7 +73,15 @@ Normalising backward mode by outflow and forward mode by inflow means the residu
 
 ### 2.4 Net mode
 
-Use the net source/sink per cell, $s_i = O^{\text{edges}}_i - I^{\text{edges}}_i$, and fix $f = 1$ in destination cells. This must reproduce [FB13]'s 3×3 worked example exactly. It exists for regression testing and for comparison with existing studies that used the reference method. It is never the default.
+Use the net source/sink per cell, $s_i = O^{\text{edges}}_i - I^{\text{edges}}_i$, with throughflow $T_i = I^{\text{edges}}_i + \max(s_i, 0)$, and fix $f = 1$ in destination cells. This must reproduce [FB13]'s 3×3 worked example exactly. It exists for regression testing and for comparison with existing studies that used the reference method. It is never the default.
+
+The destination inflow in net mode is the water attributed to the group, each passage counted once:
+
+$$
+\sum_{d \in D} T_d \;-\; \sum_{D \to D} q \;-\; \sum_{D \to \neg D} q_{ij} f_j \;=\; \sum_i f_i \max(s_i, 0).
+$$
+
+The throughflow sum alone counts water twice when it passes from one destination cell to another, or leaves a destination cell and reaches the group again; it is kept as `destination_throughflow`. For a single destination cell that no water leaves and reaches again, the two are equal. The closure check is volume from = destination inflow, with no residual term.
 
 ### 2.5 Solution strategy
 
