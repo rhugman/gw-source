@@ -4,14 +4,24 @@ A Selection carries two masks:
 - ``terms``: which external term entries belong to the group. Gross accounting uses this. In
   backward mode only the selected entries that are sinks (negative flow) act as destinations;
   in forward mode only the selected entries that are sources (positive flow) act as sources.
-- ``cells``: which cells belong to the group. Net accounting uses this (destination or source
-  cells are fixed at fraction 1).
+- ``cells``: which cells belong to the group. Net accounting fixes these cells at fraction 1
+  when the group is a pure cell or zone selection (``term_criteria`` False).
 
 Selecting by cells therefore means "all external terms located in those cells" in gross mode,
 and "those cells" in net mode. Selecting by package, bound or boundname marks the cells that
-host the selected entries. A zone array selects the cells where zone == value (any grid type:
-the array may have the grid shape or one value per cell); combine it with package= to pick,
-for example, the recharge falling on one zone as a forward source.
+host the selected entries. Any term criterion (package, term, model, bounds, boundnames,
+term_mask), with or without cells=, sets ``term_criteria``: net accounting then fixes only the
+cells where any selected entry flows in the traced direction (a sink backward, a source
+forward; gwsource.trace.net_fixed_cells), so a well listed at zero rate, a drain above the
+water table or a losing river cell in a backward trace does not become a destination. A cell
+with selected entries of both signs is fixed in both directions.
+
+A zone array selects the cells where zone == value (any grid type: the array may have the grid
+shape or one value per cell); combine it with package= to pick, for example, the recharge
+falling on one zone as a forward source. In net mode, a zone or cells= selection without term
+criteria keeps all its cells, as the reference method defines groups by cells; with package=
+it fixes the zone's cells where the selected entries flow, the same cells as select(package=)
+restricted to the zone.
 
 Boundnames need a FlowStep read with boundnames=True (they are not in the budget file). A
 boundname that is absent in a step (e.g. a well listed only in some stress periods) selects
@@ -21,7 +31,10 @@ Network steps (gwsource.network): cells are global nodes (gwsource.network.globa
 a model's cells or a package's nodes to them). model= keeps only the terms on the nodes of one
 model (its cells and its package nodes); term= keeps only records with the given budget text,
 e.g. select(step, package="MAW", bounds=[1], term="RATE") is the pumping of MAW well 1 and
-select(step, package="SFR", bounds=[20], term="EXT-OUTFLOW") the outflow of reach 20.
+select(step, package="SFR", bounds=[20], term="EXT-OUTFLOW") the outflow of reach 20. In net
+mode, package= fixes only the nodes whose selected records flow in the traced direction; to
+make the whole stream the destination, select its nodes, e.g.
+select(step, cells=global_nodes(step, "SFR", reaches)).
 
 Groups are plain dicts {group name: Selection}.
 """
@@ -36,10 +49,15 @@ from .flowstep import FlowStep
 
 @dataclass
 class Selection:
-    """Boolean masks over the external term entries and over the cells of a FlowStep."""
+    """Boolean masks over the external term entries and over the cells of a FlowStep.
+
+    term_criteria is False only for a pure cell or zone selection; net accounting then fixes
+    all its cells, and otherwise only the cells where selected entries flow.
+    """
 
     terms: np.ndarray
     cells: np.ndarray
+    term_criteria: bool = False
 
 
 def _package_mask(step: FlowStep, package: str | Iterable[str]) -> np.ndarray:
@@ -119,9 +137,12 @@ def select(
     if cells is None:
         cell_mask = np.zeros(step.n_cells, dtype=bool)
         cell_mask[step.term_cell[terms]] = True
-        return Selection(terms=terms, cells=cell_mask)
+        return Selection(terms=terms, cells=cell_mask, term_criteria=True)
     cell_mask = _cell_mask(step, cells)
-    return Selection(terms=terms & cell_mask[step.term_cell], cells=cell_mask)
+    terms &= cell_mask[step.term_cell]
+    criteria = (package, term, model, bounds, boundnames, term_mask)
+    term_criteria = any(c is not None for c in criteria)
+    return Selection(terms=terms, cells=cell_mask, term_criteria=term_criteria)
 
 
 def select_cells(step: FlowStep, cells) -> Selection:

@@ -293,6 +293,88 @@ def test_net_destination_in_closed_loop():
     assert abs(backward_closure(step, res, "c2").error) < 1e-13
 
 
+def zero_recharge_step() -> gs.FlowStep:
+    """Chain 0 -> 1 -> 2: recharge 10 at cell 0 and 0.0 at cell 1, CHD inflow 5 at cell 1."""
+    packages = [gs.Package("RCH", "RCH"), gs.Package("CHD", "CHD"), gs.Package("WEL", "WEL")]
+    terms = [(0, 10.0, 0), (1, 0.0, 0), (1, 5.0, 1), (2, -15.0, 2)]
+    return graph(3, [(0, 1, 10.0), (1, 2, 15.0)], terms, packages)
+
+
+def test_net_forward_skips_zero_flow_source_cells():
+    """A recharge entry at 0.0 does not fix its cell: g_1 = q01 / T1 = 10 / 15, not 1."""
+    step = zero_recharge_step()
+    rch = {"rch": gs.select(step, package="RCH")}
+    res = gs.forward(step, rch, gs.TraceConfig(accounting="net"))
+    np.testing.assert_allclose(res.source_fraction["rch"], [1.0, 2.0 / 3.0, 2.0 / 3.0], rtol=1e-14)
+    assert res.source_inflow["rch"] == pytest.approx(10.0, rel=1e-14)
+    assert abs(forward_closure(step, res, "rch").error) < 1e-13
+
+
+def test_net_fixed_cells_follow_the_traced_direction():
+    """Term selections fix the cells whose selected entries flow in the traced direction only."""
+    step = zero_recharge_step()
+    both = gs.select(step, package=["RCH", "WEL"])
+    assert both.cells.tolist() == [True, True, True]
+    assert gs.trace.net_fixed_cells(step, both, +1).tolist() == [True, False, False]
+    assert gs.trace.net_fixed_cells(step, both, -1).tolist() == [False, False, True]
+    by_cell = gs.select_cells(step, [1])
+    for sign in (-1, +1):
+        assert gs.trace.net_fixed_cells(step, by_cell, sign).tolist() == [False, True, False]
+    cells_and_package = gs.select(step, package="RCH", cells=[0, 1])
+    assert by_cell.term_criteria is False and cells_and_package.term_criteria is True
+    assert gs.trace.net_fixed_cells(step, cells_and_package, +1).tolist() == [True, False, False]
+    with pytest.raises(AssertionError, match="sign"):
+        gs.trace.net_fixed_cells(step, both, 0)
+    # any selected entry flowing in the traced direction fixes the cell: +3 and -4 fix it both ways
+    packages = [gs.Package("RIV", "RIV"), gs.Package("WEL", "WEL")]
+    mixed = graph(2, [(1, 0, 1.0)], [(0, 3.0, 0), (0, -4.0, 1), (1, 1.0, 0)], packages)
+    sel = gs.select(mixed, term_mask=mixed.term_cell == 0)
+    for sign in (-1, +1):
+        assert gs.trace.net_fixed_cells(mixed, sel, sign).tolist() == [True, False]
+
+
+def zero_drain_step() -> gs.FlowStep:
+    """Source 10 at cell 0 -> cell 1, which splits 6 to a drain at cell 2 and 4 to a well at 3.
+
+    Cell 1 also has a drain entry at 0.0 (a drain above the water table).
+    """
+    packages = [SRC, gs.Package("DRN", "DRN"), gs.Package("WEL", "WEL")]
+    terms = [(0, 10.0, 0), (1, 0.0, 1), (2, -6.0, 1), (3, -4.0, 2)]
+    return graph(4, [(0, 1, 10.0), (1, 2, 6.0), (1, 3, 4.0)], terms, packages)
+
+
+def test_net_backward_skips_zero_flow_destination_cells():
+    """A drain entry at 0.0 leaves its cell non-absorbing; the inflow is the flowing drain's."""
+    step = zero_drain_step()
+    config = gs.TraceConfig(accounting="net")
+    res = gs.backward(step, {"drn": gs.select(step, package="DRN")}, config)
+    np.testing.assert_allclose(res.fraction_through["drn"], [0.6, 0.6, 1.0, 0.0], rtol=1e-14)
+    alone = gs.backward(step, {"c2": gs.select_cells(step, [2])}, config)
+    assert res.destination_inflow["drn"] == alone.destination_inflow["c2"] == pytest.approx(6.0)
+    assert abs(backward_closure(step, res, "drn").error) < 1e-13
+
+
+def test_net_group_with_no_flowing_entry_fixes_nothing():
+    """A group whose selected entries are all at 0.0 fixes no cell: every value is 0, no NaN."""
+    step = zero_drain_step()
+    idle = gs.select(step, package="DRN", term_mask=step.term_flow == 0.0)
+    res = gs.backward(step, {"idle": idle}, gs.TraceConfig(accounting="net"))
+    np.testing.assert_array_equal(res.fraction_through["idle"], 0.0)
+    assert res.destination_inflow["idle"] == 0.0
+    assert res.destination_throughflow["idle"] == 0.0
+    assert backward_closure(step, res, "idle").error == 0.0
+    assert not np.isnan(res.fraction_from_total["idle"]).any()
+
+
+def test_net_cell_selection_keeps_its_cells():
+    """select_cells still fixes every selected cell, whether or not a term flows there."""
+    step = zero_drain_step()
+    groups = {"c12": gs.select_cells(step, [1, 2])}
+    res = gs.backward(step, groups, gs.TraceConfig(accounting="net"))
+    np.testing.assert_allclose(res.fraction_through["c12"], [1.0, 1.0, 1.0, 0.0], rtol=1e-14)
+    assert res.destination_inflow["c12"] == pytest.approx(10.0, rel=1e-14)
+
+
 def test_gross_results_have_no_throughflow_sums():
     """destination_throughflow and source_throughflow are net-only and empty in gross results."""
     step = cycle_step()

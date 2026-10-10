@@ -75,6 +75,8 @@ Normalising backward mode by outflow and forward mode by inflow means the residu
 
 Use the net source/sink per cell, $s_i = O^{\text{edges}}_i - I^{\text{edges}}_i$, with throughflow $T_i = I^{\text{edges}}_i + \max(s_i, 0)$, and fix $f = 1$ in destination cells. This must reproduce [FB13]'s 3×3 worked example exactly. It exists for regression testing and for comparison with existing studies that used the reference method. It is never the default.
 
+Which cells are fixed depends on how the group was selected. A pure cell or zone selection fixes those cells, as the reference method defines groups. A selection with any term criterion (package, term, model, bounds, boundnames, a term mask), with or without cells or a zone, fixes a cell only if any selected entry in it flows in the traced direction: a sink backward, a source forward (`net_fixed_cells`). A cell with selected entries of both signs is fixed in both directions, and a group with no such entry fixes no cell (every fraction is 0). A well listed at zero rate, a drain above the water table, recharge on a constant-head cell with zero flow, or a losing river cell in a backward trace is therefore not fixed. Recharge selected in a zone fixes the same cells as all recharge restricted to the zone. On a network step, a package selection fixes only the package nodes whose records flow in the traced direction; to fix a whole stream, select its nodes as cells.
+
 The destination inflow in net mode is the water attributed to the group, each passage counted once:
 
 $$

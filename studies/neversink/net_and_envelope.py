@@ -99,9 +99,10 @@ def trace_both(ws: Path) -> tuple[gs.FlowStep, dict, dict[str, gs.BackwardResult
 def well_cell_budget(step: gs.FlowStep, sel: gs.Selection, budget: gs.CellBudget) -> dict:
     """Return the summed budget of a group's cells and the share of their outflow the wells take.
 
-    The share is left blank (NaN) for a group of several cells.
+    The group's cells are its net destination cells (gwsource.trace.net_fixed_cells). The share
+    is left blank (NaN) for a group of several cells.
     """
-    cells = sel.cells
+    cells = gs.trace.net_fixed_cells(step, sel, -1)
     pumping = float(-step.term_flow[sel.terms].sum())
     outflow = float(budget.outflow[cells].sum())
     single = int(cells.sum()) == 1
@@ -141,7 +142,8 @@ def accounting_table(
         row["gross_closure_error"] = check.error
         row["net_dest_throughflow_sum"] = net.destination_throughflow[group]
         row["net_volume_from"] = float(net.volume_from[group].sum())
-        double = gs.assemble.net_double_count(edges, sel.cells, net.fraction_through[group])
+        fixed = gs.trace.net_fixed_cells(step, sel, -1)
+        double = gs.assemble.net_double_count(edges, fixed, net.fraction_through[group])
         row["dest_to_dest_flow"], row["dest_onward_to_dest"] = double
         row["net_closure_rhs"] = net.destination_inflow[group]
         row["net_closure_error"] = gs.diagnostics.backward_closure(step, net, group).error
@@ -349,7 +351,8 @@ def main(
             out / "net_vs_gross_wells.csv", index=False
         )
         mask_table(results, endpoints).to_csv(out / "net_vs_gross_mp7.csv", index=False)
-        dest, start = groups["priority"].cells, endpoints["node0"].to_numpy()
+        dest = gs.trace.net_fixed_cells(step, groups["priority"], -1)
+        start = endpoints["node0"].to_numpy()
         class_table(step, results, dest, start, edges, budget).to_csv(
             out / "net_vs_gross_cell_classes.csv", index=False
         )
