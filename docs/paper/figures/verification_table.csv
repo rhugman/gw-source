@@ -1,66 +1,66 @@
 model,check,error,tolerance,measure,n_compared,status,seconds,note
-fb13_example,reference_example,0.000e+00,1.000e-14,absolute (published values),27,ok,8.442e-04,"net accounting, 9 cells x 3 outputs"
-m1_dis,backward_closure,1.710e-16,1.000e-10,relative to destination inflow (absolute in m³/d below 1 m³/d),4,ok,7.492e-02,1 step(s)
-m1_dis,forward_closure,3.298e-16,1.000e-10,relative to source inflow (absolute in m³/d below 1 m³/d),4,ok,7.492e-02,1 step(s)
-m1_dis,duality,1.649e-16,1.000e-10,relative to forward source-to-destination flow (absolute in m³/d below 1 m³/d),16,ok,7.492e-02,1 step(s)
-m1_dis,boundary_control,5.551e-16,1.000e-12,absolute (fraction),594,ok,7.492e-02,1 step(s)
-m2_dis3lay,backward_closure,1.622e-16,1.000e-10,relative to destination inflow (absolute in m³/d below 1 m³/d),3,ok,4.106e-02,1 step(s)
-m2_dis3lay,forward_closure,1.318e-16,1.000e-10,relative to source inflow (absolute in m³/d below 1 m³/d),3,ok,4.106e-02,1 step(s)
-m2_dis3lay,duality,1.928e-16,1.000e-10,relative to forward source-to-destination flow (absolute in m³/d below 1 m³/d),9,ok,4.106e-02,1 step(s)
-m2_dis3lay,boundary_control,6.661e-16,1.000e-12,absolute (fraction),1125,ok,4.106e-02,1 step(s)
-m3_disv,backward_closure,2.842e-16,1.000e-10,relative to destination inflow (absolute in m³/d below 1 m³/d),4,ok,1.344e-01,1 step(s)
-m3_disv,forward_closure,1.466e-16,1.000e-10,relative to source inflow (absolute in m³/d below 1 m³/d),4,ok,1.344e-01,1 step(s)
-m3_disv,duality,3.183e-16,1.000e-10,relative to forward source-to-destination flow (absolute in m³/d below 1 m³/d),16,ok,1.344e-01,1 step(s)
-m3_disv,boundary_control,6.661e-16,1.000e-12,absolute (fraction),525,ok,1.344e-01,1 step(s)
-m4_disu_vert,backward_closure,1.710e-16,1.000e-10,relative to destination inflow (absolute in m³/d below 1 m³/d),4,ok,8.833e-02,1 step(s)
-m4_disu_vert,forward_closure,3.298e-16,1.000e-10,relative to source inflow (absolute in m³/d below 1 m³/d),4,ok,8.833e-02,1 step(s)
-m4_disu_vert,duality,1.649e-16,1.000e-10,relative to forward source-to-destination flow (absolute in m³/d below 1 m³/d),16,ok,8.833e-02,1 step(s)
-m4_disu_vert,boundary_control,5.551e-16,1.000e-12,absolute (fraction),594,ok,8.833e-02,1 step(s)
-m4_disu_novert,backward_closure,1.710e-16,1.000e-10,relative to destination inflow (absolute in m³/d below 1 m³/d),4,ok,5.805e-02,1 step(s)
-m4_disu_novert,forward_closure,3.298e-16,1.000e-10,relative to source inflow (absolute in m³/d below 1 m³/d),4,ok,5.805e-02,1 step(s)
-m4_disu_novert,duality,1.649e-16,1.000e-10,relative to forward source-to-destination flow (absolute in m³/d below 1 m³/d),16,ok,5.805e-02,1 step(s)
-m4_disu_novert,boundary_control,5.551e-16,1.000e-12,absolute (fraction),594,ok,5.805e-02,1 step(s)
-m5_xt3d,backward_closure,4.090e-16,1.000e-10,relative to destination inflow (absolute in m³/d below 1 m³/d),4,ok,5.861e-02,1 step(s)
-m5_xt3d,forward_closure,1.894e-16,1.000e-10,relative to source inflow (absolute in m³/d below 1 m³/d),4,ok,5.861e-02,1 step(s)
-m5_xt3d,duality,2.709e-16,1.000e-10,relative to forward source-to-destination flow (absolute in m³/d below 1 m³/d),16,ok,5.861e-02,1 step(s)
-m5_xt3d,boundary_control,4.441e-16,1.000e-12,absolute (fraction),594,ok,5.861e-02,1 step(s)
-m6_transient,backward_closure,1.278e-15,1.000e-10,relative to destination inflow (absolute in m³/d below 1 m³/d),78,ok,2.737e-01,13 step(s)
-m6_transient,forward_closure,1.096e-15,1.000e-10,relative to source inflow (absolute in m³/d below 1 m³/d),78,ok,2.737e-01,13 step(s)
-m6_transient,duality,9.414e-16,1.000e-10,relative to forward source-to-destination flow (absolute in m³/d below 1 m³/d),468,ok,2.737e-01,13 step(s)
-m6_transient,boundary_control,1.776e-15,1.000e-12,absolute (fraction),7722,ok,2.737e-01,13 step(s)
-m7_mover,backward_closure,6.202e-16,1.000e-10,relative to destination inflow (absolute in m³/d below 1 m³/d),26,ok,1.552e-01,"2 step(s), package network"
-m7_mover,forward_closure,3.411e-16,1.000e-10,relative to source inflow (absolute in m³/d below 1 m³/d),26,ok,1.552e-01,"2 step(s), package network"
-m7_mover,duality,1.494e-15,1.000e-10,relative to forward source-to-destination flow (absolute in m³/d below 1 m³/d),338,ok,1.552e-01,"2 step(s), package network"
-m7_mover,boundary_control,1.110e-15,1.000e-12,absolute (fraction),1228,ok,1.552e-01,"2 step(s), package network"
-m8_maw,backward_closure,7.525e-16,1.000e-10,relative to destination inflow (absolute in m³/d below 1 m³/d),6,ok,5.103e-02,"1 step(s), package network"
-m8_maw,forward_closure,1.318e-16,1.000e-10,relative to source inflow (absolute in m³/d below 1 m³/d),6,ok,5.103e-02,"1 step(s), package network"
-m8_maw,duality,4.836e-16,1.000e-10,relative to forward source-to-destination flow (absolute in m³/d below 1 m³/d),36,ok,5.103e-02,"1 step(s), package network"
-m8_maw,boundary_control,8.882e-16,1.000e-12,absolute (fraction),1126,ok,5.103e-02,"1 step(s), package network"
-m9_lak_uzf,backward_closure,4.441e-16,1.000e-10,relative to destination inflow (absolute in m³/d below 1 m³/d),60,ok,2.035e-01,"3 step(s), package network"
-m9_lak_uzf,forward_closure,3.158e-16,1.000e-10,relative to source inflow (absolute in m³/d below 1 m³/d),60,ok,2.035e-01,"3 step(s), package network"
-m9_lak_uzf,duality,6.427e-16,1.000e-10,relative to forward source-to-destination flow (absolute in m³/d below 1 m³/d),1200,ok,2.035e-01,"3 step(s), package network"
-m9_lak_uzf,boundary_control,1.110e-15,1.000e-12,absolute (fraction),3411,ok,2.035e-01,"3 step(s), package network"
-m4_disu_vert,dis_vs_disu,0.000e+00,1.000e-12,relative to output maximum,60,ok,4.210e-03,vs model 1 (DIS)
-m4_disu_novert,dis_vs_disu,0.000e+00,1.000e-12,relative to output maximum,60,ok,1.491e-02,vs model 1 (DIS)
-m1_dis,split_vs_single,7.433e-10,1.000e-08,relative to output maximum,128,ok,1.218e-01,"3 models, 1 step(s)"
-m3_disv,split_vs_single,1.440e-10,1.000e-08,relative to output maximum,128,ok,4.816e-01,"2 models, 1 step(s)"
-m6_transient,split_vs_single,1.465e-12,1.000e-08,relative to output maximum,772,ok,4.349e-01,"4 models, 4 step(s)"
-m6_transient,tracking_vs_gwt,2.220e-15,1.000e-08,absolute (fraction),5,ok,4.660e-01,5 tagging cases
-m7_mover,tracking_vs_gwt,1.018e-14,1.000e-08,absolute (fraction),2,ok,1.151e-01,SFR nodes + MVR vs SFT + MVT
-m1_dis,prt_capture,5.111e-04,1.000e-02,relative to destination inflow,6128,ok,3.433e-01,800.4 of 800.0 m3/d
-m3_disv,prt_capture,4.846e-04,1.000e-02,relative to destination inflow,8032,ok,8.277e-01,800.4 of 800.0 m3/d
-m2_dis3lay,prt_capture,5.944e-03,2.000e-02,relative to destination inflow,15912,ok,1.165e+00,402.6 of 405.0 m3/d
-m6_transient,tracking_duality,5.929e-16,1.000e-10,relative to forward source-to-destination volume (absolute when zero),24,ok,1.643e-01,"13 steps, both volume options, 1 and 5 transport sub-steps"
-m6_split,tracking_duality,4.464e-16,1.000e-10,relative to forward source-to-destination volume (absolute when zero),12,ok,1.239e-01,"13 steps, both volume options"
-m7_mover,tracking_duality,4.652e-16,1.000e-10,relative to forward source-to-destination volume (absolute when zero),12,ok,1.813e-02,"2 steps, both volume options"
-m9_lak_uzf,tracking_duality,7.669e-16,1.000e-10,relative to forward source-to-destination volume (absolute when zero),16,ok,3.842e-02,"3 steps, both volume options"
-m6_transient,water_balance,6.929e-17,1.000e-10,relative to the cell's water volume,13,ok,6.253e-02,13 steps
-m6_transient,tagged_balance,1.032e-15,1.000e-10,relative to largest term of the tagged-water balance,3,ok,6.253e-02,"13 steps, 3 tagged groups incl. initial water"
-m9_lak_uzf,water_balance,9.474e-17,1.000e-10,relative to the cell's water volume,3,ok,5.338e-02,3 steps
-m9_lak_uzf,tagged_balance,1.786e-16,1.000e-10,relative to largest term of the tagged-water balance,4,ok,5.338e-02,"3 steps, 4 tagged groups incl. initial water"
-m10_constant,steady_limit_g,9.695e-14,1.000e-11,absolute (fraction),4,ok,3.167e-01,121 steps; c vs G at the end (at the start: at least 0.40)
-m10_constant,steady_limit_f,6.800e-10,1.000e-08,absolute (fraction),4,ok,3.167e-01,121 steps; w vs F at the start (at the end: at least 0.52)
-substep_network,substeps,1.630e-16,1.000e-12,relative to output maximum,15,ok,1.300e-02,"3 sub-steps vs 3x flow steps, 15 outputs"
-m1_dis,steady_g_vs_gwt,1.417e-11,1.000e-10,absolute (fraction),2,ok,7.687e-02,m1_rch 5.7e-12; m1_riv 1.4e-11
-m2_dis3lay,steady_g_vs_gwt,2.764e-11,1.000e-10,absolute (fraction),2,ok,1.001e-01,m2_rch 2.8e-11; m2_chd 1.1e-11
-m7_mover,steady_g_vs_gwt,1.031e-08,1.000e-07,absolute (fraction),4,ok,1.553e+00,cells and reaches; flow model solved about 100 times tighter: 2.5e-11
+fb13_example,reference_example,0.000e+00,1.000e-14,absolute (published values),27,ok,8.363e-04,"net accounting, 9 cells x 3 outputs"
+m1_dis,backward_closure,1.710e-16,1.000e-10,relative to destination inflow (absolute in m³/d below 1 m³/d),4,ok,7.357e-02,1 step(s)
+m1_dis,forward_closure,3.298e-16,1.000e-10,relative to source inflow (absolute in m³/d below 1 m³/d),4,ok,7.357e-02,1 step(s)
+m1_dis,duality,1.649e-16,1.000e-10,relative to forward source-to-destination flow (absolute in m³/d below 1 m³/d),16,ok,7.357e-02,1 step(s)
+m1_dis,boundary_control,5.551e-16,1.000e-12,absolute (fraction),594,ok,7.357e-02,1 step(s)
+m2_dis3lay,backward_closure,1.622e-16,1.000e-10,relative to destination inflow (absolute in m³/d below 1 m³/d),3,ok,4.132e-02,1 step(s)
+m2_dis3lay,forward_closure,1.318e-16,1.000e-10,relative to source inflow (absolute in m³/d below 1 m³/d),3,ok,4.132e-02,1 step(s)
+m2_dis3lay,duality,1.928e-16,1.000e-10,relative to forward source-to-destination flow (absolute in m³/d below 1 m³/d),9,ok,4.132e-02,1 step(s)
+m2_dis3lay,boundary_control,6.661e-16,1.000e-12,absolute (fraction),1125,ok,4.132e-02,1 step(s)
+m3_disv,backward_closure,2.842e-16,1.000e-10,relative to destination inflow (absolute in m³/d below 1 m³/d),4,ok,1.362e-01,1 step(s)
+m3_disv,forward_closure,1.466e-16,1.000e-10,relative to source inflow (absolute in m³/d below 1 m³/d),4,ok,1.362e-01,1 step(s)
+m3_disv,duality,3.183e-16,1.000e-10,relative to forward source-to-destination flow (absolute in m³/d below 1 m³/d),16,ok,1.362e-01,1 step(s)
+m3_disv,boundary_control,6.661e-16,1.000e-12,absolute (fraction),525,ok,1.362e-01,1 step(s)
+m4_disu_vert,backward_closure,1.710e-16,1.000e-10,relative to destination inflow (absolute in m³/d below 1 m³/d),4,ok,9.008e-02,1 step(s)
+m4_disu_vert,forward_closure,3.298e-16,1.000e-10,relative to source inflow (absolute in m³/d below 1 m³/d),4,ok,9.008e-02,1 step(s)
+m4_disu_vert,duality,1.649e-16,1.000e-10,relative to forward source-to-destination flow (absolute in m³/d below 1 m³/d),16,ok,9.008e-02,1 step(s)
+m4_disu_vert,boundary_control,5.551e-16,1.000e-12,absolute (fraction),594,ok,9.008e-02,1 step(s)
+m4_disu_novert,backward_closure,1.710e-16,1.000e-10,relative to destination inflow (absolute in m³/d below 1 m³/d),4,ok,5.873e-02,1 step(s)
+m4_disu_novert,forward_closure,3.298e-16,1.000e-10,relative to source inflow (absolute in m³/d below 1 m³/d),4,ok,5.873e-02,1 step(s)
+m4_disu_novert,duality,1.649e-16,1.000e-10,relative to forward source-to-destination flow (absolute in m³/d below 1 m³/d),16,ok,5.873e-02,1 step(s)
+m4_disu_novert,boundary_control,5.551e-16,1.000e-12,absolute (fraction),594,ok,5.873e-02,1 step(s)
+m5_xt3d,backward_closure,4.090e-16,1.000e-10,relative to destination inflow (absolute in m³/d below 1 m³/d),4,ok,5.912e-02,1 step(s)
+m5_xt3d,forward_closure,1.894e-16,1.000e-10,relative to source inflow (absolute in m³/d below 1 m³/d),4,ok,5.912e-02,1 step(s)
+m5_xt3d,duality,2.709e-16,1.000e-10,relative to forward source-to-destination flow (absolute in m³/d below 1 m³/d),16,ok,5.912e-02,1 step(s)
+m5_xt3d,boundary_control,4.441e-16,1.000e-12,absolute (fraction),594,ok,5.912e-02,1 step(s)
+m6_transient,backward_closure,1.278e-15,1.000e-10,relative to destination inflow (absolute in m³/d below 1 m³/d),78,ok,2.808e-01,13 step(s)
+m6_transient,forward_closure,1.096e-15,1.000e-10,relative to source inflow (absolute in m³/d below 1 m³/d),78,ok,2.808e-01,13 step(s)
+m6_transient,duality,9.414e-16,1.000e-10,relative to forward source-to-destination flow (absolute in m³/d below 1 m³/d),468,ok,2.808e-01,13 step(s)
+m6_transient,boundary_control,1.776e-15,1.000e-12,absolute (fraction),7722,ok,2.808e-01,13 step(s)
+m7_mover,backward_closure,6.202e-16,1.000e-10,relative to destination inflow (absolute in m³/d below 1 m³/d),26,ok,1.580e-01,"2 step(s), package network"
+m7_mover,forward_closure,3.411e-16,1.000e-10,relative to source inflow (absolute in m³/d below 1 m³/d),26,ok,1.580e-01,"2 step(s), package network"
+m7_mover,duality,1.494e-15,1.000e-10,relative to forward source-to-destination flow (absolute in m³/d below 1 m³/d),338,ok,1.580e-01,"2 step(s), package network"
+m7_mover,boundary_control,1.110e-15,1.000e-12,absolute (fraction),1228,ok,1.580e-01,"2 step(s), package network"
+m8_maw,backward_closure,7.525e-16,1.000e-10,relative to destination inflow (absolute in m³/d below 1 m³/d),6,ok,5.177e-02,"1 step(s), package network"
+m8_maw,forward_closure,1.318e-16,1.000e-10,relative to source inflow (absolute in m³/d below 1 m³/d),6,ok,5.177e-02,"1 step(s), package network"
+m8_maw,duality,4.836e-16,1.000e-10,relative to forward source-to-destination flow (absolute in m³/d below 1 m³/d),36,ok,5.177e-02,"1 step(s), package network"
+m8_maw,boundary_control,8.882e-16,1.000e-12,absolute (fraction),1126,ok,5.177e-02,"1 step(s), package network"
+m9_lak_uzf,backward_closure,4.441e-16,1.000e-10,relative to destination inflow (absolute in m³/d below 1 m³/d),60,ok,2.080e-01,"3 step(s), package network"
+m9_lak_uzf,forward_closure,3.158e-16,1.000e-10,relative to source inflow (absolute in m³/d below 1 m³/d),60,ok,2.080e-01,"3 step(s), package network"
+m9_lak_uzf,duality,6.427e-16,1.000e-10,relative to forward source-to-destination flow (absolute in m³/d below 1 m³/d),1200,ok,2.080e-01,"3 step(s), package network"
+m9_lak_uzf,boundary_control,1.110e-15,1.000e-12,absolute (fraction),3411,ok,2.080e-01,"3 step(s), package network"
+m4_disu_vert,dis_vs_disu,0.000e+00,1.000e-12,relative to output maximum,60,ok,4.311e-03,vs model 1 (DIS)
+m4_disu_novert,dis_vs_disu,0.000e+00,1.000e-12,relative to output maximum,60,ok,1.513e-02,vs model 1 (DIS)
+m1_dis,split_vs_single,7.433e-10,1.000e-08,relative to output maximum,128,ok,1.223e-01,"3 models, 1 step(s)"
+m3_disv,split_vs_single,1.440e-10,1.000e-08,relative to output maximum,128,ok,4.881e-01,"2 models, 1 step(s)"
+m6_transient,split_vs_single,1.465e-12,1.000e-08,relative to output maximum,772,ok,4.512e-01,"4 models, 4 step(s)"
+m6_transient,tracking_vs_gwt,2.220e-15,1.000e-08,absolute (fraction),5,ok,4.706e-01,5 tagging cases
+m7_mover,tracking_vs_gwt,1.018e-14,1.000e-08,absolute (fraction),2,ok,1.152e-01,SFR nodes + MVR vs SFT + MVT
+m1_dis,prt_capture,5.111e-04,1.000e-02,relative to destination inflow,6128,ok,3.456e-01,800.4 of 800.0 m3/d
+m3_disv,prt_capture,4.846e-04,1.000e-02,relative to destination inflow,8032,ok,8.259e-01,800.4 of 800.0 m3/d
+m2_dis3lay,prt_capture,5.944e-03,2.000e-02,relative to destination inflow,15912,ok,1.148e+00,402.6 of 405.0 m3/d
+m6_transient,tracking_duality,5.929e-16,1.000e-10,relative to forward source-to-destination volume (absolute when zero),24,ok,1.638e-01,"13 steps, both volume options, 1 and 5 transport sub-steps"
+m6_split,tracking_duality,4.464e-16,1.000e-10,relative to forward source-to-destination volume (absolute when zero),12,ok,1.192e-01,"13 steps, both volume options"
+m7_mover,tracking_duality,4.652e-16,1.000e-10,relative to forward source-to-destination volume (absolute when zero),12,ok,1.775e-02,"2 steps, both volume options"
+m9_lak_uzf,tracking_duality,7.669e-16,1.000e-10,relative to forward source-to-destination volume (absolute when zero),16,ok,3.931e-02,"3 steps, both volume options"
+m6_transient,water_balance,6.929e-17,1.000e-10,relative to the cell's water volume,13,ok,6.277e-02,13 steps
+m6_transient,tagged_balance,1.032e-15,1.000e-10,relative to largest term of the tagged-water balance,3,ok,6.277e-02,"13 steps, 3 tagged groups incl. initial water"
+m9_lak_uzf,water_balance,9.474e-17,1.000e-10,relative to the cell's water volume,3,ok,5.393e-02,3 steps
+m9_lak_uzf,tagged_balance,1.786e-16,1.000e-10,relative to largest term of the tagged-water balance,4,ok,5.393e-02,"3 steps, 4 tagged groups incl. initial water"
+m10_constant,steady_limit_g,9.695e-14,1.000e-11,absolute (fraction),4,ok,3.221e-01,121 steps; c vs G at the end (at the start: at least 0.40); flow model solved 100 times tighter: 1.2e-14
+m10_constant,steady_limit_f,6.800e-10,1.000e-08,absolute (fraction),4,ok,3.221e-01,121 steps; w vs F at the start (at the end: at least 0.52); flow model solved 100 times tighter: 1.4e-11
+substep_network,substeps,1.630e-16,1.000e-12,relative to output maximum,15,ok,1.350e-02,"3 sub-steps vs 3x flow steps, 15 outputs"
+m1_dis,steady_g_vs_gwt,1.417e-11,1.000e-10,absolute (fraction),2,ok,7.830e-02,m1_rch 5.7e-12; m1_riv 1.4e-11
+m2_dis3lay,steady_g_vs_gwt,2.764e-11,1.000e-10,absolute (fraction),2,ok,1.011e-01,m2_rch 2.8e-11; m2_chd 1.1e-11
+m7_mover,steady_g_vs_gwt,1.031e-08,1.000e-07,absolute (fraction),4,ok,1.568e+00,cells and reaches; flow model solved about 100 times tighter: 2.5e-11

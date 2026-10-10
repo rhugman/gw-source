@@ -337,15 +337,14 @@ def draw_tracking_cells(ax, x0: float = 6.4, y: float = 1.9, size: float = 1.0,
     time_y = y - h - 0.12
     arrow(ax, (xa - h, time_y), (xc + h + 0.6, time_y), MUTED, width=0.6)
     ax.text(xc + h + 0.65, time_y, "time", ha="left", va="center", fontsize=7, color=MUTED)
-    high = y + 0.36
-    arrow(ax, (xb - h - 0.75, high), (xb - h, high))
-    ax.text(xb - h - 0.38, high + 0.08, "$q_{ji}\\, c_j^{n+1}$", ha="center", va="bottom",
-            fontsize=7)
+    high = y + 0.4
+    arrow(ax, (xb - h - 0.55, high), (xb - h, high))
+    ax.text(xb - h - 0.6, high, "$q_{ji}\\, c_j^{n+1}$", ha="right", va="center", fontsize=7)
     arrow(ax, (xb + h, high), (xb + h + 0.85, high))
     ax.text(xb + h + 0.5, high + 0.08, "$q_{ik}\\, c_i^{n+1}$", ha="center", va="bottom",
             fontsize=7)
     arrow(ax, (xb - 0.25, y + h + 0.6), (xb - 0.25, y + h), blue, width=1.4)
-    ax.text(xb - 0.37, y + h + 0.42, "tagged source $s_i$\n(recharge)", ha="right",
+    ax.text(xb - 0.45, y + h + 0.42, "tagged source $s_i$\n(recharge)", ha="right",
             va="center", fontsize=7, color=blue)
     arrow(ax, (xb + 0.25, y + h), (xb + 0.25, y + h + 0.6), red, width=1.4)
     ax.text(xb + 0.37, y + h + 0.35, "well", ha="left", va="center", fontsize=7, color=red)
@@ -465,10 +464,15 @@ def draw_errors(ax, table: pd.DataFrame, rows: dict, labels: dict) -> list:
     return handles
 
 
-def axis_break(ax, x: float = 1e-17) -> None:
-    """Mark the break in the x axis between the 'exact' slot and the first decade."""
+def axis_break(ax, x: float = 1.7e-17) -> None:
+    """Mark the break in the x axis between the 'exact' slot and the first decade.
+
+    x sits halfway (on the log axis) between the grey 'exact' band and 1e-16; the white box
+    behind the mark is kept small so it cuts the axis line but not the band.
+    """
     ax.text(x, 0.0, "//", transform=ax.get_xaxis_transform(), ha="center", va="center",
-            fontsize=7, color=MUTED, backgroundcolor="white", zorder=5, clip_on=False)
+            fontsize=7, color=MUTED, zorder=5, clip_on=False,
+            bbox={"facecolor": "white", "edgecolor": "none", "pad": 0.3})
 
 
 def make_fig2(out_dir: Path, table: pd.DataFrame, model_labels: dict,

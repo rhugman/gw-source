@@ -19,9 +19,6 @@ Checks and error measures (one row per model and check in the CSV):
   against the single model, every output and travel time; same measure as above, largest over
   outputs (and the four transient steps of model 6). Tolerance 1e-8 (the two runs agree only to
   the MF6 solver tolerance; tests/test_multimodel.py).
-- tracking_vs_gwt: transient tracking (volume_mode "gwt") against MF6 GWT unit concentrations;
-  max |c - C| over all steps and active cells (and SFR reaches on model 7), largest over the
-  tagging cases of tests/test_tracking_mf6.py. Tolerance 1e-8.
 - prt_capture: captured flow-weighted PRT particle flow against the destination inflow,
   |captured / inflow - 1|. Tolerance 0.01 (models 1, 3) and 0.02 (model 2), as in tests/test_prt.py;
   the error is quadrature (release points), not round-off.
@@ -37,10 +34,11 @@ Checks and error measures (one row per model and check in the CSV):
 
 Transient tracking checks (tests/test_tracking_mf6.py, tests/test_tracking.py). The collectors
 call the tests' own helpers, which assert the test tolerances, and record() refuses an "ok"
-row whose error exceeds its tolerance:
+row whose error is not finite or exceeds its tolerance:
 
-- tracking_vs_gwt (above).
-
+- tracking_vs_gwt: transient tracking (volume_mode "gwt") against MF6 GWT unit concentrations;
+  max |c - C| over all steps and active cells (and SFR reaches on model 7), largest over the
+  tagging cases of tests/test_tracking_mf6.py. Tolerance 1e-8.
 - tracking_duality: forward tracking against backward tracking in time, |tagged outflow
   forward - adjoint inner product| / forward outflow, the largest over both volume options, all
   source (and initial-water) and destination pairs, on models 6 (1 and 5 transport sub-steps),
@@ -54,7 +52,7 @@ row whose error exceeds its tolerance:
   balance term. Tolerance 1e-10.
 - steady_limit_g, steady_limit_f: model 10 (model 1's flows held 4e5 d in 120 equal steps);
   max |c - G| at the end and max |w - F| at the start over active cells and groups. Tolerances
-  1e-11 and 1e-8.
+  1e-11 and 1e-8. The note gives the value with the flow model solved 100 times tighter.
 - substeps: m = 3 transport sub-steps against a flow model with 3 times more steps of the same
   flows (hand-built 15-cell network with flow loops and no storage, not an MF6 model, 6
   steps); every fraction, outflow and volume, max |a - b| / max |b| per output. The test
@@ -196,9 +194,10 @@ class ModelCache:
 
 def record(model: str, check: str, error: float, n: int, seconds: float, tol=None,
            status: str = "ok", note: str = "") -> dict:
-    """Return one row of the verification table; an "ok" row must be within its tolerance."""
+    """Return one row of the verification table; an "ok" row must be finite and within tolerance."""
     tol = TOLERANCES.get(check) if tol is None else tol
-    assert not (status == "ok" and error > tol), f"{model} {check}: {error:.2e} > {tol:.0e}"
+    if status == "ok":
+        assert np.isfinite(error) and error <= tol, f"{model} {check}: {error:.2e} > {tol:.0e}"
     return {"model": model, "check": check, "error": error, "tolerance": tol,
             "measure": MEASURES[check], "n_compared": n, "status": status, "seconds": seconds,
             "note": note}
@@ -450,21 +449,34 @@ def balance_rows(cache: ModelCache) -> list[dict]:
 
 
 def steady_limit_rows(cache: ModelCache) -> list[dict]:
-    """Return model 10's steady-limit rows: c at the end against G, w at the start against F."""
+    """Return model 10's steady-limit rows: c at the end against G, w at the start against F.
+
+    Model 10 is also built with the flow model solved 100 times tighter (TIGHT_FLOW_IMS); the
+    notes give its errors, which show what limits the default ones.
+    """
+    from models.structured import build_constant_flow_dis
+    from test_gwt_equilibrium import TIGHT_FLOW_IMS
     from test_tracking_mf6 import steady_limit_errors
 
     start = time.perf_counter()
     reader = gs.open_model(cache.get("m10_constant").ws)
     errors = steady_limit_errors(reader)
     seconds = time.perf_counter() - start
+    ws = cache.work / "m10_tight"
+    ws.mkdir(parents=True, exist_ok=True)
+    tight_run = build_constant_flow_dis(ws, cache.exes.mf6, ims_kwargs=TIGHT_FLOW_IMS)
+    tight = steady_limit_errors(gs.open_model(tight_run.ws))
+    assert tight["g_end"] < errors["g_end"] and tight["f_start"] < errors["f_start"], tight
     n, groups = len(reader.steps), errors["n_groups"]
     return [
         record("m10_constant", "steady_limit_g", errors["g_end"], groups, seconds,
                note=f"{n} steps; c vs G at the end (at the start: at least "
-                    f"{errors['g_start']:.2f})"),
+                    f"{errors['g_start']:.2f}); flow model solved 100 times tighter: "
+                    f"{tight['g_end']:.1e}"),
         record("m10_constant", "steady_limit_f", errors["f_start"], groups, seconds,
                note=f"{n} steps; w vs F at the start (at the end: at least "
-                    f"{errors['f_end']:.2f})"),
+                    f"{errors['f_end']:.2f}); flow model solved 100 times tighter: "
+                    f"{tight['f_start']:.1e}"),
     ]
 
 
