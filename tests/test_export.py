@@ -59,6 +59,24 @@ def test_netcdf_forward_result(model_run, tmp_path):
             ds["source_fraction"].sel(group="rch").values, to_grid(step, res.source_fraction["rch"])
         )
         assert float(ds["source_inflow"].sel(group="rch")) == res.source_inflow["rch"]
+        assert ds["source_inflow"].attrs["long_name"].startswith("water entering through")
+        assert "source_throughflow" not in ds
+
+
+def test_dataset_net_inflow_and_throughflow(model_run):
+    """Net results export the inflow under a net label and the throughflow sum beside it."""
+    step = gs.read_step(model_run("m1_dis").ws)
+    groups = {"wel": gs.select(step, package="WEL")}
+    net = gs.TraceConfig(accounting="net")
+    back, fwd = gs.backward(step, groups, net), gs.forward(step, groups, net)
+    results = {"destination": back, "source": fwd}
+    for prefix, res in results.items():
+        ds = gs.export.to_dataset(step, res)
+        inflow = getattr(res, f"{prefix}_inflow")["wel"]
+        throughflow = getattr(res, f"{prefix}_throughflow")["wel"]
+        assert float(ds[f"{prefix}_inflow"].sel(group="wel")) == inflow
+        assert float(ds[f"{prefix}_throughflow"].sel(group="wel")) == throughflow
+        assert "each passage counted once" in ds[f"{prefix}_inflow"].attrs["long_name"]
 
 
 @pytest.mark.parametrize("key", ["m1_dis", "m2_dis3lay", "m3_disv", "m4_disu_vert"])

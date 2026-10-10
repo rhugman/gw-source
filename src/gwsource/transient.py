@@ -111,7 +111,8 @@ class TransientResult:
     """Statistics over time steps: stats[statistic][output][group] -> per-cell array.
 
     steps, totim and weights describe the analysed steps in order; group_inflow[group] holds,
-    per step, the group's destination inflow (backward) or source inflow (forward). series
+    per step, the group's destination inflow (backward) or source inflow (forward); in net
+    accounting that counts each passage into (out of) the group once (gwsource.metrics). series
     (keep_series=True) holds series[output][group] -> (n_steps, n_cells).
     """
 
@@ -239,7 +240,7 @@ def _output_values(results: tuple, output: str) -> dict[str, np.ndarray]:
 
 
 def _inflow(result, mode: str) -> dict[str, float]:
-    """Return each group's destination (backward) or source (forward) inflow."""
+    """Return each group's destination (backward) or source (forward) inflow (gwsource.metrics)."""
     return result.destination_inflow if mode == "backward" else result.source_inflow
 
 

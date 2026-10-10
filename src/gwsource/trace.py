@@ -1,5 +1,7 @@
 """Public entry points: backward (capture) and forward (fate) tracing of one FlowStep."""
 
+from dataclasses import dataclass
+
 import numpy as np
 
 from .assemble import (
@@ -11,6 +13,7 @@ from .assemble import (
     gross_forward_system,
     group_term_flows,
     net_balance,
+    net_double_count,
     net_system,
 )
 from .config import TraceConfig
@@ -137,23 +140,55 @@ def _net_edges(
     return edges.subset(keep)
 
 
+@dataclass
+class NetSolution:
+    """Net-mode fractions and per-cell s and T (cells, groups), the edges used per group."""
+
+    fraction: np.ndarray
+    s: np.ndarray
+    throughflow: np.ndarray
+    used: list[Edges]
+    solvers: list[str]
+    loops: list[np.ndarray]
+
+
 def _net_solve(
     step: FlowStep, groups: dict, edges: Edges, config: TraceConfig, backward: bool
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[str], list[np.ndarray]]:
-    """Solve net mode group by group; return (fractions, s, T, solvers, closed loops)."""
+) -> NetSolution:
+    """Solve net mode group by group."""
     n, n_groups = step.n_cells, len(groups)
     fraction, s_all, t_all = (np.zeros((n, n_groups)) for _ in range(3))
-    solvers, closed = [], np.zeros(n, dtype=bool)
+    used_all, solvers, closed = [], [], np.zeros(n, dtype=bool)
     for g, sel in enumerate(groups.values()):
         used = _net_edges(n, edges, sel.cells, backward, config.remove_cycles)
         s, throughflow = net_balance(n, used)
         matrix, rhs = net_system(n, used, sel.cells, throughflow, backward)
         fraction[:, g], factor, loops = _solve(matrix, rhs, config)
         s_all[:, g], t_all[:, g] = s, throughflow
+        used_all.append(used)
         solvers.append(factor.kind)
         for cells in loops:
             closed[cells] = True
-    return fraction, s_all, t_all, solvers, _loops_from_mask(n, edges, closed)
+    loops = _loops_from_mask(n, edges, closed)
+    return NetSolution(fraction, s_all, t_all, used_all, solvers, loops)
+
+
+def _net_group_inflow(
+    used: list[Edges],
+    cells: np.ndarray,
+    fraction: np.ndarray,
+    throughflow: np.ndarray,
+    backward: bool,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return per group (inflow with each passage counted once, the fixed cells' T sum)."""
+    t_sum = (throughflow * cells).sum(axis=0)
+    double = np.array(
+        [
+            net_double_count(used[g], cells[:, g], fraction[:, g], backward)
+            for g in range(cells.shape[1])
+        ]
+    )
+    return t_sum - double[:, 0] - double[:, 1], t_sum
 
 
 def _loops_from_mask(n: int, edges: Edges, closed: np.ndarray) -> list[np.ndarray]:
@@ -167,32 +202,38 @@ def _loops_from_mask(n: int, edges: Edges, closed: np.ndarray) -> list[np.ndarra
 def _net_backward(
     step: FlowStep, groups: dict, edges: Edges, config: TraceConfig
 ) -> BackwardResult:
-    """Net-mode backward trace (reference method): destination cells absorbing with f = 1."""
-    fraction, s, throughflow, solvers, loops = _net_solve(
-        step, groups, edges, config, backward=True
-    )
+    """Net-mode backward trace (reference method): destination cells absorbing with f = 1.
+
+    destination_inflow is the destination cells' throughflow sum less the water it counts twice
+    (net_double_count); destination_throughflow keeps the throughflow sum.
+    """
+    sol = _net_solve(step, groups, edges, config, backward=True)
     cells = np.column_stack([sel.cells for sel in groups.values()])
-    destination = (throughflow * cells).sum(axis=0)
+    inflow, t_sum = _net_group_inflow(sol.used, cells, sol.fraction, sol.throughflow, True)
     result = backward_metrics(
-        step, groups, fraction, throughflow, np.maximum(s, 0.0), {}, destination, "net"
+        step, groups, sol.fraction, sol.throughflow, np.maximum(sol.s, 0.0), {}, inflow, "net"
     )
-    result.solver_used = solvers
-    result.closed_loops = loops
+    result.destination_throughflow = {g: float(v) for g, v in zip(groups, t_sum)}
+    result.solver_used = sol.solvers
+    result.closed_loops = sol.loops
     return result
 
 
 def _net_forward(
     step: FlowStep, groups: dict, edges: Edges, config: TraceConfig
 ) -> ForwardResult:
-    """Net-mode forward trace: source cells fixed at g = 1 on the reversed graph."""
-    fraction, s, throughflow, solvers, loops = _net_solve(
-        step, groups, edges, config, backward=False
-    )
+    """Net-mode forward trace: source cells fixed at g = 1 on the reversed graph.
+
+    source_inflow is the source cells' throughflow sum less the water it counts twice
+    (net_double_count); source_throughflow keeps the throughflow sum.
+    """
+    sol = _net_solve(step, groups, edges, config, backward=False)
     cells = np.column_stack([sel.cells for sel in groups.values()])
-    source = (throughflow * cells).sum(axis=0)
+    inflow, t_sum = _net_group_inflow(sol.used, cells, sol.fraction, sol.throughflow, False)
     result = forward_metrics(
-        step, groups, fraction, throughflow, np.maximum(-s, 0.0), {}, source, "net"
+        step, groups, sol.fraction, sol.throughflow, np.maximum(-sol.s, 0.0), {}, inflow, "net"
     )
-    result.solver_used = solvers
-    result.closed_loops = loops
+    result.source_throughflow = {g: float(v) for g, v in zip(groups, t_sum)}
+    result.solver_used = sol.solvers
+    result.closed_loops = sol.loops
     return result

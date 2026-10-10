@@ -15,14 +15,24 @@ Backward (capture) outputs per destination group g:
   reaches g; sums to 1 (later definition, Black, Foley & Witterick 2021).
 - flux_from: volume_from / cell plan area.
 - destination_inflow: water entering the destination: sum of |q| of the group's sink terms
-  (gross) or sum of the destination cells' throughflow T (net).
+  (gross) or the water reaching the destination cells with each passage counted once (net):
+  sum_D T_d - sum_{D->D} q - sum_{D->not D} q f_j, which equals the net volume from. For a single
+  destination cell that no water leaves and reaches again it is that cell's throughflow T. In net
+  accounting it depends on the solved fractions, not on the budget alone (gwsource.assemble).
+- destination_throughflow (net only, empty in gross): sum of the destination cells' throughflow
+  T. For a group of several cells it counts water passing between them more than once.
 
 Forward (fate) outputs per source group g:
 - source_fraction G: fraction of the water in the cell that came from g (dilution ratio C/C0).
 - volume_through: G x I (gross) or G x T (net).
 - volume_to: G x (sink terms of the cell) (gross) or G x max(-s, 0) (net).
 - volume_to_by_term: volume_to split by package (gross only).
-- source_inflow: sum of the group's source terms (gross) or of the source cells' T (net).
+- source_inflow: sum of the group's source terms (gross) or the water leaving the source cells
+  with each passage counted once (net): sum_S T_s - sum_{S->S} q - sum_{not S->S} q g_j, which
+  equals the net volume to. For a single source cell that no water leaves and comes back to it is
+  that cell's throughflow T. In net accounting it depends on the solved fractions.
+- source_throughflow (net only, empty in gross): sum of the source cells' throughflow T. For a
+  group of several cells it counts water passing between them more than once.
 
 Gross results also keep the factorised system matrix (factor; not picklable) so that the travel
 times of gwsource.traveltime reuse it.
@@ -52,6 +62,7 @@ class BackwardResult:
     flux_through: dict[str, np.ndarray] | None
     flux_from: dict[str, np.ndarray] | None
     destination_inflow: dict[str, float]
+    destination_throughflow: dict[str, float] = field(default_factory=dict)
     solver_used: list[str] = field(default_factory=list)
     cycles: list[Cycle] = field(default_factory=list)
     closed_loops: list[np.ndarray] = field(default_factory=list)
@@ -74,6 +85,7 @@ class ForwardResult:
     volume_to: dict[str, np.ndarray]
     volume_to_by_term: dict[str, dict[str, np.ndarray]]
     source_inflow: dict[str, float]
+    source_throughflow: dict[str, float] = field(default_factory=dict)
     solver_used: list[str] = field(default_factory=list)
     cycles: list[Cycle] = field(default_factory=list)
     closed_loops: list[np.ndarray] = field(default_factory=list)

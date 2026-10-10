@@ -79,6 +79,37 @@ The wells of the U cluster share cells and capture areas, and a published cell b
 
 Status 5 is therefore the normal capture outcome at a strong sink, not an abnormal stop: the 980 published cells are the 514 particles that end in strong-sink wells plus the 466 stopped in weak-sink wells. The PRT runs of Section 3 end every particle the same way, also with status 5. The split between status 2 and status 3 does show a convention of the published runs that the comparison inherits: a stream cell with an active cell above stops particles as a weak sink, while one without lets them pass and leave only through its top face.
 
+**Gross against net accounting.** `studies/neversink/net_and_envelope.py` traces the same flow field (streams as cells) with net accounting, the reference method's bookkeeping [FB13]: it uses only the intercell flows and fixes F = 1 in the destination cells, so a well is credited with all the water passing through its cell. The flow field has no cycles, so net accounting uses every connection; removing cycles, as the reference method does, would change nothing here. The gross and net closure identities hold to 1e-12 m³/d for the eight wells together (the script checks both to 1e-9 of the group's flow). In the same run, the net trace of the nine destination groups took 3.8 s and the gross trace 1.0 s (reading the budget excluded). The net attribution of a well is the source water that net accounting assigns to it (the volume traced from all sources).
+
+**Table 2a. Net attribution per well (gross attribution equals the pumping)**
+
+| well | pumping (m³/d) | well's share of its cell's outflow | net attribution (m³/d) | net / pumping |
+|---|---|---|---|---|
+| SV_193 | 63 | 1.00 | 63 | 1.00 |
+| SV_227 | 203 | 1.00 | 199 | 0.98 |
+| SV_407 | 94 | 0.91 | 103 | 1.10 |
+| SV_487 | 381 | 0.69 | 545 | 1.43 |
+| U_917 | 1,054 | 1.00 | 1,054 | 1.00 |
+| U__55 | 250 | 0.85 | 293 | 1.17 |
+| U___7 | 516 | 0.44 | 1,167 | 2.26 |
+| U___8 | 1,110 | 0.93 | 1,197 | 1.08 |
+| all eight | 3,671 | – | 3,944 | 1.07 |
+
+The difference is large only at wells that take a small share of their cell's outflow: U___7 (44 %) is credited with 2.26 times its pumping and SV_487 (69 %) with 1.43 times. Wells that take all of their cell's outflow get their pumping in both modes; SV_227 gets 0.98 of it because net accounting leaves out the 3.7 m³/d of recharge entering its own cell. For the eight wells together the net attribution is 3,944 m³/d, 7 % more than the pumping, against 6.7 times for the weak-sink well of tutorial 02. The single-well values add up to 4,621 m³/d; the group total is lower because 608 m³/d passes from U___7's cell directly into U___8's and 70 m³/d leaves a well cell and reaches the group again, and a sum over single wells counts both twice. By cell class (`net_vs_gross_cell_classes.csv`), the 272 m³/d that net accounting adds is +111 m³/d from cells with an SFR term (stream leakage and recharge there together), +168 m³/d from cells whose only source is recharge, and −6 m³/d of recharge in the well cells themselves, which net accounting leaves out. F differs between the modes locally only in the well cells and in cells with both source and sink terms (1,305 reached SFR cells, where net F is on average 1.03 times gross F for the same F downstream). Elsewhere the change is inherited: upstream of a weak-sink well, F rises because the well cell has F = 1 instead of the well's share.
+
+**Table 2b. Gross and net accounting against the published cells (980)**
+
+| measure | gross | net |
+|---|---|---|
+| sum of F over start cells | 910 | 978 |
+| cells with F > 0.1 | 2,139 | 2,470 |
+| Jaccard index, F > 0.1 | 0.30 | 0.28 |
+| cells with F > 0.5 | 445 | 478 |
+| Jaccard index, F > 0.5 | 0.41 | 0.44 |
+| Jaccard index, same number of cells | 0.41 | 0.40 |
+
+Net accounting brings the sum of F close to the published count (978 against 980) and raises the Jaccard index at F > 0.5 from 0.41 to 0.44; at F > 0.1 it is about the same. This does not hold per well. At the three strong-sink wells both modes give about 410 cells against 514 published. At the five weak-sink wells gross accounting gives 502 and net accounting more than the published 466: 690 as a sum of single-well traces, which credit the 608 m³/d passing from U___7's cell into U___8's to both wells. The largest departures are U___7 (94 to 214, published 58) and U___8 (229 to 249, published 163). SV_487 (65 to 94, published 97) and U__55 (81 to 97, published 116) move towards the published counts. The close group total is therefore partly differences of both signs cancelling: an excess at weak-sink wells under net accounting against a shortfall at strong-sink wells that both modes share. One reading is that the stopping rule acts like net accounting at the wells: a particle that enters a weak-sink well cell is credited to the well, so all water reaching that cell counts (the 466 particles above). The per-well counts do not support this, since gross accounting is closer at the weak-sink wells, and we have not tested it further.
+
 ## 3. Results: particle tracking on the same flow field
 
 **Table 3. Agreement with the published cells (Jaccard, priority wells)**
@@ -91,7 +122,7 @@ Status 5 is therefore the normal capture outcome at a strong sink, not an abnorm
 | PRT, released at the water table, thinned, P > 0.5 | 0.39 | 592 | 2,413 |
 | PRT, released mid-cell, thinned, P > 0.5 | 0.62 | 781 | 3,722 |
 
-P is the flow-weighted share of the water released in a cell that reaches the wells, evaluated at the published start cells (uppermost active layer). "Plain" means no weak-sink thinning. Particles were released from every source term (flux-weighted) of the 30,180 cells with F > 0 that have one, in all layers, with one plan sub-division per cell (4 points), at four heights through the saturated thickness ("spread over the cell volume", 488,448 particles) or at one (122,112). Together these cells receive 90,349 m³/d. The captured flow is the PRT total, to be compared with the inflow of the wells, 3,671 m³/d.
+P is the flow-weighted share of the water released in a cell that reaches the wells, evaluated at the published start cells (uppermost active layer). "Plain" means no weak-sink thinning. Particles were released from every source term (flux-weighted) of the 30,180 cells with F > 1e-6 that have one, in all layers, with one plan sub-division per cell (4 points), at four heights through the saturated thickness ("spread over the cell volume", 488,448 particles) or at one (122,112). Together these cells receive 90,349 m³/d. The captured flow is the PRT total, to be compared with the inflow of the wells, 3,671 m³/d.
 
 - With the points spread over the cell volume and thinning, the particles capture 3,736 m³/d, 1.8 % more than enters the wells, and each well gets within 11 % of its rate (SV_227 180 of 203 m³/d, U___8 1,171 of 1,110, the others closer). That is the agreement the duality of the gross method leads one to expect: the totals match and the paths differ. The excess is not systematic. Over five seeding layouts (122,112 to 488,448 particles) the total lay between 0.0 % and +1.8 % above the well inflow, without a trend: it is the net of local errors of both signs in how cells pass particle weight on to their neighbours (1,200 to 1,900 m³/d in absolute terms). The constant thinning factor per cell accounts for less than 2 m³/d of it, and a thinning rule based on each particle's residence time in the cell gives totals within 0.6 %. The per-well errors shrink as release heights are added (root-mean-square error 18 % with one height, 6 % with four; SV_227 from −35 % to −11 %) but not with more plan points at one height. This was a one-off analysis; its scripts are not in the repository.
 - Plain particles over-count the wells' water by a factor of 2.6 (2.1 to 2.5 for single-height releases). They pass every weak sink other than the wells without losing weight, so water that streams and other sinks take on the way is counted as reaching the wells. Thinning corrects this.
@@ -149,7 +180,20 @@ With the SFR reaches as nodes of the graph (`package_nodes=("SFR",)` in `gwsourc
 ## 5. Interpretation and guidance
 
 - **The published mask is a convention.** It uses one particle at each cell centre and stops at every weak sink. It is a valid delineation, but at the scale of single cells it is not a reference that full mixing, or any other method, should reproduce exactly. On the same flow field, flux-weighted particles span 0.29 to 0.62 agreement with it, depending on weak-sink treatment and release depth, and full mixing (0.30 to 0.41) is inside that range. PRT reproduces it (0.998) only when the published conventions are copied: top-face recharge and stream flows where the top is open, stopping at weak sinks, and dry cells treated as inactive.
-- **Thresholds.** `docs/dispersion_study.md` Section 5 recommends F = 0.5 for an advective zone and F ≥ 0.1 as a conservative envelope. Here, the F > 0.5 zone (445 cells) is a core that lies almost entirely inside the published area (980 cells) and covers 43 % of it. The F > 0.1 zone (2,139 cells) is about twice the size of the published area and still misses 27 % of its cells, so it was not a conservative envelope at cell level, unlike in the dispersion study (one well, analytical or particle reference zone). The published area sits between the two. That guidance was derived against references that do not stop at weak sinks, and this case does not test it in that sense.
+- **Thresholds.** `docs/dispersion_study.md` Section 5 recommends F = 0.5 for an advective zone and F ≥ 0.1 as a conservative envelope. Here, the F > 0.5 zone (445 cells) is a core that lies almost entirely inside the published area (980 cells) and covers 43 % of it. The F > 0.1 zone (2,139 cells) is about twice the size of the published area and still misses 27 % of its cells, so it was not a conservative envelope at cell level, unlike in the dispersion study (one well, analytical or particle reference zone). The published area sits between the two. That guidance was derived against references that do not stop at weak sinks; the next item tests it, within two caveats, against such a reference on this model.
+- **Envelope against thinned particles.** The reference here is the thinned flux-weighted PRT run released over the cell volume (`prt_volume_thin1`, Table 3), with the zone P > 0.5, which is how the dispersion study defined its particle reference zone. Both are evaluated on the published start cells with strict thresholds (`net_and_envelope.py`, `envelope_prt.csv`).
+
+  **Table 3a. F zones against the thinned PRT zone P > 0.5 (691 start cells)**
+
+  | F zone | cells | share of the PRT zone covered | PRT cells missed | share of the F zone inside the PRT zone | Jaccard index |
+  |---|---|---|---|---|---|
+  | F > 0.1 | 2,139 | 87 % | 89 | 28 % | 0.27 |
+  | F > 0.5 | 445 | 59 % | 283 | 92 % | 0.56 |
+  | 691 cells with the largest F | 691 | 74 % | 179 | 74 % | 0.59 |
+
+  F > 0.1 covers 87 % of the PRT zone and misses 89 of its cells. 86 of them are in the NE region around the U cluster (85 % covered there, against 93 % in S and 99 % in W). The missed cells have a median F of 0.066, and 87 of them receive only recharge (the other two, in S, also stream leakage). Their source terms total 350 m³/d, 276 m³/d of it recharge and 74 m³/d stream leakage in the two S cells, and the particles deliver 227 m³/d of it to the wells, 6 % of the 3,736 m³/d they deliver in all (Table 3). F > 0.1 is therefore not a full envelope of the thinned-particle zone on Neversink. In the dispersion study F ≥ 0.1 missed at most 0.1 % of the reference zone, but as an area share on a fine raster and only where no method mixes at weak sinks. The F > 0.5 zone stays a core: 92 % of it lies inside the PRT zone. Against the wider zone P > 0.1 (1,392 cells), F > 0.1 covers 66 %.
+
+  Two caveats limit the test. PRT was seeded only from cells with F > 1e-6: 29,201 of the 50,703 start cells with F > 0 got particles, and the 21,307 with 0 < F ≤ 1e-6 and 195 without a source term got P = 0 (`envelope_prt_notes.csv`). The PRT zone can therefore lie only inside F's own support, but all 2,139 start cells with F > 0.1 were seeded. The 87 % coverage is therefore an upper bound: an unseeded cell that would have P > 0.5 would be one more missed cell. And the thinned particles lose weight at every weak sink by the full-mixing shares, so the reference shares full mixing at the sinks and is not an independent advective zone. The comparison measures only the spreading that full mixing adds between sinks.
 - **State the conventions.** Release depth and weak-sink treatment both change the agreement with the published mask substantially (Section 3). A comparison with it should state where particles start and what stops them.
 - **Streams.** With streams as cells, 43 % of the wells' water is attributed to stream leakage and the contributing area stops at the streams. Whether that is the intended reading depends on the question: it is correct for "which source package delivers the water", and incomplete for "where does the water come from".
 

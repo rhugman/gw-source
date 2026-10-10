@@ -15,6 +15,19 @@ Destination cells are absorbing (f = 1, their out-edges ignored); elsewhere
     f_i = sum_j q_ij f_j / T_i.
 Forward net mode is the same on the reversed graph with source cells fixed at g = 1.
 
+Net group inflow. Summing the row equations T_i f_i = sum_j q_ij f_j over the cells outside the
+destination group D gives, with s+ = max(s, 0),
+    sum_i f_i s+_i = sum_{d in D} T_d - sum_{D->D} q - sum_{D->not D} q_ij f_j
+and in forward mode, with S the source group and s- = max(-s, 0),
+    sum_i g_i s-_i = sum_{s in S} T_s - sum_{S->S} q - sum_{not S->S} q_ji g_j.
+The throughflow sum of the fixed cells counts twice the water passing from one fixed cell to
+another and the water that leaves the group and comes back (with share f_j or g_j). The net
+destination (source) inflow is the throughflow sum less these two terms (net_double_count), so
+it counts each passage once and equals the net volume from (to). It depends on the solved
+fractions just outside the group, not on the budget alone. With the solved fractions, volume
+from (to) minus the net inflow is exactly the sum of the un-normalised row residuals over the
+cells outside the group (gwsource.diagnostics).
+
 Matrices are written in "dependency" form: row i of (I - P) refers to the cells whose values
 cell i depends on (downstream cells in backward mode, upstream cells in forward mode).
 """
@@ -164,6 +177,18 @@ def net_system(
     row, col = (edges.src, edges.dst) if backward else (edges.dst, edges.src)
     matrix = system_matrix(n, row, col, edges.q, throughflow, fixed=fixed)
     return matrix, fixed.astype(float)
+
+
+def net_double_count(
+    edges: Edges, fixed: np.ndarray, fraction: np.ndarray, backward: bool = True
+) -> tuple[float, float]:
+    """Return the water the fixed cells' T sum counts twice: (inside, boundary x f) (module doc)."""
+    near, far = (edges.src, edges.dst) if backward else (edges.dst, edges.src)
+    inside = fixed[near] & fixed[far]
+    leaving = fixed[near] & ~fixed[far]
+    within = float(edges.q[inside].sum())
+    returning = float(np.sum(edges.q[leaving] * fraction[far[leaving]]))
+    return within, returning
 
 
 def absorbing_edges(edges: Edges, fixed: np.ndarray, backward: bool) -> Edges:
