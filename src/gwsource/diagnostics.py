@@ -12,6 +12,19 @@ source and sink totals, d the destination sink flows and b the selected source f
 So with the residual term the checks hold to round-off; without it they hold to within the
 model's budget error (|sum F r| <= sum |r|, since 0 <= F <= 1).
 
+Net accounting (the reference method [FB13]) uses intercell flows only: s_i = O^edges_i -
+I^edges_i, T_i = I^edges_i + max(s_i, 0), f = 1 in the destination cells D. Summing
+T_i f_i = sum_j q_ij f_j over the cells outside D gives, with no residual term,
+
+    net backward closure:  sum_i f_i max(s_i, 0) = sum_{d in D} T_d - sum_{D->D} q
+                                                   - sum_{D->not D} q_ij f_j
+
+The right side is the net destination inflow: the destination cells' throughflow less the water
+it counts twice, water that passes from one destination cell to another and water that leaves a
+destination cell and reaches the group again (gwsource.assemble.net_double_count).
+backward_closure checks it to round-off; the right side is computed from the edges and the left
+from the net sources, so the check tests the solve.
+
 Cycle report: cycle_report() lists every strongly connected set of the flow graph with the flow
 that goes round it (by cycle cancelling) and its share of the model throughflow; cycle_table()
 and cycle_ids() turn it into rows and a per-cell array for export.
@@ -69,14 +82,20 @@ def budget_error(step: FlowStep) -> dict[str, float]:
 
 
 def backward_closure(step: FlowStep, result: BackwardResult, group: str) -> Check:
-    """Return the closure check sum(volume from) - sum(F r) = destination inflow (gross only)."""
-    assert result.accounting == "gross", "closure identity is for gross accounting"
-    r = cell_residual(step)
-    f = result.fraction_through[group]
+    """Return the closure check sum(volume from) - sum(F r) = destination inflow.
+
+    Net accounting uses intercell flows only, so its residual term is zero and the check is
+    sum(volume from) = destination inflow (module docstring).
+    """
+    assert result.accounting in ("gross", "net"), f"unknown accounting {result.accounting}"
+    if result.accounting == "net":
+        residual_term = 0.0
+    else:
+        residual_term = float(np.dot(result.fraction_through[group], cell_residual(step)))
     return Check(
         lhs=float(result.volume_from[group].sum()),
         rhs=result.destination_inflow[group],
-        residual_term=float(np.dot(f, r)),
+        residual_term=residual_term,
     )
 
 

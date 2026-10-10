@@ -166,6 +166,22 @@ def net_system(
     return matrix, fixed.astype(float)
 
 
+def net_double_count(
+    edges: Edges, fixed: np.ndarray, fraction: np.ndarray
+) -> tuple[float, float]:
+    """Return the water the fixed cells' throughflow sum counts twice in net mode.
+
+    (sum_{D->D} q, sum_{D->not D} q f_j): water passing from one destination cell to another, and
+    water leaving a destination cell that reaches the group again (share f_j). The net destination
+    inflow sum_D T_d minus both equals sum_i f_i max(s_i, 0) (gwsource.diagnostics).
+    """
+    from_dest, to_dest = fixed[edges.src], fixed[edges.dst]
+    onward = from_dest & ~to_dest
+    dest_to_dest = float(edges.q[from_dest & to_dest].sum())
+    dest_onward = float(np.sum(edges.q[onward] * fraction[edges.dst[onward]]))
+    return dest_to_dest, dest_onward
+
+
 def absorbing_edges(edges: Edges, fixed: np.ndarray, backward: bool) -> Edges:
     """Return the edges left once the fixed cells absorb (backward: drop their out-edges)."""
     cut = fixed[edges.src] if backward else fixed[edges.dst]
