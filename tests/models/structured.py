@@ -112,14 +112,16 @@ def build_transient_dis(ws: Path, exe: Path, spec: BaseSpec | None = None) -> Mo
     return run_model(sim, gwf, name, ws, dis_filename, notes)
 
 
-CONSTANT_FLOW_PERIODS = ((1.0, 1, 1.0), (4.0e5, 30, 1.2))
+CONSTANT_FLOW_PERIODS = ((1.0, 1, 1.0), (4.0e5, 120, 1.0))
 
 
 def build_constant_flow_dis(ws: Path, exe: Path, spec: BaseSpec | None = None) -> ModelRun:
     """Model 10: model 1's steady flows held for a long time (many steps, no storage).
 
-    A short first period, then one long period of geometrically growing steps; every step has
-    the same flows, so transient tracking must converge to the steady snapshot fractions.
+    A short first period, then 4e5 days in 120 equal steps; every step has the same flows, so
+    transient tracking must converge to the steady snapshot fractions. Equal steps keep the
+    time-stepping tail small (with 30 steps growing by 1.2 the last steps leave errors of 1e-8
+    in c and 6e-7 in f).
     """
     spec = BaseSpec() if spec is None else spec
     name = "m10_constant"
