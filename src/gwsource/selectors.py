@@ -4,14 +4,20 @@ A Selection carries two masks:
 - ``terms``: which external term entries belong to the group. Gross accounting uses this. In
   backward mode only the selected entries that are sinks (negative flow) act as destinations;
   in forward mode only the selected entries that are sources (positive flow) act as sources.
-- ``cells``: which cells belong to the group. Net accounting uses this (destination or source
-  cells are fixed at fraction 1).
+- ``cells``: which cells belong to the group. Net accounting fixes these cells at fraction 1
+  when the group was selected by cells or zone (``cells_from_terms`` False).
 
 Selecting by cells therefore means "all external terms located in those cells" in gross mode,
 and "those cells" in net mode. Selecting by package, bound or boundname marks the cells that
-host the selected entries. A zone array selects the cells where zone == value (any grid type:
-the array may have the grid shape or one value per cell); combine it with package= to pick,
-for example, the recharge falling on one zone as a forward source.
+host the selected entries and sets ``cells_from_terms``: net accounting then fixes only the
+cells whose selected entries carry flow in the traced direction (sinks backward, sources
+forward; gwsource.trace.net_fixed_cells), so a well listed at zero rate, a drain above the
+water table or a losing river cell in a backward trace does not become a destination.
+
+A zone array selects the cells where zone == value (any grid type: the array may have the grid
+shape or one value per cell); combine it with package= to pick, for example, the recharge
+falling on one zone as a forward source. Zone and cells= selections keep their cells in net
+mode, as the reference method defines groups by cells.
 
 Boundnames need a FlowStep read with boundnames=True (they are not in the budget file). A
 boundname that is absent in a step (e.g. a well listed only in some stress periods) selects
@@ -36,10 +42,14 @@ from .flowstep import FlowStep
 
 @dataclass
 class Selection:
-    """Boolean masks over the external term entries and over the cells of a FlowStep."""
+    """Boolean masks over the external term entries and over the cells of a FlowStep.
+
+    cells_from_terms is True when cells were derived from the selected entries (no cells=).
+    """
 
     terms: np.ndarray
     cells: np.ndarray
+    cells_from_terms: bool = False
 
 
 def _package_mask(step: FlowStep, package: str | Iterable[str]) -> np.ndarray:
@@ -119,7 +129,7 @@ def select(
     if cells is None:
         cell_mask = np.zeros(step.n_cells, dtype=bool)
         cell_mask[step.term_cell[terms]] = True
-        return Selection(terms=terms, cells=cell_mask)
+        return Selection(terms=terms, cells=cell_mask, cells_from_terms=True)
     cell_mask = _cell_mask(step, cells)
     return Selection(terms=terms & cell_mask[step.term_cell], cells=cell_mask)
 

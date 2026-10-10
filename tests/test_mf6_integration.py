@@ -88,6 +88,32 @@ def test_weak_sink_gross_vs_net(model_run):
     assert np.all(gross.fraction_through["weak"] <= net.fraction_through["weak"] + 1e-12)
 
 
+def test_net_forward_recharge_skips_zero_flow_chd_cells(model_run):
+    """Model 2: recharge on the top CHD cells has zero flow, so the left inflow edge gets g = 0."""
+    run = model_run("m2_dis3lay")
+    step = gs.read_step(run.ws)
+    rch = gs.select(step, package="RCH")
+    assert np.sum(rch.terms & (step.term_flow == 0.0)) == 30
+    res = gs.forward(step, {"rch": rch}, gs.TraceConfig(accounting="net"))
+    g = res.source_fraction["rch"].reshape(3, 15, 25)
+    np.testing.assert_array_equal(g[0, :, 0], 0.0)
+    assert res.source_inflow["rch"] == pytest.approx(1159.728254, rel=1e-8)
+    assert res.source_fraction["rch"][run.notes["weak_well_node"]] == pytest.approx(
+        8.428851e-3, rel=1e-6
+    )
+
+
+def test_net_backward_river_skips_losing_cells(model_run):
+    """Model 1: losing river cells (RIV a source) are not destinations in a net backward trace."""
+    step = gs.read_step(model_run("m1_dis").ws)
+    riv = gs.select(step, package="RIV")
+    losing = step.term_cell[riv.terms & (step.term_flow > 0.0)]
+    assert len(losing) == 9
+    res = gs.backward(step, {"riv": riv}, gs.TraceConfig(accounting="net"))
+    assert np.all(res.fraction_through["riv"][losing] < 1.0)
+    assert res.destination_inflow["riv"] == pytest.approx(171.792432, rel=1e-8)
+
+
 def test_export_grid_and_npz(model_run, tmp_path):
     """Gridded outputs have NaN in inactive cells and round-trip through .npz."""
     step = gs.read_step(model_run("m1_dis").ws)
