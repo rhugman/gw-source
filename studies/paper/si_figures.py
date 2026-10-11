@@ -1,4 +1,4 @@
-"""Supporting-information figure S1 of the paper: gross against net accounting, and the F zones
+"""Supporting-information figure S2 of the paper: gross against net accounting, and the F zones
 against the PRT zone of weight-losing particles, Neversink calibrated model (streams as cells,
 the eight priority wells).
 
@@ -306,10 +306,10 @@ def map_title(letter: str, name: str, n: int) -> str:
     return f"({letter}) {name} wells: {n} cell{'s' if n != 1 else ''} missed"
 
 
-def make_figS1(fig_dir: Path, table: pd.DataFrame, codes: np.ndarray, p_zone: np.ndarray,
+def make_figS2(fig_dir: Path, table: pd.DataFrame, codes: np.ndarray, p_zone: np.ndarray,
                windows: dict, wells: dict, missed: pd.Series,
                cluster_region: dict = CLUSTER_REGION) -> Path:
-    """Fig. S1: (a) gross and net accounting per well; (b-d) F zones against the PRT zone."""
+    """Fig. S2: (a) gross and net accounting per well; (b-d) F zones against the PRT zone."""
     nfig.paper_style()
     fig = plt.figure(figsize=(nfig.DOUBLE, 5.0), layout="constrained")
     top, bottom = fig.subfigures(2, 1, height_ratios=(1.0, 1.12))
@@ -328,12 +328,12 @@ def make_figS1(fig_dir: Path, table: pd.DataFrame, codes: np.ndarray, p_zone: np
     handles, names = map_legend_handles()
     bottom.legend(handles, names, loc="outside lower center", ncol=4, handlelength=2.2,
                   columnspacing=1.2, handler_map={tuple: HandlerTuple(ndivide=None, pad=0.4)})
-    return nfig.save(fig, fig_dir, "figS1_net_and_envelope")
+    return nfig.save(fig, fig_dir, "figS2_net_and_envelope")
 
 
 def main(fig_dir: Path = FIG_DIR, out: Path = OUT, cluster_region: dict = CLUSTER_REGION,
          p_zone: float = P_ZONE) -> Path:
-    """Make Fig. S1 in fig_dir from the outputs in out; return the PNG path."""
+    """Make Fig. S2 in fig_dir from the outputs in out; return the PNG path."""
     idomain = wf.grid_idomain(out / "optimal")
     shape = idomain.shape[1:]
     wells = wf.PRIORITY_WELLS
@@ -347,7 +347,7 @@ def main(fig_dir: Path = FIG_DIR, out: Path = OUT, cluster_region: dict = CLUSTE
     windows = nfig.capture_windows(idomain, wells, nfig.published_mask(shape, out), out)
     for name, n in window_counts(code_grid, windows).items():
         assert n == missed[cluster_region[name]], f"{name}: {n} missed cells in the window"
-    return make_figS1(fig_dir, table, code_grid, np.nan_to_num(p_grid) > 0, windows, wells,
+    return make_figS2(fig_dir, table, code_grid, np.nan_to_num(p_grid) > 0, windows, wells,
                       missed, cluster_region)
 
 

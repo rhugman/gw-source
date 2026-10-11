@@ -168,7 +168,7 @@ What it demonstrates about the method, steady state only (the model is steady, N
 
 ## 6. Figures and tables
 
-Figures are numbered in the order of §5: method and verification (Figs 1–3), transient demonstration (Fig. 4), Neversink (Figs 5–10, previously 4–9).
+Figures are numbered in the order of §5: method and verification (Figs 1–3), transient demonstration (Fig. 4), Neversink (Figs 5–9, previously 4–8; the former Fig. 10 is now Fig. S3).
 
 | # | content | status | source |
 |---|---|---|---|
@@ -181,7 +181,7 @@ Figures are numbered in the order of §5: method and verification (Figs 1–3), 
 | Fig. 7 | Overlap with the published contributing cells by method and convention (full-mixing thresholds; PRT plain and weight-losing, release depth; PRT from MF6 default to published conventions) | made | `docs/paper/figures/fig7_agreement.png` / `.pdf`; code `studies/paper/neversink_figures.py` |
 | Fig. 8 | Published probability of contribution vs ensemble mean F (streams as cells, stream network) | made | `docs/paper/figures/fig8_probability_maps.png` / `.pdf`; code `studies/paper/neversink_figures.py` |
 | Fig. 9 | Area growth against pumping: published, full mixing, stream network, PRT with published conventions | made; SI candidate | `docs/paper/figures/fig9_area_growth.png` / `.pdf`; code `studies/paper/neversink_figures.py` |
-| Fig. 10 | Growth mechanism: stream share vs pumping, and area-growth excess vs stream-share drop across realisations (r = 0.94) | made; SI candidate | `docs/paper/figures/fig10_growth_mechanism.png` / `.pdf`; code `studies/paper/neversink_figures.py` |
+| Fig. S3 (formerly Fig. 10) | Growth mechanism: stream share vs pumping, and area-growth excess vs stream-share drop across realisations (r = 0.94) | made; in SI | `docs/paper/figures/figS3_growth_mechanism.png` / `.pdf`; code `studies/paper/neversink_figures.py` |
 | Table 1 | Comparison of the reference method, this formulation, GWT unit concentration [BED24, LAN22] and hydraulic mixing cells [PAR11]. Rows: what is solved and how, mixing in a cell, accounting at weak sinks, flow loops, outputs; transient: carried through storage?; backward in time?; destinations or sources per solve; built-in water-budget checks; grids and packages; open implementation. MODALL [POT08] in a footnote only. The [PAR11] column rests on its full text and describes [PAR11] itself, with later versions in a footnote; cells resting on an abstract are marked [check] | made | `docs/paper/figures/table1_methods.md` (caption, table, footnotes, sources per cell); PLAN §1 table; `references/SUMMARY.md` §2, §5; §7 item 10 |
 | Table 2 | Verification checks with tolerance and observed error, in two parts (steady and snapshot checks; transient tracking checks, as in Fig. 2) | made | `docs/paper/figures/verification_table.md` / `.csv`; code `studies/paper/verification.py` |
 | Table 3 | Calibrated model vs published cells (counts, overlap) | exists | NS Table 1 |
@@ -189,7 +189,8 @@ Figures are numbered in the order of §5: method and verification (Figs 1–3), 
 | Table 5 | Ensemble comparison | exists; SI candidate | NS Table 4 |
 | Table 6 | Median areas by scenario | exists; SI candidate | NS Table 5 |
 | Table 7 | One convention at a time: areas at base and maximum pumping | exists; SI candidate | NS Table 6 |
-| Fig. S1 | Gross vs net attribution per well (a); maps of the PRT-zone cells missed by F > 0.1 (b–d) | made | `docs/paper/figures/figS1_net_and_envelope` (branch paper-figs) |
+| Fig. S1 | Numerical dispersion maps (problems A and B, 50 m cells) and transport sub-steps (DS Figs 1, 3, 5 redrawn) | made | `docs/paper/figures/figS1_numerical_dispersion.png` / `.pdf`; code `studies/paper/si_dispersion_figure.py` |
+| Fig. S2 | Gross vs net attribution per well (a); maps of the PRT-zone cells missed by F > 0.1 (b–d) | made | `docs/paper/figures/figS2_net_and_envelope.png` / `.pdf`; code `studies/paper/si_figures.py` |
 | SI | Per-well table (NS Table 2); end states; PRT diagnosis; NS Table 7; gross vs net and envelope tables (NS Tables 2a–2b, 3a); dispersion maps and transient sub-steps (DS Figs 1, 3, 5) | exist | NS, DS |
 
 ## 7. Claims–evidence gaps (priority order)

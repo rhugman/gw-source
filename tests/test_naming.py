@@ -6,6 +6,7 @@ SKIP_DIRS = frozenset(
     {"references", "bin", ".claude", ".git", "__pycache__", ".pytest_cache", ".ruff_cache",
      ".ipynb_checkpoints", "_work", "output", "large_ws"}
 )  # source, vendored and generated (git-ignored) folders
+SKIP_PATHS = ("docs/paper/draft/",)  # the paper text names and cites the product, by the author's choice
 
 
 def forbidden_terms() -> tuple[str, ...]:
@@ -13,12 +14,15 @@ def forbidden_terms() -> tuple[str, ...]:
     return ("flow" + "source", "fs" + "20")
 
 
-def repo_files(root: Path, skip_dirs: frozenset[str] = SKIP_DIRS) -> list[Path]:
-    """Return every file under root outside the skipped directories and egg-info folders."""
+def repo_files(root: Path, skip_dirs: frozenset[str] = SKIP_DIRS,
+               skip_paths: tuple[str, ...] = SKIP_PATHS) -> list[Path]:
+    """Return every file under root outside the skipped directories, path prefixes and egg-info folders."""
     files = []
     for path in root.rglob("*"):
-        parts = path.relative_to(root).parts
-        if any(p in skip_dirs or p.endswith(".egg-info") for p in parts):
+        rel = path.relative_to(root)
+        if any(p in skip_dirs or p.endswith(".egg-info") for p in rel.parts):
+            continue
+        if rel.as_posix().startswith(skip_paths):
             continue
         if path.is_file():
             files.append(path)
@@ -38,7 +42,7 @@ def find_violations(root: Path) -> list[str]:
 
 
 def test_no_forbidden_name_in_repo():
-    """No file name or file content outside references/ uses the product name."""
+    """No file name or file content outside references/ and the paper draft uses the product name."""
     root = Path(__file__).resolve().parents[1]
     assert (root / "PLAN.md").is_file()
     violations = find_violations(root)

@@ -2,7 +2,7 @@
 
 ## {SI: per-well gross and net}
 
-**Table.** Contributing area of each priority well against its published contributing cells, under gross and net accounting (§2.3); calibrated Neversink model, streams as cells. Where two values are given, the first is gross accounting and the second net accounting.
+**Table.** Contributing area of each priority well against its published contributing cells, under gross and net accounting (Section 2.3); calibrated Neversink model, streams as cells. Where two values are given, the first is gross accounting and the second net accounting.
 
 | well | pumping (m³/d) | well's share of its cell's outflow | net attribution (m³/d) | published contributing cells | expected area (sum of F) | overlap, F > 0.1 | overlap, F > 0.5 | overlap, area-matched |
 |---|---|---|---|---|---|---|---|---|
@@ -47,7 +47,7 @@ At the weak-sink wells the published convention and full mixing part ways. The w
 
 ## {SI: diagnosis of the first PRT runs}
 
-The PRT comparison of §5.3 uses flow-weighted release and, unless stated, weight-losing particles. Plain particles lose weight only to the eight priority wells and pass every other sink with full weight, so water that streams and other sinks take on the way is counted as reaching the wells. Released over the cell volume they delivered 9,555 m³/d, 2.6 times the wells' inflow of 3,671 m³/d (2.1–2.5 times for releases at one height). Weight loss at the other sinks removes this excess. <!-- evidence: docs/neversink_study.md §3, Table 3; studies/neversink/output/prt_diagnosis.csv (captured_whole_path with thin_weak_sinks False: 9,554.6 volume, 7,684.8 water table, 9,181.7 mid-cell) -->
+The PRT comparison of Section 5.3 uses flow-weighted release and, unless stated, weight-losing particles. Plain particles lose weight only to the eight priority wells and pass every other sink with full weight, so water that streams and other sinks take on the way is counted as reaching the wells. Released over the cell volume they delivered 9,555 m³/d, 2.6 times the wells' inflow of 3,671 m³/d (2.1–2.5 times for releases at one height). Weight loss at the other sinks removes this excess. <!-- evidence: docs/neversink_study.md §3, Table 3; studies/neversink/output/prt_diagnosis.csv (captured_whole_path with thin_weak_sinks False: 9,554.6 volume, 7,684.8 water table, 9,181.7 mid-cell) -->
 
 An earlier version of our PRT helper gave the opposite error for weight-losing particles: it delivered only 53–82 % of the inflow. To find out why, PRT was run without a stop zone and both rules for crediting weight were evaluated on the same particle tracks (gate `diagnose_prt` of `studies/neversink/workflow.py`).
 
@@ -80,7 +80,7 @@ Two other explanations were ruled out. Every particle ended in a cell with no ex
 
 Expected area: the sum of the map over the start cells. Mean F is the full-mixing counterpart of the published probability. <!-- evidence: docs/neversink_study.md §6, Table 4; studies/neversink/output/ensemble/probability_comparison.csv (correlation 0.799, 0.760, 0.722; sum_ratio 0.905, 0.468, 1.508; jaccard_P>0.5 0.483, 0.479, 0.487) -->
 
-Mean F gives 90 % of the published expected area, close to the calibrated model's 910 against 980 cells (§5.2). With the stream network it gives 1.51 times the published expected area, because it includes the area upstream that feeds the losing reaches (§5.4). <!-- evidence: docs/neversink_study.md §6, text after Table 4 -->
+Mean F gives 90 % of the published expected area, close to the calibrated model's 910 against 980 cells (Section 5.2). With the stream network it gives 1.51 times the published expected area, because it includes the area upstream that feeds the losing reaches (Section 5.4). <!-- evidence: docs/neversink_study.md §6, text after Table 4 -->
 
 Across the 358 realisations the wells' inflow was 3,586–3,756 m³/d and the stream share 30–45 %. Each realisation took about 50 s for the MODFLOW 6 run and 9 s for its two traces (streams as cells and stream network), and closure held to 3 × 10⁻¹² m³/d in every one. <!-- evidence: docs/neversink_study.md §6, "Runs"; studies/neversink/output/ensemble/summary.csv -->
 
@@ -112,7 +112,7 @@ The maxrange scenario is reproduced in distribution only, because its rates are 
 
 ## {SI: one convention at a time}
 
-**Table.** Median contributing area at base, half and maximum pumping, 61 realisations (60 spread over the ensemble, and the calibrated model), changing one particle convention at a time. Particles start from the published starts, one per start cell, seeded where F > 0, since no other start has a flow path to the wells; these runs differ from the flow-weighted runs of §5.3, which release particles in cells with F > 10⁻⁶. <!-- evidence: docs/neversink_study.md §7, note to Table 6 ("seeded where F > 0"), and §3, note to Table 3 (cells with F > 1e-6); studies/neversink/growth_mechanisms.py docstring -->
+**Table.** Median contributing area at base, half and maximum pumping, 61 realisations (60 spread over the ensemble, and the calibrated model), changing one particle convention at a time. Particles start from the published starts, one per start cell, seeded where F > 0, since no other start has a flow path to the wells; these runs differ from the flow-weighted runs of Section 5.3, which release particles in cells with F > 10⁻⁶. <!-- evidence: docs/neversink_study.md §7, note to Table 6 ("seeded where F > 0"), and §3, note to Table 3 (cells with F > 1e-6); studies/neversink/growth_mechanisms.py docstring -->
 
 | area | base | half pumping | maximum pumping | growth, base to maximum |
 |---|---|---|---|---|
@@ -123,7 +123,7 @@ The maxrange scenario is reproduced in distribution only, because its rates are 
 | as above, but stopped at every weak sink (the published conventions) | 1,001 | 2,504 | 3,626 | 3.62 |
 | published Monte Carlo contributing areas (357 realisations) | 998 | 2,475 | 3,592 | 3.60 |
 
-Areas: sum of F, sum of the particle weight reaching the wells, or number of particles reaching the wells, in cells. Recharge and stream flows were put on the top face through IFLOWFACE (§3.2), which does not change the flows. <!-- evidence: docs/neversink_study.md §7, Table 6; studies/neversink/output/scenarios/mechanisms60/growth_decomposition.csv (variants f_start, r3_thinned, r2_thinned, r2_streams_thinned, r1, published; area_baserat, area_scenario, growth_of_medians for 0.5rat and maxrat) -->
+Areas: sum of F, sum of the particle weight reaching the wells, or number of particles reaching the wells, in cells. Recharge and stream flows were put on the top face through IFLOWFACE (Section 3.2), which does not change the flows. <!-- evidence: docs/neversink_study.md §7, Table 6; studies/neversink/output/scenarios/mechanisms60/growth_decomposition.csv (variants f_start, r3_thinned, r2_thinned, r2_streams_thinned, r1, published; area_baserat, area_scenario, growth_of_medians for 0.5rat and maxrat) -->
 
 With the published conventions, PRT reproduces the published growth: 3.62 against 3.60 from base to maximum pumping and 2.50 against 2.48 to half pumping. The medians of the per-realisation growth are 3.57 and 3.55. Paired with its own published area, the PRT area is within 1.4 % in every realisation and scenario, and its growth correlates with the published growth at r ≥ 0.999. <!-- evidence: docs/neversink_study.md §7; growth_decomposition.csv (r1: 2.501, 3.622; published: 2.480, 3.599; median_growth 3.570 and 3.552); studies/neversink/output/scenarios/mechanisms60/mask_matches.csv -->
 

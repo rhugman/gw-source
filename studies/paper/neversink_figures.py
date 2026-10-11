@@ -1,4 +1,5 @@
-"""Paper figures 5 to 10: the Neversink/Rondout case study, at Groundwater sizes.
+"""Paper figures 5 to 9 and supporting-information Fig. S3: the Neversink/Rondout case study,
+at Groundwater sizes.
 
 Every figure is drawn from existing outputs of the case study (studies/neversink/output, the
 USGS sparse checkout in studies/neversink/external; both git-ignored); nothing is rerun.
@@ -14,7 +15,7 @@ USGS sparse checkout in studies/neversink/external; both git-ignored); nothing i
 - Fig. 8, published probability against ensemble mean F (paper-size version of
   docs/figures/neversink_probability_maps.png).
 - Fig. 9, median contributing area against pumping, relative to base.
-- Fig. 10, growth mechanism: stream share of the wells' water against pumping, and, per
+- Fig. S3 (supporting information), growth mechanism: stream share of the wells' water against pumping, and, per
   realisation, the excess of area growth over pumping growth against the drop in stream share.
 
 Map conventions, colours and helpers follow studies/neversink/figures.py. Categorical colours
@@ -438,7 +439,7 @@ def capture_fields(idomain: np.ndarray, out: Path = OUT) -> dict:
 
 
 def capture_windows(idomain: np.ndarray, wells: dict, mask: np.ndarray, out: Path = OUT) -> dict:
-    """Return the map windows of Fig. 6, which Figs 8 and S1 reuse."""
+    """Return the map windows of Fig. 6, which Figs 8 and S2 reuse."""
     return map_windows(capture_fields(idomain, out), mask, wells)
 
 
@@ -670,7 +671,7 @@ def growth_chart(fig_dir: Path, table: pd.DataFrame) -> Path:
     return save(fig, fig_dir, "fig9_area_growth")
 
 
-# ---------------------------------------------------------------- Fig. 10: growth mechanism
+# ---------------------------------------------------------------- Fig. S3: growth mechanism
 
 
 def realisation_summary(
@@ -724,7 +725,7 @@ def excess_table(base: pd.DataFrame, top: pd.DataFrame) -> pd.DataFrame:
 
 
 def mechanism_chart(fig_dir: Path, bands: pd.DataFrame, excess: pd.DataFrame) -> Path:
-    """Fig. 10: (a) stream share against pumping; (b) area-growth excess against share drop."""
+    """Fig. S3: (a) stream share against pumping; (b) area-growth excess against share drop."""
     paper_style()
     fig, (ax_a, ax_b) = plt.subplots(1, 2, figsize=(DOUBLE, 2.7), constrained_layout=True)
     blue = COLORS["cells"]
@@ -778,7 +779,7 @@ def mechanism_chart(fig_dir: Path, bands: pd.DataFrame, excess: pd.DataFrame) ->
     ax_b.set_title("(b) per realisation, base to maximum pumping", loc="left")
     for ax in (ax_a, ax_b):
         ax.grid(True, color=GRID, lw=0.5)
-    return save(fig, fig_dir, "fig10_growth_mechanism")
+    return save(fig, fig_dir, "figS3_growth_mechanism")
 
 
 # ---------------------------------------------------------------- main
@@ -796,7 +797,7 @@ def main(
     fig7: bool = True,
     fig8: bool = True,
     fig9: bool = True,
-    fig10: bool = True,
+    figS3: bool = True,
     fig_dir: Path = FIG_DIR,
 ) -> list[Path]:
     """Make the selected figures in fig_dir; return the PNG paths."""
@@ -825,7 +826,7 @@ def main(
         paths.append(probability_maps(fig_dir, wells, windows))
     if fig9:
         paths.append(growth_chart(fig_dir, growth_table()))
-    if fig10:
+    if figS3:
         summaries = {q: realisation_summary(q) for q in FIXED_QRATS}
         excess = excess_table(summaries["baserat"], summaries["maxrat"])
         paths.append(mechanism_chart(fig_dir, share_bands(summaries), excess))

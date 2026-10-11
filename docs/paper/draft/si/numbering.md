@@ -64,9 +64,9 @@ The SI should be assembled in label order: Texts S1–S9, then Tables S1–S6, t
 ## Notes on labels
 
 - **Table S1** holds three tables under one heading: (a) largest error per check, (b) steady and snapshot checks per model, (c) transient tracking checks per model, with the description of the test models as its preamble. Label them Table S1a–c, or Tables S1–S3 if the journal wants one number per table; in that case every later Table label moves up by two.
-- **Figure S1** has no PNG in docs/paper/figures/. The item points to three figures of the dispersion study in docs/figures/: dispersion_analytic_maps.png, dispersion_model1_maps.png and dispersion_transient_substeps.png. They need to be combined into one SI figure (Figure S1a–c) or given three labels, and they need a caption. [check: figure assembly]
-- **Figure S2** is the PNG docs/paper/figures/figS1_net_and_envelope.png. Its file name and docs/paper/figures/README.md still call it Fig. S1; rename the file or the README entry to match.
-- **Figure S3** is the PNG docs/paper/figures/fig10_growth_mechanism.png (formerly Fig. 10 of the main text).
+- **Figure S1** is the PNG docs/paper/figures/figS1_numerical_dispersion.png (panels a–n), redrawn by studies/paper/si_dispersion_figure.py from the outputs behind DS Figs 1, 3 and 5; its caption is in si/C.md.
+- **Figure S2** is the PNG docs/paper/figures/figS2_net_and_envelope.png (formerly figS1_net_and_envelope.png).
+- **Figure S3** is the PNG docs/paper/figures/figS3_growth_mechanism.png (formerly Fig. 10 of the main text, fig10_growth_mechanism.png).
 - No heading holds both a table and a figure, so no label is split. Figures S2 and S3 each come with a paragraph of numbers behind the figure, which stays under the figure label.
 - **Texts S5, S6 and S8** each hold one short table inside the text (end states of the particles; PRT delivery by crediting rule; the calibrated-model growth table, NS Table 7). They stay unnumbered parts of their Text. If the journal wants every table numbered, label them Tables S7, S8 and S9 in that order.
 - brief.md §2 planned Tables S1–S6 and Texts S1–S5 in a different order; decisions_r1 item 5 replaces that plan with first-citation order, which this file follows.
