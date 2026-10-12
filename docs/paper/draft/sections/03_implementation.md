@@ -8,7 +8,7 @@ The code reads only MODFLOW 6 output (Langevin et al. 2017): the binary grid fil
 
 Destinations and sources are selected by package, boundname, cells or zone, per time step. Snapshots (Section 2.7) keep running statistics per cell (extremes, time-weighted means, threshold counts). <!-- src/gwsource/transient.py docstring (TransientConfig statistics) --> Results are written as NumPy (npz), netCDF or GeoPackage files, and ensembles are traced realisation by realisation, with per-cell statistics. Each flow step can be split into m equal transport sub-steps, with the flows held constant and the water volumes interpolated (Section 4.4).
 
-For MODFLOW 6 particle tracking (PRT; Langevin et al. 2026; MODFLOW 6 Development Team 2026), the code writes flow-weighted release points: particles start from every source term with a weight proportional to its flow, on the face given by IFLOWFACE (the cell face a boundary flow is assigned to) where the package sets it. Weight-losing particles lose weight to each sink they pass, in proportion to the sink's share of the cell's outflow: the particle analogue of gross accounting (Section 2.3).
+For MODFLOW 6 particle tracking (PRT; Langevin et al. 2026), the code writes flow-weighted release points: particles start from every source term with a weight proportional to its flow, on the face given by IFLOWFACE (the cell face a boundary flow is assigned to) where the package sets it. Weight-losing particles lose weight to each sink they pass, in proportion to the sink's share of the cell's outflow: the particle analogue of gross accounting (Section 2.3).
 
 ## 3.3 Cost
 

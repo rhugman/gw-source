@@ -14,7 +14,7 @@
 | Destinations or sources per run | One destination group (any number of cells) per calculation | Gross: all groups in one run; net: one group per run | One tagged source per GWT model; several models per simulation | All flow components together; not user-chosen terms |
 | Built-in water-budget checks | None described; flow loops reported (2013) | Closure, forward–backward, travel-time closure; more in transient tracking | Mass budget, a tagged-water balance; no source-to-destination check | Sum-of-fractions error; global volume error, gaining reaches only |
 | Grids and packages | Structured MODFLOW grids; method said to apply to unstructured grids (2013); package networks not documented | All MODFLOW 6 grid types, multi-model simulations, package networks | DIS, DISV, DISU; SFR, LAK, MAW, UZF and MVR transport | HydroGeoSphere stream cells; said to apply to other codes |
-| Open implementation | No: commercial; VB.NET source for academic use on request (2013) | Yes (`gwsource`, MIT) | Yes (MODFLOW 6, USGS) | Excel (Visual Basic) post-processor; availability not stated |
+| Open implementation | No; VB.NET source for academic use on request (2013) | Yes (`gwsource`, MIT) | Yes (MODFLOW 6, USGS) | Excel (Visual Basic) post-processor; availability not stated |
 
 ¹ Steady state is reached by running transient steps until concentrations stabilise (Langevin et al. 2022). In our test, one step with porosity 0 gave the steady G to 1 × 10⁻¹², an undocumented use. <!-- table1_methods.md footnote 2 and Sources, GWT 'Solved, how': 9.5 × 10⁻¹³ and 9.7 × 10⁻¹³ on test model 1 -->
 

@@ -42,9 +42,7 @@ Langevin, C.D., J.D. Hughes, A.M. Provost, M.J. Russcher, M.J. Reno, W.P. Bonell
 
 Leake, S.A., H.W. Reeves, and J.E. Dickinson. 2010. A new capture fraction method to map how pumpage affects surface water flow. *Ground Water* 48, no. 5: 690–700. https://doi.org/10.1111/j.1745-6584.2010.00701.x
 
-McLane, C.F., and L. Cecan. 2009. Comment on "MODALL: A practical tool for designing and optimizing capture systems," by S.T. Potter, E. Moreno-Barbero, and C.E. Divine. *Ground Water* 47, no. 2: 172–173. https://doi.org/10.1111/j.1745-6584.2008.00527_1.x <!-- checked against the article PDF (references/docs/): volume, issue, pages 172–173 and authors' affiliation; the PDF gives the first author as "Charles McLane", so the middle initial F is from earlier records only; DOI 00527_1.x confirmed on Crossref (2026-10-12); the 00527.x printed in the PDF footer is Potter et al.'s reply -->
-
-MODFLOW 6 Development Team. 2026. MODFLOW 6—Description of input and output, version 6.9 (development build). Reston, Virginia: USGS. https://github.com/MODFLOW-ORG/modflow6/tree/develop/doc/mf6io <!-- bibliography.md [MF6IO] (binary output section, doc/mf6io/framework/binaryoutput.tex, develop branch). Author and title from doc/mf6io/mf6io.tex (\theauthors, \reporttitle); that file sets \reportyear to 2017 and no report number, so the year here is that of the development build used. Cited at si/A.md:19, :31, :64, sections/03_implementation.md:11 and sections/09_availability.md:3 -->
+McLane, C., and L. Cecan. 2009. Comment on "MODALL: A practical tool for designing and optimizing capture systems," by S.T. Potter, E. Moreno-Barbero, and C.E. Divine. *Ground Water* 47, no. 2: 172–173. https://doi.org/10.1111/j.1745-6584.2008.00527_1.x <!-- checked against the article PDF (references/docs/): volume, issue, pages 172–173 and authors' affiliation; the PDF gives the first author as "Charles McLane", with no middle initial; DOI 00527_1.x confirmed on Crossref (2026-10-12); the 00527.x printed in the PDF footer is Potter et al.'s reply -->
 
 Neupauer, R.M., and J.L. Wilson. 1999. Adjoint method for obtaining backward-in-time location and travel time probabilities of a conservative groundwater contaminant. *Water Resources Research* 35, no. 11: 3389–3398. https://doi.org/10.1029/1999WR900190
 
@@ -78,10 +76,10 @@ White, J.T., R.J. Hunt, M.N. Fienen, and J.E. Doherty. 2020. Approaches to highl
 PROBLEMS FOUND WHILE COMPILING THE LIST
 
 1. Citations with no full entry in bibliography.md (36 entries above; 12 works are not in bibliography.md at all; round 4 removed the slide and poster entries Bedekar et al. 2023, Black et al. 2021 and Daley et al. 2022, reviews/sources_cleanup.md):
-   - No author or year in the text (round 2), now given one (round 3, reviews/checks_resolved.md): MODFLOW 6 input/output guide → MODFLOW 6 Development Team 2026; FloPy model splitter → Hughes et al. 2024, the paper the FloPy documentation cites, so no separate entry; USGS data release doi 10.5066/P9HWSOHP → Fienen and Corson-Dosch 2021.
+   - No author or year in the text (round 2), now given one (round 3, reviews/checks_resolved.md): MODFLOW 6 input/output guide → MODFLOW 6 Development Team 2026, later dropped by the author (2026-10-12); FloPy model splitter → Hughes et al. 2024, the paper the FloPy documentation cites, so no separate entry; USGS data release doi 10.5066/P9HWSOHP → Fienen and Corson-Dosch 2021.
    - Author–year in the text but details missing everywhere in the repository (round 2), completed from Crossref, DataCite and USGS pages (round 3): Hughes et al. 2024; Provost et al. 2017; White et al. 2020; Nogueira et al. 2022; Schilling et al. 2017 (since read in full).
    - Not in bibliography.md, entry completed from local text copies, brief.md or docs/dispersion_study.md: Bakker et al. 2016; Campana and Simpson 1984; Javandel and Tsang 1986; Partington et al. 2012; Partington et al. 2013; Rushton 2003; Tosco et al. 2010.
-   - MODFLOW 6 PRT has no USGS report of its own; it is now cited at sections/03_implementation.md:11 as the MODFLOW 6 software release (Langevin et al. 2026) and the input/output guide (MODFLOW 6 Development Team 2026).
+   - MODFLOW 6 PRT has no USGS report of its own; it is now cited at sections/03_implementation.md:11 as the MODFLOW 6 software release (Langevin et al. 2026).
    - Page ranges of Foley and Black 2013 and Black and Foley 2013 come from secondary citations (the second checked in Maurice et al. 2021); McLane and Cecan 2009 pages from Crossref, since checked against the article.
 
 2. Bracket keys still in the text: none. sections/, display/ and si/ hold no outline keys such as [FB13] or [PAR11]; the only bracketed items are the check markers listed in reviews/checks_resolved.md.
