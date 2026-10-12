@@ -6,13 +6,9 @@ Bakker, M., V. Post, C.D. Langevin, J.D. Hughes, J.T. White, J.J. Starn, and M.N
 
 Barlow, P.M., S.A. Leake, and M.N. Fienen. 2018. Capture versus capture zones: Clarifying terminology related to sources of water to wells. *Groundwater* 56, no. 5: 694–704. https://doi.org/10.1111/gwat.12661
 
-Bedekar, V., C. Neville, M.J. Tonkin, R.D. Bartlett, and P. Plato. 2023. A unit-concentration method to quantify source contribution. Slide presentation, 29th Annual Meeting of the California Water and Environmental Modeling Forum (CWEMF), Folsom, California, April 17, 2023. [check: URL of the slides, if public] <!-- not in bibliography.md; authors, title, place and date from the title slide, references/docs/text/2023_Bedekar_etal_CWEMF_unit_concentration_slides.txt; meeting name and number from the Sierra Nevada Alliance event listing of the CWEMF 2023 annual meeting (Folsom, April 17–19, 2023); no public copy of the slides found on cwemf.org -->
-
 Bedekar, V., C. Neville, M.J. Tonkin, R.D. Bartlett, and P. Plato. 2024. A unit-concentration method to quantify source contribution. *Groundwater* 62, no. 2: 303–309. https://doi.org/10.1111/gwat.13333
 
 Black, A., and C. Foley. 2013. FlowSource: A program to efficiently delineate volumetric capture areas, pathways and source areas in groundwater models. In *Proceedings of MODFLOW and More 2013: Translating Science into Practice*, Golden, Colorado, June 2–5, 2013, 652–663. Golden, Colorado: IGWMC, Colorado School of Mines. https://groundwater-science.co.uk/wp-content/uploads/2013_FSv6_ApplicationPaper.pdf <!-- pages from a secondary citation: the reference list of Maurice et al. (2021), checked in references/docs/text/2021_Maurice_etal_Chalk_karst_groundwater_protection.txt; the proceedings were not seen -->
-
-Black, A., C. Foley, and W. Witterick. 2021. Advances in capture zone delineation and visualisation: 'FlowSource20' for MODFLOW6. Slide presentation, 11 slides. Shrewsbury, UK: Groundwater Science Ltd. https://groundwater-science.co.uk/wp-content/uploads/2021_FS20.pdf <!-- the title slide gives no meeting ("Location: Digital Download"), references/docs/text/2021_Black_Foley_Witterick_FlowSource20_primer.txt; published on the Groundwater Science Ltd web site; Shrewsbury from the authors' address in the 2013 papers -->
 
 Campana, M.E., and E.S. Simpson. 1984. Groundwater residence times and recharge rates using a discrete-state compartment model and C-14 data. *Journal of Hydrology* 72, no. 1–2: 171–185. https://doi.org/10.1016/0022-1694(84)90190-2 <!-- not in bibliography.md; from the reference list of references/docs/text/2011_Partington_etal_hydraulic_mixing_cell.txt; issue and DOI from Crossref -->
 
@@ -21,8 +17,6 @@ Chowdhury, M.A. 2016. Assessing the connectivity of groundwater wells to surface
 Cornaton, F., and P. Perrochet. 2006. Groundwater age, life expectancy and transit time distributions in advective–dispersive systems: 1. Generalized reservoir theory. *Advances in Water Resources* 29, no. 9: 1267–1291. https://doi.org/10.1016/j.advwatres.2005.10.009
 
 Corson-Dosch, N.T., M.N. Fienen, J.S. Finkelstein, A.T. Leaf, J.T. White, J. Woda, and J.H. Williams. 2022. Areas contributing recharge to priority wells in valley-fill aquifers in the Neversink River and Rondout Creek drainage basins, New York. U.S. Geological Survey Scientific Investigations Report 2021–5112. Reston, Virginia: USGS. https://doi.org/10.3133/sir20215112
-
-Daley, S., A. Black, W. Witterick, M. Graham, and C. Foley. 2022. Going with the flow: Tracking groundwater flow in Modflow 6 and Modflow USG with FlowSource20. Poster, Groundwater Modellers' Forum 2022, Birmingham, UK. https://groundwater-science.co.uk/wp-content/uploads/FlowSource.pdf
 
 Environment Agency. 2019. *Manual for the Production of Groundwater Source Protection Zones*. Bristol, UK: Environment Agency. https://assets.publishing.service.gov.uk/media/5d41a020e5274a0a0bf7757c/Manual-for-the-production-of-Groundwater-Source-Protection-Zones.pdf
 
@@ -83,10 +77,10 @@ White, J.T., R.J. Hunt, M.N. Fienen, and J.E. Doherty. 2020. Approaches to highl
 <!--
 PROBLEMS FOUND WHILE COMPILING THE LIST
 
-1. Citations with no full entry in bibliography.md (39 entries above; 13 works are not in bibliography.md at all):
+1. Citations with no full entry in bibliography.md (36 entries above; 12 works are not in bibliography.md at all; round 4 removed the slide and poster entries Bedekar et al. 2023, Black et al. 2021 and Daley et al. 2022, reviews/sources_cleanup.md):
    - No author or year in the text (round 2), now given one (round 3, reviews/checks_resolved.md): MODFLOW 6 input/output guide → MODFLOW 6 Development Team 2026; FloPy model splitter → Hughes et al. 2024, the paper the FloPy documentation cites, so no separate entry; USGS data release doi 10.5066/P9HWSOHP → Fienen and Corson-Dosch 2021.
    - Author–year in the text but details missing everywhere in the repository (round 2), completed from Crossref, DataCite and USGS pages (round 3): Hughes et al. 2024; Provost et al. 2017; White et al. 2020; Nogueira et al. 2022; Schilling et al. 2017 (not read).
-   - Not in bibliography.md, entry completed from local text copies, brief.md or docs/dispersion_study.md: Bakker et al. 2016; Bedekar et al. 2023; Campana and Simpson 1984; Javandel and Tsang 1986; Partington et al. 2012; Partington et al. 2013; Rushton 2003; Tosco et al. 2010.
+   - Not in bibliography.md, entry completed from local text copies, brief.md or docs/dispersion_study.md: Bakker et al. 2016; Campana and Simpson 1984; Javandel and Tsang 1986; Partington et al. 2012; Partington et al. 2013; Rushton 2003; Tosco et al. 2010.
    - MODFLOW 6 PRT has no USGS report of its own; it is now cited at sections/03_implementation.md:11 as the MODFLOW 6 software release (Langevin et al. 2026) and the input/output guide (MODFLOW 6 Development Team 2026).
    - Page ranges of Foley and Black 2013 and Black and Foley 2013 come from secondary citations (the second checked in Maurice et al. 2021); McLane and Cecan 2009 pages now from Crossref.
 
@@ -94,7 +88,7 @@ PROBLEMS FOUND WHILE COMPILING THE LIST
 
 3. Year or author list differing between the text and bibliography.md:
    - Fienen et al. 2022 in the text (sections/01_introduction.md:3, 05_neversink.md:7, 09_availability.md:3; display/D.md:3) against [FIE21] Fienen et al. (2021) in bibliography.md, which also lacks volume and pages. The list uses 2022 (Groundwater 60, no. 1), as brief.md decides. Update bibliography.md.
-   - No author-list differences found. Black et al. 2021 has three authors in bibliography.md (Black, Foley and Witterick), which is "et al." in NGWA style.
+   - No author-list differences found.
 
 4. Style: si/A.md:73 writes "Campana & Simpson 1984"; elsewhere the text uses "and".
 -->
