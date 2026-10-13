@@ -1,6 +1,6 @@
 # 5. Neversink Demonstration and Benchmark
 
-The Neversink/Rondout model (Fienen et al. 2022; Corson-Dosch et al. 2022) is a published real-world regional model in steady state, so only the steady-state method is tested here. <!-- NS §1, §6; outline §5.5 --> Its published contributing areas come from one choice of particle settings, so they are a benchmark, not the true answer. We rerun particles on the same flow field to show how far the settings alone move the area. Particles that lose water at each sink as full mixing does then isolate the effect of mixing (Section 5.3). <!-- NS §3, §5 ("The published mask is a convention") -->
+The Neversink/Rondout model (Fienen et al. 2022; Corson-Dosch et al. 2022) is a published real-world regional model in steady state, so only the steady-state method is tested here. <!-- NS §1, §6; outline §5.5 --> Its published contributing areas come from one choice of particle settings, so they are a benchmark, not the true answer. We rerun particles on the same flow field to show how far the particle settings alone move the contributing areas of the wells. Particles that lose water at each sink as full mixing does then isolate the effect of mixing (Section 5.3). <!-- NS §3, §5 ("The published mask is a convention") -->
 
 ## 5.1 Model and benchmark
 
