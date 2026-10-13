@@ -20,6 +20,8 @@ Sources: `output/optimal/neversink.dis.grb` (IDOMAIN); `output/optimal/neversink
 
 Notes: four connections longer than 250 m (routing between distant reaches) are not drawn. The four U wells lie within about 1 km of each other, and their markers overlap at this scale.
 
+Check of the black cells (2026-10-13): the 980 cells of `mp7_priority.npz` equal the start cells of the published `.mpend` records that end in one of the eight well nodes (688 NE, 195 W, 97 S). The x0 and y0 of every record match the drawn cell centres. All 980 cells are active with F > 0, so there is no flip or offset. A redraw from the current code and data is pixel-identical to the committed PNG. Per cluster: U 688 (U_917 351, U__55 116, U___7 58, U___8 163), SV_W 195 (SV_193 48, SV_227 115, SV_407 32), SV_S 97. The cells far from the wells are real. 74 lie more than 2 km from their well, up to 4.3 km. The strip 2.3–2.7 km west of the U wells and the speck at x 23.6 km, y 19.7 km are U__55 cells. SV_407 has only 32 cells, in a strip up to 1 km west of the well. 15 of them lie under its marker. The caption now says what the black cells are and why they are patchy.
+
 ## Fig. 6: F with the published cells, streams as cells and as a stream network (double column)
 
 `fig6_capture_maps.{png,pdf}`. A paper-size version of `docs/figures/neversink_capture_maps.png` (NS Fig. 1), with the same data. Redrawn in round 4 (decision 40):
