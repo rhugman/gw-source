@@ -16,8 +16,8 @@
   snapshot checks, transient tracking checks.
 - Fig. 3, numerical dispersion. The two convergence figures of docs/dispersion_study.md
   (problem A, analytical reference; problem B, PRT reference) are merged into one figure of two
-  rows: the band width carries the h^0.5 message, the F >= 0.1 area error the "conservative
-  but too large" message and the F >= 0.5 area error the "within 5 % for h <= 50 m" message.
+  rows: the band width carries the h^0.5 message, the F > 0.1 area error the "conservative
+  but too large" message and the F > 0.5 area error the "within 5 % for h <= 50 m" message.
   It is redrawn from the study's metric tables (studies/dispersion/output) with the study's
   own axis helper and labels.
 
@@ -418,6 +418,7 @@ TOLERANCE_GREY = "#9a9a9a"
 ROW_GRID = "#ececec"
 FIG2_MODEL_LABELS = {  # reader-facing legend labels that differ from verification.MODEL_LABELS
     "fb13_example": "Foley and Black (2013)\nexample, net accounting",
+    "m5_xt3d": "5 flow loops (XT3D)",
     "substep_network": "hand-built 15-cell\nnetwork (not MF6)",
 }
 FIG2_CHECK_LABELS = {"reference_example": "Foley and Black (2013) example"}
@@ -584,7 +585,7 @@ def plain_log_ticks(ax, ticks: tuple[float, ...]) -> None:
 
 def dispersion_row(axes, table: pd.DataFrame, keys: list, angles: tuple, size_axis,
                    sizes: tuple) -> None:
-    """Draw band width, area error F >= 0.1 and area error F >= 0.5 for one problem."""
+    """Draw band width, area error F > 0.1 and area error F > 0.5 for one problem."""
     columns = ("band_width", "area_err_0.1", "area_err_0.5")
     for ax, column in zip(axes, columns):
         for key in keys:
@@ -616,8 +617,8 @@ def make_fig3(out_dir: Path, dispersion_out: Path) -> list[Path]:
     plain_log_ticks(axes[1, 0], (10, 30, 100, 300))
     plain_log_ticks(axes[0, 1], (0.03, 0.1, 0.3, 1, 3))
     plain_log_ticks(axes[1, 1], (0.02, 0.05, 0.1, 0.2, 0.5))
-    titles = ("width of the 0.1 < F < 0.9 band (m)", "relative area error, F ≥ 0.1",
-              "relative area error, F ≥ 0.5")
+    titles = ("width of the 0.1 < F < 0.9 band (m)", "relative area error, F > 0.1",
+              "relative area error, F > 0.5")
     for row, problem in enumerate(("A: analytical reference", "B: PRT reference")):
         for col, title in enumerate(titles):
             ax = axes[row, col]

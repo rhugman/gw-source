@@ -14,7 +14,7 @@ USGS sparse checkout in studies/neversink/external; both git-ignored); nothing i
 - Fig. 7, overlap (Jaccard index) with the published contributing cells by method and
   convention, full mixing with gross and net accounting.
 - Fig. 8, published probability against ensemble mean F (paper-size version of
-  docs/figures/neversink_probability_maps.png).
+  docs/figures/neversink_probability_maps.png), in the classes, windows and overlays of Fig. 6.
 - Fig. 9, median contributing area against pumping, relative to base.
 - Fig. S3 (supporting information), growth mechanism: stream share of the wells' water against pumping, and, per
   realisation, the excess of area growth over pumping growth against the drop in stream share.
@@ -416,35 +416,6 @@ def map_windows(fields: dict, outline: np.ndarray, wells: dict) -> dict:
     return ordered_windows(wells, outline.shape[1], extent)
 
 
-def map_grid(
-    fields: dict, outline: np.ndarray, wells: dict, windows: dict, height: float, bar_label: str
-) -> plt.Figure:
-    """Return a figure of F-type maps: one row per field, one column per well cluster window."""
-    nrow, ncol = outline.shape
-    wells_ij = list(well_ij(wells, (nrow, ncol)).values())
-    fig, axes = plt.subplots(
-        len(fields), len(windows), figsize=(DOUBLE, height), constrained_layout=True, squeeze=False
-    )
-    letters = iter("abcdefghijkl")
-    for row, (label, field) in enumerate(fields.items()):
-        for col, (name, window) in enumerate(windows.items()):
-            ax = axes[row, col]
-            image = nf._panel(
-                ax, field, outline, wells_ij, window, f"({next(letters)}) {name}: {label}"
-            )
-            ax.tick_params(labelsize=7)
-            for line in ax.lines:
-                line.set_markersize(4)
-    for ax in axes[-1]:
-        ax.set_xlabel("x from grid origin (km)")
-    for ax in axes[:, 0]:
-        ax.set_ylabel("y (km)")
-    bar = fig.colorbar(image, ax=axes, shrink=0.6, aspect=30, label=bar_label)
-    bar.outline.set_visible(False)
-    bar.ax.tick_params(labelsize=7)
-    return fig
-
-
 def capture_fields(idomain: np.ndarray, out: Path = OUT) -> dict:
     """Return F of the uppermost active cell with streams as cells and as a stream network."""
     top = nf.top_active(idomain)
@@ -455,7 +426,7 @@ def capture_fields(idomain: np.ndarray, out: Path = OUT) -> dict:
 
 
 def capture_windows(idomain: np.ndarray, wells: dict, mask: np.ndarray, out: Path = OUT) -> dict:
-    """Return the cluster windows of Figs 8 and S2; Fig. 6 enlarges them to one size."""
+    """Return the cluster windows of Fig. S2; Figs 6 and 8 enlarge them to one size."""
     return map_windows(capture_fields(idomain, out), mask, wells)
 
 
@@ -486,7 +457,7 @@ def f_classes(
     return cmap, BoundaryNorm(edges, cmap.N)
 
 
-def capture_panel(
+def class_panel(
     ax: plt.Axes,
     field: np.ndarray,
     outline: np.ndarray,
@@ -496,7 +467,7 @@ def capture_panel(
     f_map: tuple,
     title: str,
 ) -> AxesImage:
-    """Draw one Fig. 6 panel: F classes, SFR reaches, published outline (haloed) and wells."""
+    """Draw one panel of Figs 6 and 8: classes, SFR reaches, outline (haloed) and wells."""
     r0, r1, c0, c1 = window
     nrow = field.shape[0]
     extent = window_extent(window, nrow)
@@ -528,16 +499,56 @@ def capture_panel(
     return image
 
 
-def capture_legend(fig: plt.Figure) -> None:
-    """Draw the legend of Fig. 6 below the panels."""
+def class_legend(fig: plt.Figure, outline_label: str) -> None:
+    """Draw the legend of Figs 6 and 8 below the panels."""
     handles = [
         plt.Line2D(
             [], [], ls="", marker="o", ms=4, mfc=COLORS["prt"], mec=INK, mew=0.7, label="wells"
         ),
         plt.Line2D([], [], color=STREAM, lw=1, label="SFR reaches"),
-        plt.Line2D([], [], color=INK, lw=0.8, label="published contributing cells (outline)"),
+        plt.Line2D([], [], color=INK, lw=0.8, label=outline_label),
     ]
     fig.legend(handles=handles, loc="outside lower center", ncol=3, handlelength=1.6)
+
+
+def class_maps(
+    fields: dict,
+    outline: np.ndarray,
+    wells: dict,
+    windows: dict,
+    segments: np.ndarray,
+    height: float,
+    bar_label: str,
+    outline_label: str,
+    bar_km: float = F6_BAR_KM,
+) -> plt.Figure:
+    """Return a figure of class maps (Figs 6 and 8): one row per field, one column per cluster,
+    equal windows, one scale bar in the first panel."""
+    nrow, ncol = outline.shape
+    wells_ij = list(well_ij(wells, (nrow, ncol)).values())
+    windows = equal_windows(windows, (nrow, ncol))
+    f_map = f_classes()
+    fig, axes = plt.subplots(
+        len(fields), len(windows), figsize=(DOUBLE, height), constrained_layout=True, squeeze=False
+    )
+    letters = iter("abcdefghijkl")
+    for row, (label, field) in enumerate(fields.items()):
+        for col, (name, window) in enumerate(windows.items()):
+            title = f"({next(letters)}) {name}: {label}"
+            image = class_panel(
+                axes[row, col], field, outline, wells_ij, window, segments, f_map, title
+            )
+    x0, _, y0, _ = window_extent(windows[next(iter(windows))], nrow)
+    scale_bar(axes[0, 0], x0 + 0.4, y0 + 0.4, bar_km)
+    bar = fig.colorbar(
+        image, ax=axes, shrink=0.75, aspect=25, extend="min", ticks=F_EDGES, spacing="uniform"
+    )
+    bar.set_label(bar_label)
+    bar.ax.set_yticklabels([f"{edge:g}" for edge in F_EDGES])
+    bar.outline.set_visible(False)
+    bar.ax.tick_params(labelsize=7)
+    class_legend(fig, outline_label)
+    return fig
 
 
 def capture_maps(
@@ -548,51 +559,51 @@ def capture_maps(
     windows: dict,
     segments: np.ndarray,
     out: Path = OUT,
-    bar_km: float = F6_BAR_KM,
 ) -> Path:
-    """Fig. 6: F of the uppermost active cell in classes, streams as cells and as a network,
-    with the SFR reaches, the wells and the published outline; equal windows, one scale bar."""
+    """Fig. 6: F of the uppermost active cell in classes, streams as cells and as a network."""
     paper_style()
-    fields = capture_fields(idomain, out)
-    nrow, ncol = mask.shape
-    wells_ij = list(well_ij(wells, (nrow, ncol)).values())
-    windows = equal_windows(windows, (nrow, ncol))
-    f_map = f_classes()
-    fig, axes = plt.subplots(
-        len(fields), len(windows), figsize=(DOUBLE, 3.9), constrained_layout=True, squeeze=False
+    fig = class_maps(
+        capture_fields(idomain, out),
+        mask,
+        wells,
+        windows,
+        segments,
+        3.9,
+        "F, uppermost active cell (grey: below 0.01)",
+        "published contributing cells (outline)",
     )
-    letters = iter("abcdef")
-    for row, (label, field) in enumerate(fields.items()):
-        for col, (name, window) in enumerate(windows.items()):
-            title = f"({next(letters)}) {name}: {label}"
-            image = capture_panel(
-                axes[row, col], field, mask, wells_ij, window, segments, f_map, title
-            )
-    x0, _, y0, _ = window_extent(windows[next(iter(windows))], nrow)
-    scale_bar(axes[0, 0], x0 + 0.4, y0 + 0.4, bar_km)
-    bar = fig.colorbar(
-        image, ax=axes, shrink=0.75, aspect=25, extend="min", ticks=F_EDGES, spacing="uniform"
-    )
-    bar.set_label("F, uppermost active cell (grey: below 0.01)")
-    bar.ax.set_yticklabels([f"{edge:g}" for edge in F_EDGES])
-    bar.outline.set_visible(False)
-    bar.ax.tick_params(labelsize=7)
-    capture_legend(fig)
     return save(fig, fig_dir, "fig6_capture_maps")
 
 
 def probability_maps(
-    fig_dir: Path, wells: dict, windows: dict, maps_file: Path = ENS_DIR / "probability_maps.npz"
+    fig_dir: Path,
+    idomain: np.ndarray,
+    wells: dict,
+    windows: dict,
+    segments: np.ndarray,
+    maps_file: Path = ENS_DIR / "probability_maps.npz",
 ) -> Path:
-    """Fig. 8: published probability against ensemble mean F, base pumping (Fig. 6 windows)."""
+    """Fig. 8: published probability against ensemble mean F, base pumping, in the classes and
+    windows of Fig. 6."""
     paper_style()
     maps = np.load(maps_file)
+    active = nf.top_active(idomain) >= 0
     fields = {
         "published probability": maps["mp7"],
         "mean F, cells": maps["cells:mean_F"],
         "mean F, network": maps["network:mean_F"],
     }
-    fig = map_grid(fields, maps["mp7"] > 0.5, wells, windows, 5.2, "probability or mean F")
+    fields = {label: np.where(active, field, np.nan) for label, field in fields.items()}
+    fig = class_maps(
+        fields,
+        maps["mp7"] > 0.5,
+        wells,
+        windows,
+        segments,
+        5.6,
+        "probability or mean F (grey: below 0.01)",
+        "published probability 0.5 (outline)",
+    )
     return save(fig, fig_dir, "fig8_probability_maps")
 
 
@@ -602,7 +613,7 @@ FLUX_LABELS = {  # prt_comparison.csv (release, thin_weak_sinks) -> label
     ("volume", True): "cell volume, weight-losing",
     ("z0.5", True): "mid-cell, weight-losing",
     ("z1", True): "water table, weight-losing",
-    ("volume", False): "cell volume, plain particles",
+    ("volume", False): "cell volume, losing weight only at wells",
 }
 FLUX_KEYS = {
     ("volume", True): "volume, thinned",
@@ -936,7 +947,7 @@ def main(
     if fig5 or fig6 or fig8:
         mask = published_mask(shape)
         windows = capture_windows(idomain, wells, mask)
-    if fig5 or fig6:
+    if fig5 or fig6 or fig8:
         segments = model_segments(MODEL_DIR, shape[0])
     if fig5:
         regions = region_grids(wf.read_endpoints(columns=("node0",)), shape)
@@ -948,7 +959,7 @@ def main(
     if fig7:
         paths.append(agreement_chart(fig_dir, agreement_table()))
     if fig8:
-        paths.append(probability_maps(fig_dir, wells, windows))
+        paths.append(probability_maps(fig_dir, idomain, wells, windows, segments))
     if fig9:
         paths.append(growth_chart(fig_dir, growth_table()))
     if figS3:

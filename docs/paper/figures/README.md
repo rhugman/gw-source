@@ -22,12 +22,13 @@ Notes: four connections longer than 250 m (routing between distant reaches) are 
 
 ## Fig. 6: F with the published cells, streams as cells and as a stream network (double column)
 
-`fig6_capture_maps.{png,pdf}`. A paper-size version of `docs/figures/neversink_capture_maps.png` (NS Fig. 1), with the same data. Redrawn for decision 40 (round 3):
+`fig6_capture_maps.{png,pdf}`. A paper-size version of `docs/figures/neversink_capture_maps.png` (NS Fig. 1), with the same data. Redrawn in round 4 (decision 40):
 
 - F is shown in classes of a perceptual sequential colour map (viridis, reversed so that low F is light): 0.01–0.1, 0.1–0.25, 0.25–0.5, 0.5–0.75 and 0.75–1. The 0.1 and 0.5 limits of the overlap values are class edges. F below 0.01 is grey (active area) and inactive cells are white.
 - The SFR reaches are drawn as in Fig. 5 (blue lines from each reach to its downstream reach) and the wells as in Fig. 5 (orange dots).
 - The published contributing cells are outlined in black with a white halo, so the outline shows on the dark classes.
-- Every panel has the same window, 142 × 185 cells (7.1 × 9.25 km), centred on the cluster windows of Figs 8 and S2 (`equal_windows`; the U window was already this size). Shared coordinate axes are not possible because each panel centres on a different cluster, so the panels have no tick labels and panel (a) has the one scale bar (2 km).
+- Every panel has the same window, 142 × 185 cells (7.1 × 9.25 km), centred on the cluster windows of Fig. S2 (`equal_windows`; the U window was already this size). Shared coordinate axes are not possible because each panel centres on a different cluster, so the panels have no tick labels and panel (a) has the one scale bar (2 km). Fig. 8 uses the same windows.
+- Exact labels: colour bar "F, uppermost active cell (grey: below 0.01)", ticks 0.01, 0.1, 0.25, 0.5, 0.75, 1, with a grey triangle below 0.01; legend "wells", "SFR reaches", "published contributing cells (outline)". Panel titles unchanged: "(a) U: streams as cells" to "(f) SV_S: stream network".
 
 Sources: `output/fractions_cells.npz`, `output/fractions_sfr_network.npz` (group `priority`), `output/mp7_priority.npz`, `output/optimal/neversink_packagedata.dat` and `neversink.sfr` (as Fig. 5).
 
@@ -39,6 +40,8 @@ Caption to update (not changed here): "(blue, 0 to 1)" should name the classes a
 
 `fig7_agreement.{png,pdf}`
 
+Round 4: the row label "cell volume, plain particles" is now "cell volume, losing weight only at wells" (group *PRT, flow-weighted, P > 0.5*, value 0.29). The other labels are unchanged. Caption to update (not changed here): "Plain particles, which lose weight only to the wells, give 0.29" should use the same name, e.g. "Particles that lose weight only at the wells give 0.29".
+
 Sources: `output/agreement_with_mp7.csv` (full mixing, gross accounting), `output/net_vs_gross_mp7.csv` (row `priority`, accounting `net`, columns `jaccard_F>0.1`, `jaccard_F>0.5` and `jaccard_area_matched`; from `studies/neversink/net_and_envelope.py`), `output/prt_comparison.csv` (column `jaccard_mp7_prt>0.5`; `seeded_cells` 30,180 in all four runs), `output/mp7_reproduction.csv` (column `jaccard`; the duplicate `mp7_conventions_published_flows` run, also 0.998, is not shown).
 
 > **Figure 7.** Overlap between the 980 published contributing cells (the benchmark) and other delineations of the eight priority wells' area on the same flow field (cells in both as a share of cells in either). *Full mixing, gross accounting*: F > 0.1 (0.30), F > 0.5 (0.41), and the 980 cells with the largest F (0.41). *Full mixing, net accounting* (open circles), with F = 1 in the well cells as in the reference method [FB13]: 0.28, 0.44 and 0.40. *PRT, flow-weighted*: particles released from the source terms of every cell with F > 10⁻⁶, in proportion to their flow (30,180 cells), counted where the particle share P reaching the wells is above 0.5. Weight-losing particles, which lose weight at every sink in proportion to the flow that sink takes from the cell's outflow, give 0.62 when released over the cell volume or at mid-cell and 0.39 at the water table. Plain particles, which lose weight only to the wells, give 0.29. *PRT, published starts*: one particle per published start, stopped at every weak sink, where its whole weight is credited to that cell's sink. With MF6's default distributed boundary flows the overlap is 0.62 (dry starts dropped to the water table) or 0.65 (draped, i.e. moved down to the first active cell below). With recharge and stream flows on the top face where it is open (IFLOWFACE) it is 0.96 (dry starts dropped) or 0.998 (draped; the published conventions).
@@ -49,7 +52,16 @@ Values checked against NS Table 1, Table 3 and the Section 3 reproduction table,
 
 `fig8_probability_maps.{png,pdf}`. A paper-size version of `docs/figures/neversink_probability_maps.png` (NS Fig. 2), from the same file, which was regenerated with the corrected published Monte Carlo areas.
 
-Source: `output/ensemble/probability_maps.npz` (`mp7`, `cells:mean_F`, `network:mean_F`). The map windows are the cluster windows of `capture_windows`, as in Fig. S2; Fig. 6 shows the same areas, enlarged about the same centres to one size (decision 40). Until this change Fig. 8 computed its own, and its SV_S window sat 0.75 km further east. The caption numbers are whole-model values (NS Table 4) and do not depend on the windows.
+Round 4 (decision 40, extended to Fig. 8): redrawn in the scheme of Fig. 6 (both use `class_maps`):
+
+- The published probability and the mean F share one set of classes of reversed viridis: 0.01–0.1, 0.1–0.25, 0.25–0.5, 0.5–0.75 and 0.75–1. Values below 0.01 are grey (active area) and inactive cells are white.
+- The SFR reaches (blue lines) and the wells (orange dots) are drawn as in Figs 5 and 6. The outline, published probability 0.5, is black with a white halo.
+- The windows are those of Fig. 6, all the same size (142 × 185 cells, 7.1 × 9.25 km), with no tick labels and one 2 km scale bar in panel (a).
+- Exact labels: colour bar "probability or mean F (grey: below 0.01)", ticks 0.01, 0.1, 0.25, 0.5, 0.75, 1, grey triangle below 0.01; legend "wells", "SFR reaches", "published probability 0.5 (outline)". Panel titles unchanged: "(a) U: published probability" to "(i) SV_S: mean F, network".
+
+Caption to update (not changed here): add the classes and the grey below 0.01, the SFR reaches and wells, and "all panels at the same scale; scale bar 2 km".
+
+Source: `output/ensemble/probability_maps.npz` (`mp7`, `cells:mean_F`, `network:mean_F`), masked to the active area of `output/optimal/neversink.dis.grb`; the SFR files as Fig. 5. The windows are the cluster windows of `capture_windows`, as in Fig. S2, enlarged about the same centres to one size as in Fig. 6 (decision 40). Earlier versions of Fig. 8 computed their own windows, and the SV_S window sat 0.75 km further east. Fig. S2 is unchanged: it draws its own panels and shares only `capture_windows`, which is unchanged. The caption numbers are whole-model values (NS Table 4) and do not depend on the windows.
 
 > **Figure 8.** Base pumping. (a–c) Published probability of contribution (357 published Monte Carlo contributing areas, moved one row north onto their cells). (d–f) Ensemble mean F with streams as cells and (g–i) with the stream network (358 realisations). Outline: published probability 0.5. Mean F correlates with the published probability at r = 0.80 and gives 90 % of its expected area. The zones above 0.5 have an overlap (cells in both as a share of cells in either) of 0.48. With the stream network the values are r = 0.72, an area ratio of 1.51 and an overlap of 0.49 (NS Table 4).
 

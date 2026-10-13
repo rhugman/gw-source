@@ -1,8 +1,8 @@
 ## Table 1
 
-**Table 1.** Four ways to compute, from a groundwater flow model's flows, the share of each cell's water that reaches a destination or came from a source. The columns are FlowSource (Foley and Black 2013; Black and Foley 2013), this formulation, unit-concentration transport in GWT (Bedekar et al. 2024 [check: abstract only]; Langevin et al. 2022) and hydraulic mixing cells as published by Partington et al. (2011). The fractions F, G, c and w and gross and net accounting are defined in Section 2. The FlowSource column describes the program as published in 2013. Years in parentheses date a statement to those papers. We found no published description of later versions. MODALL (Potter et al. 2008) has no column because its solution method could not be established. Fuller notes on each cell, and the sources it rests on, are given separately (Supporting Information, Text S1). <!-- Text S1 = {SI: Table 1 notes and sources}, si/A.md (si/numbering.md); the first SI citation in the paper, so written in full (decisions_r3 item 29) -->
+**Table 1.** Four ways to compute the share of each cell's water that reaches a destination, or that came from a source, from the flows of a groundwater flow model. The columns are FlowSource (Foley and Black 2013; Black and Foley 2013), this paper's code, unit-concentration transport in GWT (Bedekar et al. 2024 [check: abstract only]; Langevin et al. 2022) and hydraulic mixing cells as published by Partington et al. (2011). Section 2 defines the fractions F, G, c and w, and gross and net accounting. The FlowSource column describes the program as published in 2013. Years in parentheses date a statement to those papers. We found no published description of later versions. MODALL (Potter et al. 2008) has no column because its solution method could not be established. Fuller notes on each table entry, and their sources, are given separately (Supporting Information, Text S1). <!-- Text S1 = {SI: Table 1 notes and sources}, si/A.md (si/numbering.md); the first SI citation in the paper, so written in full (decisions_r3 item 29) -->
 
-| | FlowSource (Foley and Black 2013; Black and Foley 2013) | This formulation | GWT unit concentration (Bedekar et al. 2024; Langevin et al. 2022) | Hydraulic mixing cells (Partington et al. 2011) |
+| | FlowSource (Foley and Black 2013; Black and Foley 2013) | This paper's code | GWT unit concentration (Bedekar et al. 2024; Langevin et al. 2022) | Hydraulic mixing cells (Partington et al. 2011) |
 |---|---|---|---|---|
 | What is solved, and how | Fractions cell by cell in flow order; one pass per time step | Linear equations in flow order; transient tracking: implicit steps | Implicit time steps, iterative solver; no documented steady-state option¹ | Explicit, on the flow model's steps; stable only for short steps² |
 | Mixing in a cell | Full mixing | Full mixing | Full mixing with upstream weighting and no dispersion | Modified mixing cell; tends to full mixing as steps shorten³ |
@@ -16,12 +16,12 @@
 | Grids and packages | Structured MODFLOW grids; method said to apply to unstructured grids (2013); package networks not documented | All MODFLOW 6 grid types, multi-model simulations, package networks | DIS, DISV, DISU; SFR, LAK, MAW, UZF and MVR transport | HydroGeoSphere stream cells; said to apply to other codes |
 | Open implementation | No; VB.NET source for academic use on request (2013) | Yes (`gwsource`, MIT) | Yes (MODFLOW 6, USGS) | Excel (Visual Basic) post-processor; availability not stated |
 
-¹ Steady state is reached by running transient steps until concentrations stabilise (Langevin et al. 2022). In our test, one step with porosity 0 gave the steady G to 1 × 10⁻¹², an undocumented use. <!-- table1_methods.md footnote 2 and Sources, GWT 'Solved, how': 9.5 × 10⁻¹³ and 9.7 × 10⁻¹³ on test model 1 -->
+¹ Steady state is reached by running transient steps until concentrations stabilise (Langevin et al. 2022). In our test, one step with porosity 0 gave the steady G to 1 × 10⁻¹². This use of porosity 0 is not documented. <!-- table1_methods.md footnote 2 and Sources, GWT 'Solved, how': 9.5 × 10⁻¹³ and 9.7 × 10⁻¹³ on test model 1 -->
 
 ² Each step's fractions come from the previous step's. The update is stable only while a step's inflow or outflow volume does not exceed the cell's storage. Later versions add overland and aquifer cells and sub-steps. All step forward in time only.
 
 ³ After Campana and Simpson (1984): water leaving a cell over a step carries the previous step's mix.
 
-⁴ A group of cells with no outflow to any sink or to a cell outside the group; reported, with no connections deleted.
+⁴ A closed recirculation loop is a group of cells with no outflow to any sink or to a cell outside the group. Such loops are reported. No connections are deleted.
 
 ⁵ No backward option is documented (Langevin et al. 2022). Of Bedekar et al. (2024) we read only the abstract. It lists well capture analysis among the uses without saying how it is done.
