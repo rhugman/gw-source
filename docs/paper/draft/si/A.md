@@ -24,7 +24,7 @@ The notes below give the full text behind each cell of Table 1 that the main-tex
 
 ### Sources by column
 
-What each cell rests on, by column. Page numbers are given where the source has them; the 2013 conference papers (Foley and Black 2013; Black and Foley 2013) are cited by section heading because their text has no page numbers, and Partington et al. (2011) by section and equation number.
+The notes below give the source for each entry of Table 1, column by column. We give page numbers where the source has them. The two 2013 conference papers (Foley and Black 2013; Black and Foley 2013) have no page numbers, so we cite them by section heading. We cite Partington et al. (2011) by section and equation number.
 
 ### Read in full, and read as secondary account only
 
