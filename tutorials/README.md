@@ -25,7 +25,7 @@ The notebooks share the model builders and plotting helpers in [`herebedragons.p
 
 ## Order
 
-Start with 01 and 02: they introduce the outputs and the accounting that every later tutorial uses. After that, 03 to 09 can be read in any order; the list below is the suggested one.
+Start with 01 and 02: they introduce the outputs and the accounting that every later tutorial uses. After that, 03 to 10 can be read in any order; the list below is the suggested one.
 
 | # | Tutorial | What it answers | What you learn | Runtime |
 |---|---|---|---|---|
@@ -38,6 +38,7 @@ Start with 01 and 02: they introduce the outputs and the accounting that every l
 | 07 | [Networks and multi-model](07_networks_multimodel/07_networks_multimodel.ipynb) | What if water moves through streams, drains or wells between layers, or across models? | Cells-only vs package-node traces; SFR reaches and MVR transfers as nodes and edges (drain → mover → stream → aquifer → well); MAW borehole across layers; a split simulation matches the single model; required save options and limitations | ~10 s |
 | 08 | [Transient tracking](08_transient_tracking/08_transient_tracking.ipynb) | How much of the well water arrived since the simulation started? | Why snapshots are not transport; forward tracking of tagged sources and initial water; backward (adjoint) fate maps and closure; duality; volume modes "gwt" vs "flow"; agreement with MF6 GWT; sub-stepping and early arrival | ~30 s |
 | 09 | [Ensembles](09_ensembles/09_ensembles.ipynb) | How sure are we about the capture zone? | 20 random-K realisations; capture probability P(F > 0.1) and P(F > 0.5); mean and quantile maps; spread of the well's source shares; exact vs histogram quantiles and the memory budget; serial vs parallel runs; parameter vs grid/mixing uncertainty; plugging into PEST++ IES (described, not run) | ~15 s |
+| 10 | [Unit concentration](10_unit_concentration/10_unit_concentration.ipynb) | Does tracking reproduce a published unit-concentration study? | The Bedekar et al. (2024) example rebuilt in MF6 and the values the paper leaves open; well shares of lateral inflow, recharge, stream and stored water over 25 years; agreement with four MF6 GWT unit-concentration runs (≤ 1.5e-10) and with the paper's Figure 2 (≤ 1.3 percentage points); the steady long-time limit; transport sub-steps and arrival fronts; backward time-limited contributing areas and where the pumped recharge and stream water entered | ~2.5 min |
 
 Thresholds on the fraction through, and the numerical dispersion of full mixing, are discussed in [`docs/dispersion_study.md`](../docs/dispersion_study.md). The method and equations are in [`PLAN.md`](../PLAN.md).
 
@@ -55,3 +56,5 @@ All models share one plan: a 2 km × 2 km unconfined aquifer in 50 m cells with 
 | `build_stream_mover` | SFR stream fed by drains through the water mover, leaking back to the aquifer |
 | `build_maw` | three layers with a multi-aquifer well that moves water between layers |
 | `build_realisation`, `build_ensemble` | seeded random log-K realisations |
+
+Tutorial 10 does not use this plan. It rebuilds the published model of Bedekar et al. (2024) with its own builder, `build_bedekar` in [`10_unit_concentration/helpers.py`](10_unit_concentration/helpers.py): 101 × 101 cells of 10 m in three layers, lateral inflow on the west edge, a stream on the east edge and a well pumping 700 m³/d from year 0.
