@@ -50,7 +50,7 @@ We keep every flow and solve each loop exactly as one block of equations. In lin
 
 ## 2.5 Water-budget checks
 
-Four checks tell the user whether a trace is right. Each must hold exactly, because each follows from adding up the cell equations. The first is the backward closure check:
+Four checks tell the user whether a trace agrees with the model's water budget. They test the solve, not the flow model itself. Each must hold exactly, because each follows from adding up the cell equations. The first is the backward closure check:
 
 $$\sum_i F_i\, \mathrm{Src}_i - \sum_i F_i\, r_i = \sum_i d_i. \tag{5}$$
 
