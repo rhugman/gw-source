@@ -8,7 +8,7 @@ The USGS model (Fienen et al. 2022; Corson-Dosch et al. 2022) has four layers of
 
 [[Figure 5]]
 
-Comparisons are made on the start cells, where 96 % of the wells' water enters the model. <!-- NS §2 Coverage; mp7_coverage.csv --> Tracing nine destination groups, each well alone and all eight together, took 2–3 s, against 44 s for MODFLOW 6. <!-- NS Summary, §1, §4; checks_cells.csv (2.3 s), checks_sfr_network.csv (2.6 s); mf6_runs.csv --> For every group, the traced source water matched the wells' inflow to 1 × 10⁻¹² m³/d or less (Section 2.5). <!-- NS Summary, §1, §4; checks_cells.csv, checks_sfr_network.csv -->
+Comparisons are made on the start cells, where 96 % of the wells' water enters the model. <!-- NS §2 Coverage; mp7_coverage.csv --> Tracing nine destination groups, each well alone and all eight together, took 2–3 s. On the same flows, one PRT run with the published particle settings took about 30 s when it wrote only where each particle ends. PRT runs that wrote full particle tracks took 5–13 min (122,112 to 488,448 particles). <!-- docs/neversink_study.md run notes (about line 338): published-mask reproduction, five PRT runs of about 30 s each, termination records only; single-height runs (122,112 particles) about 5 min, four-height runs (488,448 particles) about 13 min --> <!-- NS Summary, §1, §4; checks_cells.csv (2.3 s), checks_sfr_network.csv (2.6 s); mf6_runs.csv --> For every group, the traced source water matched the wells' inflow to 1 × 10⁻¹² m³/d or less (Section 2.5). <!-- NS Summary, §1, §4; checks_cells.csv, checks_sfr_network.csv -->
 
 ## 5.2 Full mixing against the published area
 
