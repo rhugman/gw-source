@@ -61,3 +61,39 @@ def test_quickstart_builder(tmp_path, mf6_exe):
     assert set(table.index) == {"RCH", "RIV", "CHD"}
     assert np.all(table["share"] > 0.05)
     assert hbd.feature_cells(step, "RIV").size == run.spec.nrow
+
+
+def load_tutorial_helpers(folder: str):
+    """Import a tutorial's own helpers.py under a unique module name (each tutorial has one)."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        f"helpers_{folder}", TUTORIALS_DIR / folder / "helpers.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_bedekar_builder(tmp_path, mf6_exe):
+    """Tutorial 10's model has the published rates and the published long-time shares at the well.
+
+    Bedekar et al. (2024), p. 305-306: 454.5 m3/d lateral inflow, 306.03 m3/d recharge, 700 m3/d
+    pumped from period 2; after 25 years about 48 % lateral inflow, 29 % recharge, 23 % stream.
+    """
+    helpers = load_tutorial_helpers("10_unit_concentration")
+    run = helpers.build_bedekar(tmp_path, mf6_exe, nstp=25)
+    reader = gs.open_model(run.ws, boundnames=True)
+    first = helpers.package_budget(reader.read(reader.steps[0]))
+    last_step = reader.read(reader.steps[-1])
+    last = helpers.package_budget(last_step)
+    assert first.loc["INFLOW", "in"] == pytest.approx(454.5, rel=1e-8)
+    assert first.loc["RCH", "in"] == pytest.approx(306.03, rel=1e-8)
+    assert first.loc["RIV", "in"] == pytest.approx(0.0, abs=1e-8)  # the stream is only a sink
+    assert last.loc["PUMP", "out"] == pytest.approx(700.0, rel=1e-8)
+    assert last.loc["RIV", "in"] > 100.0 and last.loc["RIV", "out"] > 100.0
+    names = {"INFLOW": "lateral inflow", "RCH": "recharge", "RIV": "stream"}
+    shares = helpers.steady_shares(last_step, helpers.WELL, names)
+    assert shares["lateral inflow"] == pytest.approx(0.48, abs=0.01)
+    assert shares["recharge"] == pytest.approx(0.29, abs=0.01)
+    assert shares["stream"] == pytest.approx(0.23, abs=0.01)
