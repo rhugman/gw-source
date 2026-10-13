@@ -6,7 +6,7 @@ Bakker, M., V. Post, C.D. Langevin, J.D. Hughes, J.T. White, J.J. Starn, and M.N
 
 Barlow, P.M., S.A. Leake, and M.N. Fienen. 2018. Capture versus capture zones: Clarifying terminology related to sources of water to wells. *Groundwater* 56, no. 5: 694–704. https://doi.org/10.1111/gwat.12661
 
-Bedekar, V., C. Neville, M.J. Tonkin, R.D. Bartlett, and P. Plato. 2024. A unit-concentration method to quantify source contribution. *Groundwater* 62, no. 2: 303–309. https://doi.org/10.1111/gwat.13333
+Bedekar, V., C. Neville, M.J. Tonkin, R.D. Bartlett, and P. Plato. 2024. A unit-concentration method to quantify source contribution. *Groundwater* 62, no. 2: 303–309. https://doi.org/10.1111/gwat.13333 <!-- checked against the full-text PDF (references/docs/): Methods Brief, Groundwater 62, no. 2 (March–April 2024), pp. 303–309, doi 10.1111/gwat.13333. Received January 2023, accepted June 2023, © 2023 NGWA, so it appeared online in 2023. Dated 2024, the year of the issue, as the journal's own running footer does. -->
 
 Black, A., and C. Foley. 2013. FlowSource: A program to efficiently delineate volumetric capture areas, pathways and source areas in groundwater models. In *Proceedings of MODFLOW and More 2013: Translating Science into Practice*, Golden, Colorado, June 2–5, 2013, 652–663. Golden, Colorado: IGWMC, Colorado School of Mines. https://groundwater-science.co.uk/wp-content/uploads/2013_FSv6_ApplicationPaper.pdf <!-- pages from a secondary citation: the reference list of Maurice et al. (2021), checked in references/docs/text/2021_Maurice_etal_Chalk_karst_groundwater_protection.txt; the proceedings were not seen -->
 
