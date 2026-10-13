@@ -24,7 +24,7 @@ Let $P_{ij} = q_{ij}/O_i$ be the share of cell $i$'s outflow that goes to cell $
 
 $$(\mathbf{I} - \mathbf{P})\,\mathbf{F} = \mathbf{S}\,\mathbf{D}, \tag{3}$$
 
-where $\mathbf{I}$ is the identity matrix, $\mathbf{S}$ holds the share of each cell's outflow that leaves through each of its sink terms, and $\mathbf{D}$ marks which sink terms belong to which destination group. In words: each column of $\mathbf{F}$ holds the fractions to one destination group, so one solve gives every group.
+where $\mathbf{I}$ is the identity matrix, $\mathbf{S}$ holds the share of each cell's outflow that leaves through each of its sink terms, and $\mathbf{D}$ marks which sink terms belong to which destination group. Each column of $\mathbf{F}$ holds the fractions to one destination group, so one solve gives every group.
 
 The forward fraction $G_i$ answers the reverse question. It is the share of the water entering cell $i$ that came from the source. It follows in the same way from the inflow shares $Q_{ij} = q_{ji}/I_i$:
 
@@ -54,11 +54,11 @@ Four checks tell the user whether a trace agrees with the model's water budget. 
 
 $$\sum_i F_i\, \mathrm{Src}_i - \sum_i F_i\, r_i = \sum_i d_i. \tag{5}$$
 
-In words: the water entering through every source term, weighted by its $F$ and corrected for the cell budget errors, equals the water that leaves through the destination. Its mirror image is the forward closure check: $\sum_i G_i\, \mathrm{Snk}_i + \sum_i G_i\, r_i = \sum_i s_i$. The third is the forward–backward check:
+The check says that the water entering through every source term, weighted by its $F$ and corrected for the cell budget errors, equals the water that leaves through the destination. Its mirror image is the forward closure check: $\sum_i G_i\, \mathrm{Snk}_i + \sum_i G_i\, r_i = \sum_i s_i$. The third is the forward–backward check:
 
 $$\sum_i F_i\, s_i - \sum_i G_i\, d_i = \sum_i F_i\, G_i\, r_i. \tag{6}$$
 
-In words: the volume from a source to a destination is the same traced backward or forward, once the cell budget errors are included. The fourth is the boundary-control check. In every cell with outflow, the backward fractions to all sink terms must add up to 1. Maps of these fractions (boundary-control maps) show where each cell's water goes.
+So the volume from a source to a destination is the same whether it is traced backward or forward, once the cell budget errors are included. The fourth is the boundary-control check. In every cell with outflow, the backward fractions to all sink terms must add up to 1. Maps of these fractions (boundary-control maps) show where each cell's water goes.
 
 Because the checks include the flow model's budget errors $r_i$, a failed check points to an error in the tracing, not in the flow model.
 
@@ -68,7 +68,7 @@ Fractions say how much water arrives, not when. Let $V_i$ be the volume of water
 
 $$(\mathbf{I} - \mathbf{P})\,\mathbf{m} = \boldsymbol{\tau} \circ \mathbf{F} \tag{7}$$
 
-and $\circ$ is the cell-by-cell product ({SI: travel-time identity}). In words: each cell adds its residence time, weighted by its $F$, and passes the sum upstream with the outflow shares. Travel times are defined under gross accounting. A mean travel time averages fast and slow water that have mixed in the cells. It should not be used alone to draw a time-of-travel zone (Section 6.4).
+and $\circ$ is the cell-by-cell product ({SI: travel-time identity}). Each cell adds its residence time, weighted by its $F$, and passes the sum upstream with the outflow shares. Travel times are defined under gross accounting. A mean travel time averages fast and slow water that have mixed in the cells. It should not be used alone to draw a time-of-travel zone (Section 6.4).
 
 ## 2.7 Transient models: snapshots and transient tracking
 
@@ -78,7 +78,7 @@ Transient tracking extends full mixing through time. Water from the chosen sourc
 
 $$V_i^{\mathrm{new}} c_i^n - V_i^{\mathrm{old}} c_i^{n-1} = \Delta t \Big[ \sum_j q_{ji}\, c_j^n + s_i^n - (O_i + r_i)\, c_i^n \Big], \tag{8}$$
 
-where $O_i$ now leaves out storage. In words: the tagged water at the end of a step is the tagged water at its start, plus arrivals from upstream cells and source terms, less what leaves at the cell's end-of-step mix.
+where $O_i$ now leaves out storage. Each cell's tagged water at the end of a step is its tagged water at the start, plus arrivals from upstream cells and source terms, less what leaves at the cell's end-of-step mix.
 
 As in GWT, the scheme is implicit, so outflows carry the cell's mix at the end of the step. It is upstream weighted, so inflows carry the mix of the cell they come from. It adds no dispersion. It runs on the flow model's own time steps, so the budget of every step must be saved (SAVE BUDGET ALL in the Output Control file).
 
@@ -94,4 +94,4 @@ The same run gives the fractions of each cell's water that leave through other s
 
 $$\sum_n \Delta t \sum_i d_i^n c_i^n = \sum_n \Delta t \sum_i s_i^n w_i^n + \sum_i V_i^0 c_i^0 w_i^1, \tag{9}$$
 
-where $V_i^0$ and $c_i^0$ are the water volume and tagged fraction of cell $i$ at the start. In words: the tagged water the destination takes, found by forward tracking, equals the tagged inflow and initial water, each multiplied by its share that later reaches the destination. The check holds exactly for either volume option (Section 4.2).
+where $V_i^0$ and $c_i^0$ are the water volume and tagged fraction of cell $i$ at the start. This check says that the tagged water the destination takes, found by forward tracking, equals the tagged inflow and initial water, each multiplied by its share that later reaches the destination. The check holds exactly for either volume option (Section 4.2).
