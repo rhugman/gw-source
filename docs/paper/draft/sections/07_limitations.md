@@ -1,6 +1,6 @@
 # 7. Limitations
 
-The checks test the tracing, not the flow model. A model with wrong recharge gives wrong areas that pass every check.
+A trace is only as good as the flow model behind it. The checks of Section 2.5 confirm that the trace agrees with the model's flows. They cannot tell whether those flows are right. If a model's recharge is too high, for example, its contributing areas are too small. The trace still passes every check.
 
 Because each cell is fully mixed, no cell can hold a sharp boundary between waters of different origin. Each cell mixes over its saturated thickness, so thick layers spread an area vertically as well as laterally. The transition band narrows only as about $h^{0.5}$ with cell size $h$ (Section 4.3). <!-- DS §2, §4, §5, Summary --> An experimental option, face-to-face routing, passes water between cell faces instead of mixing it in the cell. It removes 35–70 % of the excess spreading. It works in 2D only. It has no effect in cells with weak sinks or vertical through-flow. <!-- DS Summary, §4, §6 -->
 
