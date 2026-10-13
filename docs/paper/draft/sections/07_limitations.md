@@ -10,6 +10,6 @@ Travel times and transient tracking need a porosity, which fractions of water do
 
 Full mixing removes the need for a stop-or-pass rule at weak sinks while tracing. The modeller still decides how to credit a weak-sink well and which threshold on F draws the area (Sections 2.3 and 6.4).
 
-The particle check of Section 6.4 relies on PRT, which supports DIS and DISV grids only. On DISU grids the full-mixing mean travel time is the only travel-time option. <!-- PLAN §2.8 --> PRT can also stop with an error in cells wet only by a thin film of water ({SI: PRT abort in thin-film cells}). <!-- NS §3, §8 -->
+The particle check of Section 6.4 relies on PRT, which supports DIS and DISV grids only. On DISU grids the full-mixing mean travel time is the only travel-time option. <!-- PLAN §2.8 -->
 
 Transient tracking has been tested on synthetic models only (Sections 4.2 and 4.4). It has no real-world application yet, because the Neversink model is steady state.

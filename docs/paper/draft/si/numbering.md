@@ -26,9 +26,8 @@ Order: first citation, reading `sections/` in file order, with each display capt
 | {SI: growth mechanism} | Figure S3 | – | sections/05_neversink.md:55 |
 | {SI: one convention at a time} | Table S6 | – | sections/05_neversink.md:57 |
 | {SI: faster growth of weight-losing particles} | Text S11 | – | sections/05_neversink.md:57 |
-| {SI: PRT abort in thin-film cells} | Text S12 | – | sections/07_limitations.md:13 |
 
-**Count:** 21 SI items: 12 Texts (S1–S12), 6 Tables (S1–S6), 3 Figures (S1–S3).
+**Count:** 20 SI items: 11 Texts (S1–S11), 6 Tables (S1–S6), 3 Figures (S1–S3).
 
 ## Where each item lives
 
@@ -54,9 +53,8 @@ Order: first citation, reading `sections/` in file order, with each display capt
 | Figure S3 | {SI: growth mechanism} | si/D.md |
 | Table S6 | {SI: one convention at a time} | si/F_editor.md |
 | Text S11 | {SI: faster growth of weight-losing particles} | si/F_editor.md |
-| Text S12 | {SI: PRT abort in thin-film cells} | si/E.md |
 
-The SI should be assembled in label order: Texts S1–S12, then Tables S1–S6, then Figures S1–S3, or in first-citation order as in the first table; the labels hold either way.
+The SI should be assembled in label order: Texts S1–S11, then Tables S1–S6, then Figures S1–S3, or in first-citation order as in the first table; the labels hold either way.
 
 ## Renames to apply
 
