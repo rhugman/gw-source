@@ -13,7 +13,7 @@ output/prt_volume_thin1/cell_capture_fraction.npy); nothing is traced or rerun.
   terms, not the sum of the per-well values, which counts water passing between well cells
   twice).
 - (b-d) On the start cells of the published particles (uppermost active layer), in the windows
-  of Fig. 6 (which Fig. 7 reuses): the F > 0.1 and F > 0.5 zones (gross), the outline of the PRT
+  of Fig. 6 (which Fig. 8 reuses): the F > 0.1 and F > 0.5 zones (gross), the outline of the PRT
   zone P > 0.5 (weight-losing particles released over the cell volume) and the PRT-zone cells
   with F <= 0.1, filled and marked so that single cells show.
 
