@@ -11,7 +11,8 @@ Order: first citation, reading `sections/` in file order, with each display capt
 | {SI: travel-time identity} | Text S3 | – | sections/02_methods.md:65 |
 | {SI: verification errors per check and model} | Table S1 (parts a–c) | – | sections/04_verification.md:5 |
 | {SI: numerical dispersion maps and time steps} | Figure S1 | – | sections/04_verification.md:25 |
-| {SI: transient checks on tutorial 08} | Text S4 | – | sections/04_verification.md:41 |
+| {SI: example and test models} | Text (new in round 4; Text S3 by first citation, see note) | – | sections/02_methods.md:39 |
+| {SI: transient checks on the seasonal example model} | Text S4 | – | sections/03_implementation.md:9 (renamed in round 4 from {SI: transient checks on tutorial 08}) |
 | {SI: per-well comparison} | Table S2 | {SI: per-well gross and net} | sections/05_neversink.md:15 |
 | {SI: end states of the published particles} | Text S5 | – | sections/05_neversink.md:19 |
 | {SI: net attribution and PRT-area maps} | Figure S2 | – | sections/05_neversink.md:19 |
@@ -38,7 +39,8 @@ Order: first citation, reading `sections/` in file order, with each display capt
 | Text S3 | {SI: travel-time identity} | si/B.md |
 | Table S1 | {SI: verification errors per check and model} | si/C.md |
 | Figure S1 | {SI: numerical dispersion maps and time steps} | si/C.md |
-| Text S4 | {SI: transient checks on tutorial 08} | si/C.md |
+| Text (new; S3 by first citation) | {SI: example and test models} | si/C.md |
+| Text S4 | {SI: transient checks on the seasonal example model} | si/C.md |
 | Table S2 | {SI: per-well gross and net} | si/F_editor.md (new) |
 | Text S5 | {SI: end states of the published particles} | si/F_editor.md (new) |
 | Figure S2 | {SI: net attribution and PRT-area maps} | si/E.md |
@@ -63,7 +65,7 @@ The SI should be assembled in label order: Texts S1–S9, then Tables S1–S6, t
 
 ## Notes on labels
 
-- **Table S1** holds three tables under one heading: (a) largest error per check, (b) steady and snapshot checks per model, (c) transient tracking checks per model, with the description of the test models as its preamble. Label them Table S1a–c, or Tables S1–S3 if the journal wants one number per table; in that case every later Table label moves up by two.
+- **Table S1** holds three tables under one heading: (a) largest error per check, (b) steady and snapshot checks per model, (c) transient tracking checks per model. Since round 4 the test models are described in {SI: example and test models}, not in a preamble to Table S1. Label them Table S1a–c, or Tables S1–S3 if the journal wants one number per table; in that case every later Table label moves up by two.
 - **Figure S1** is the PNG docs/paper/figures/figS1_numerical_dispersion.png (panels a–n), redrawn by studies/paper/si_dispersion_figure.py from the outputs behind DS Figs 1, 3 and 5; its caption is in si/C.md.
 - **Figure S2** is the PNG docs/paper/figures/figS2_net_and_envelope.png (formerly figS1_net_and_envelope.png).
 - **Figure S3** is the PNG docs/paper/figures/figS3_growth_mechanism.png (formerly Fig. 10 of the main text, fig10_growth_mechanism.png).
@@ -71,3 +73,4 @@ The SI should be assembled in label order: Texts S1–S9, then Tables S1–S6, t
 - **Texts S5, S6 and S8** each hold one short table inside the text (end states of the particles; PRT delivery by crediting rule; the calibrated-model growth table, NS Table 7). They stay unnumbered parts of their Text. If the journal wants every table numbered, label them Tables S7, S8 and S9 in that order.
 - brief.md §2 planned Tables S1–S6 and Texts S1–S5 in a different order; decisions_r1 item 5 replaces that plan with first-citation order, which this file follows.
 - Six main-text citations stand without parentheses: sections/02_methods.md:39 and :65 (the last a bare placeholder after the sentence), sections/06_discussion.md:11 and :15, sections/07_limitations.md:7 and :9. When the labels go in, write them as "(Text S2)", "(Table S2)" and so on.
+- **Round 4 (writer C), not yet renumbered:** {SI: example and test models} is a new Text item in si/C.md. It describes the ten test models, the [FB13] worked example, the sub-step network and the three example models (Figs 1b, 1c and 4). By first citation it is first cited at sections/02_methods.md:39 (writer B, Fig. 1c), after Text S2 and before {SI: travel-time identity}. It then becomes Text S3, and every later Text moves down by one (travel-time identity S4, transient checks S5, and so on). In the same round, {SI: transient checks on tutorial 08} was renamed {SI: transient checks on the seasonal example model}, and it is now first cited at sections/03_implementation.md:9. {SI: verification errors per check and model} is no longer cited in sections/04_verification.md. Its first citation is the Fig. 2 caption, counted at `[[Figure 2]]`, which leaves its place in the order unchanged. The full renumbering and the line numbers in the first table are left to the orchestrator.

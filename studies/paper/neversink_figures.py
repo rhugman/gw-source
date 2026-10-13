@@ -8,8 +8,9 @@ USGS sparse checkout in studies/neversink/external; both git-ignored); nothing i
   (start cells of the published runs), the published contributing cells of the calibrated model
   and the eight priority wells by cluster. Coordinates are km from the grid origin; the north
   arrow shows true north, computed from the model's EPSG:5070 grid.
-- Fig. 6, F of the uppermost active cell with streams as cells and as a network, published
-  contributing cells outlined (paper-size version of docs/figures/neversink_capture_maps.png).
+- Fig. 6, F of the uppermost active cell in classes (viridis, edges 0.01, 0.1, 0.25, 0.5, 0.75,
+  1) with streams as cells and as a network, the SFR reaches, the wells and the published
+  contributing cells outlined; equal windows and one scale bar.
 - Fig. 7, overlap (Jaccard index) with the published contributing cells by method and
   convention, full mixing with gross and net accounting.
 - Fig. 8, published probability against ensemble mean F (paper-size version of
@@ -43,7 +44,9 @@ import workflow as wf  # noqa: E402
 
 import matplotlib.pyplot as plt  # noqa: E402  (figures sets the Agg backend)
 from matplotlib.collections import LineCollection  # noqa: E402
-from matplotlib.colors import ListedColormap  # noqa: E402
+from matplotlib import patheffects  # noqa: E402
+from matplotlib.colors import BoundaryNorm, ListedColormap  # noqa: E402
+from matplotlib.image import AxesImage  # noqa: E402
 
 OUT = NEVERSINK / "output"
 SCENARIO_DIR = OUT / "scenarios"
@@ -73,6 +76,9 @@ CLUSTERS = {  # as studies/neversink/growth_mechanisms.CLUSTERS
 }
 WINDOW_ASPECT = 1.3  # width / height of every map panel
 WINDOW_NAMES = {"U": "U", "SV north": "SV_W", "SV south": "SV_S"}  # nf.cluster_windows keys
+F_EDGES = (0.01, 0.1, 0.25, 0.5, 0.75, 1.0)  # Fig. 6 colour classes of F; below 0.01: grey
+F_COLORMAP = "viridis_r"  # perceptual; light for low F, dark for high F
+F6_BAR_KM = 2.0  # length of the one scale bar of Fig. 6
 FIXED_QRATS = nf.QRAT_FRACTION  # baserat to maxrat and their pumping fraction f
 
 # Values quoted in docs/neversink_study.md (Tables 1, 3, 5, 6, Section 3 reproduction table,
@@ -215,6 +221,16 @@ def stream_segments(
     down = xy.loc[[b for _, b in pairs]].to_numpy()
     keep = np.hypot(*(down - up).T) <= max_km
     return np.stack([up[keep], down[keep]], axis=1)
+
+
+
+def model_segments(model_dir: Path, nrow: int) -> np.ndarray:
+    """Return the SFR reach-to-downstream-reach segments (km) of the model in model_dir."""
+    return stream_segments(
+        sfr_reaches(model_dir / "neversink_packagedata.dat"),
+        sfr_downstream(model_dir / "neversink.sfr"),
+        nrow,
+    )
 
 
 def region_grids(endpoints: pd.DataFrame, shape: tuple) -> dict:
@@ -439,17 +455,129 @@ def capture_fields(idomain: np.ndarray, out: Path = OUT) -> dict:
 
 
 def capture_windows(idomain: np.ndarray, wells: dict, mask: np.ndarray, out: Path = OUT) -> dict:
-    """Return the map windows of Fig. 6, which Figs 8 and S2 reuse."""
+    """Return the cluster windows of Figs 8 and S2; Fig. 6 enlarges them to one size."""
     return map_windows(capture_fields(idomain, out), mask, wells)
 
 
+def equal_windows(windows: dict, shape: tuple) -> dict:
+    """Return the windows enlarged about their centres to the size of the largest (in cells)."""
+    rows = max(r1 - r0 + 1 for r0, r1, _, _ in windows.values())
+    cols = max(c1 - c0 + 1 for _, _, c0, c1 in windows.values())
+    return {
+        name: (*_widen(r0, r1, rows, shape[0]), *_widen(c0, c1, cols, shape[1]))
+        for name, (r0, r1, c0, c1) in windows.items()
+    }
+
+
+def window_extent(window: tuple, nrow: int) -> tuple:
+    """Return the (x0, x1, y0, y1) extent in km of a (row0, row1, col0, col1) window."""
+    r0, r1, c0, c1 = window
+    x0, x1 = c0 * nf.CELL_KM, (c1 + 1) * nf.CELL_KM
+    return x0, x1, (nrow - r1 - 1) * nf.CELL_KM, (nrow - r0) * nf.CELL_KM
+
+
+def f_classes(
+    edges: tuple = F_EDGES, colormap: str = F_COLORMAP
+) -> tuple[ListedColormap, BoundaryNorm]:
+    """Return a discrete colour map of F with one colour per class between edges; F below the
+    first edge is grey (active fill) and inactive cells are the surface colour."""
+    colors = plt.get_cmap(colormap)(np.linspace(0.0, 1.0, len(edges) - 1))
+    cmap = ListedColormap(colors).with_extremes(under=ACTIVE_FILL, bad=SURFACE)
+    return cmap, BoundaryNorm(edges, cmap.N)
+
+
+def capture_panel(
+    ax: plt.Axes,
+    field: np.ndarray,
+    outline: np.ndarray,
+    wells_ij: list,
+    window: tuple,
+    segments: np.ndarray,
+    f_map: tuple,
+    title: str,
+) -> AxesImage:
+    """Draw one Fig. 6 panel: F classes, SFR reaches, published outline (haloed) and wells."""
+    r0, r1, c0, c1 = window
+    nrow = field.shape[0]
+    extent = window_extent(window, nrow)
+    cmap, norm = f_map
+    image = ax.imshow(
+        field[r0 : r1 + 1, c0 : c1 + 1],
+        cmap=cmap,
+        norm=norm,
+        extent=extent,
+        interpolation="nearest",
+    )
+    ax.add_collection(LineCollection(segments, colors=STREAM, linewidths=0.5, zorder=2))
+    yy, xx = np.mgrid[r0 : r1 + 1, c0 : c1 + 1]
+    xk, yk = grid_km(yy, xx, nrow)
+    outline_set = ax.contour(
+        xk, yk, outline[r0 : r1 + 1, c0 : c1 + 1], levels=[0.5], colors=INK, linewidths=0.7
+    )
+    outline_set.set(path_effects=[patheffects.withStroke(linewidth=1.8, foreground=SURFACE)])
+    outline_set.set_zorder(3)
+    ij = np.array([(i, j) for i, j in wells_ij if r0 <= i <= r1 and c0 <= j <= c1])
+    x, y = grid_km(ij[:, 0], ij[:, 1], nrow)
+    ax.plot(x, y, "o", ms=4, mfc=COLORS["prt"], mec=INK, mew=0.7, zorder=5)
+    ax.set_xlim(extent[:2])
+    ax.set_ylim(extent[2:])
+    ax.set_aspect("equal")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_title(title, loc="left")
+    return image
+
+
+def capture_legend(fig: plt.Figure) -> None:
+    """Draw the legend of Fig. 6 below the panels."""
+    handles = [
+        plt.Line2D(
+            [], [], ls="", marker="o", ms=4, mfc=COLORS["prt"], mec=INK, mew=0.7, label="wells"
+        ),
+        plt.Line2D([], [], color=STREAM, lw=1, label="SFR reaches"),
+        plt.Line2D([], [], color=INK, lw=0.8, label="published contributing cells (outline)"),
+    ]
+    fig.legend(handles=handles, loc="outside lower center", ncol=3, handlelength=1.6)
+
+
 def capture_maps(
-    fig_dir: Path, idomain: np.ndarray, wells: dict, mask: np.ndarray, windows: dict
+    fig_dir: Path,
+    idomain: np.ndarray,
+    wells: dict,
+    mask: np.ndarray,
+    windows: dict,
+    segments: np.ndarray,
+    out: Path = OUT,
+    bar_km: float = F6_BAR_KM,
 ) -> Path:
-    """Fig. 6: F of the uppermost active cell, streams as cells and as a network."""
+    """Fig. 6: F of the uppermost active cell in classes, streams as cells and as a network,
+    with the SFR reaches, the wells and the published outline; equal windows, one scale bar."""
     paper_style()
-    fields = capture_fields(idomain)
-    fig = map_grid(fields, mask, wells, windows, 3.6, "F, uppermost active cell")
+    fields = capture_fields(idomain, out)
+    nrow, ncol = mask.shape
+    wells_ij = list(well_ij(wells, (nrow, ncol)).values())
+    windows = equal_windows(windows, (nrow, ncol))
+    f_map = f_classes()
+    fig, axes = plt.subplots(
+        len(fields), len(windows), figsize=(DOUBLE, 3.9), constrained_layout=True, squeeze=False
+    )
+    letters = iter("abcdef")
+    for row, (label, field) in enumerate(fields.items()):
+        for col, (name, window) in enumerate(windows.items()):
+            title = f"({next(letters)}) {name}: {label}"
+            image = capture_panel(
+                axes[row, col], field, mask, wells_ij, window, segments, f_map, title
+            )
+    x0, _, y0, _ = window_extent(windows[next(iter(windows))], nrow)
+    scale_bar(axes[0, 0], x0 + 0.4, y0 + 0.4, bar_km)
+    bar = fig.colorbar(
+        image, ax=axes, shrink=0.75, aspect=25, extend="min", ticks=F_EDGES, spacing="uniform"
+    )
+    bar.set_label("F, uppermost active cell (grey: below 0.01)")
+    bar.ax.set_yticklabels([f"{edge:g}" for edge in F_EDGES])
+    bar.outline.set_visible(False)
+    bar.ax.tick_params(labelsize=7)
+    capture_legend(fig)
     return save(fig, fig_dir, "fig6_capture_maps")
 
 
@@ -808,18 +936,15 @@ def main(
     if fig5 or fig6 or fig8:
         mask = published_mask(shape)
         windows = capture_windows(idomain, wells, mask)
+    if fig5 or fig6:
+        segments = model_segments(MODEL_DIR, shape[0])
     if fig5:
         regions = region_grids(wf.read_endpoints(columns=("node0",)), shape)
-        segments = stream_segments(
-            sfr_reaches(MODEL_DIR / "neversink_packagedata.dat"),
-            sfr_downstream(MODEL_DIR / "neversink.sfr"),
-            shape[0],
-        )
         x0, y0 = read_dis_origin(MODEL_DIR / "neversink.dis")
         north = true_north_angle(x0 + shape[1] * 25.0, y0 + shape[0] * 25.0)
         paths.append(location_map(fig_dir, idomain, wells, mask, regions, segments, north))
     if fig6:
-        paths.append(capture_maps(fig_dir, idomain, wells, mask, windows))
+        paths.append(capture_maps(fig_dir, idomain, wells, mask, windows, segments))
     if fig7:
         paths.append(agreement_chart(fig_dir, agreement_table()))
     if fig8:

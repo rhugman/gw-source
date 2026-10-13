@@ -1,13 +1,14 @@
 """Method and verification figures of the paper (Figs 1 to 3, Table 2); outline in docs/paper/outline.md.
 
-- Fig. 1, method schematic. (a) One cell with intercell flows and its source and sink terms,
-  total inflow I, total outflow O and residual r. (b) An eight-cell graph with the backward
-  fraction F to a well, computed by gwsource on a hand-built FlowStep (gross accounting). (c)
-  Gross vs net accounting on the weak-sink well of tutorial 02, whose numbers are recomputed by
-  building and tracing that tutorial's layered model. (d) A transient cell: a snapshot treats
-  storage release as a source term with no origin; transient tracking carries the cell's water
-  volume, and the tagged water in it, from the end of one step into the next (symbolic, no
-  numbers).
+- Fig. 1, method schematic, one idea per panel and no tutorial names in the figure. (a) One
+  cell with intercell flows, recharge and a well, and the definitions of total inflow I, total
+  outflow O and residual r. (b) An eight-cell graph with the backward fraction F to a well,
+  computed by gwsource on a hand-built FlowStep (gross accounting); only the flows of the well
+  cell are numbered (F = 6/11 there). (c) The water credited to a weak-sink well under gross
+  and net accounting (5.0 vs 33.7 m3/d), recomputed by building and tracing the layered model
+  of tutorial 02. (d) A snapshot treats storage release as a source term of unknown origin;
+  transient tracking carries the cell's stored water from the end of one step into the next
+  (symbolic, no numbers). The quoted numbers are asserted in check_fig1_numbers().
 - Table 2 and Fig. 2, verification. studies/paper/verification.py runs the exact checks over the
   synthetic test models 1 to 10 (and the hand-built network of the sub-step test) and records
   the error reached per model and check; Fig. 2 plots them on a log scale with machine epsilon
@@ -179,19 +180,18 @@ def draw_single_cell(ax) -> None:
         cell_box(ax, xy, 0.8, face="#f2f2f2", linestyle="--")
         ax.text(*xy, name, ha="center", va="center", fontsize=9)
     cell_box(ax, (0.0, 0.0), 1.2)
-    ax.text(0.0, 0.12, "$i$", ha="center", va="center", fontsize=10)
-    ax.text(0.0, -0.25, "$r_i = I_i - O_i$", ha="center", va="center", fontsize=7)
+    ax.text(0.0, -0.05, "$i$", ha="center", va="center", fontsize=10)
     arrow(ax, (-1.2, -0.05), (-0.6, -0.05), INK)
     ax.text(-0.9, 0.05, "$q_{ji}$", ha="center", va="bottom", fontsize=7)
     arrow(ax, (0.6, -0.05), (1.2, -0.05), INK)
     ax.text(0.9, 0.05, "$q_{ik}$", ha="center", va="bottom", fontsize=7)
     arrow(ax, (-0.3, 1.25), (-0.3, 0.6), blue, width=1.4)
-    ax.text(-0.42, 1.0, "source\n(recharge)", ha="right", va="center", fontsize=7, color=blue)
+    ax.text(-0.42, 0.95, "recharge", ha="right", va="center", fontsize=7, color=blue)
     arrow(ax, (0.3, 0.6), (0.3, 1.25), red, width=1.4)
-    ax.text(0.42, 1.0, "sink (well)\n$d_i$", ha="left", va="center", fontsize=7, color=red)
-    lines = ("$I_i = \\Sigma_j\\, q_{ji} + \\mathrm{Src}_i$",
-             "$O_i = \\Sigma_k\\, q_{ik} + \\mathrm{Snk}_i$",
-             "$F_i = \\Sigma_k\\, (q_{ik}/O_i)\\, F_k + d_i/O_i$")
+    ax.text(0.42, 0.95, "well $d_i$", ha="left", va="center", fontsize=7, color=red)
+    lines = ("$I_i = \\Sigma_j\\, q_{ji}$ + sources",
+             "$O_i = \\Sigma_k\\, q_{ik}$ + sinks",
+             "$r_i = I_i - O_i$")
     for n, line in enumerate(lines):
         ax.text(-1.95, -1.0 - 0.42 * n, line, ha="left", va="center", fontsize=7.5)
     blank_axes(ax, (-2.05, 2.05), (-2.05, 1.6))
@@ -203,10 +203,16 @@ def graph_positions(shape: tuple[int, int] = GRAPH_SHAPE, spacing: float = 1.5) 
     return np.column_stack([cols * spacing, -rows * spacing])
 
 
+def term_cells(terms: tuple, package: str) -> list[int]:
+    """Return the cells of the graph terms of one package, in order."""
+    return [cell for cell, pkg, _ in terms if pkg == package]
+
+
 def draw_graph(ax, f: np.ndarray, edges: tuple = GRAPH_EDGES, terms: tuple = GRAPH_TERMS) -> None:
-    """Panel (b): cells coloured and labelled by F, arrows labelled by flow, terms at the edges."""
+    """Panel (b): cells coloured and labelled by F; only the flows of the well cell are numbered."""
     xy = graph_positions()
     half = 0.45
+    well = term_cells(terms, "WEL")[0]
     for i, (x, y) in enumerate(xy):
         cell_box(ax, (x, y), 2 * half, face=F_CMAP(f[i]))
         colour = "white" if f[i] > 0.55 else INK
@@ -215,10 +221,12 @@ def draw_graph(ax, f: np.ndarray, edges: tuple = GRAPH_EDGES, terms: tuple = GRA
         unit = (xy[b] - xy[a]) / np.linalg.norm(xy[b] - xy[a])
         start, end = xy[a] + half * unit, xy[b] - half * unit
         arrow(ax, start, end, MUTED, width=0.5 + 0.18 * q)
-        mid = 0.5 * (start + end) + 0.18 * np.array([unit[1], -unit[0]]) * (1 if unit[0] else -1)
-        ax.text(*mid, f"{q:g}", ha="center", va="center", fontsize=7, color=MUTED)
+        if well in (a, b):
+            side = np.array([unit[1], -unit[0]]) * (1 if unit[0] else -1)
+            mid = 0.5 * (start + end) + 0.18 * side
+            ax.text(*mid, f"{q:g}", ha="center", va="center", fontsize=7, color=INK)
     draw_graph_terms(ax, xy, half, terms)
-    blank_axes(ax, (-1.35, 5.35), (-2.45, 0.95))
+    blank_axes(ax, (-1.35, 5.5), (-2.45, 0.95))
 
 
 def draw_graph_terms(ax, xy: np.ndarray, half: float, terms: tuple) -> None:
@@ -228,60 +236,58 @@ def draw_graph_terms(ax, xy: np.ndarray, half: float, terms: tuple) -> None:
         x, y = xy[cell]
         if pkg == "CHD":
             arrow(ax, (x - half - 0.45, y), (x - half, y), green, width=0.5 + 0.18 * q)
-            ax.text(x - half - 0.48, y + 0.1, f"{q:g}", ha="center", va="bottom", fontsize=7,
-                    color=green)
         elif pkg == "RCH":
             arrow(ax, (x - 0.22, y + half + 0.22), (x - 0.22, y + half - 0.08), blue, width=0.7)
         elif pkg == "WEL":
             ax.plot(x + 0.28, y - 0.27, marker="v", color=red, ms=5, zorder=5)
         elif pkg == "RIV":
             arrow(ax, (x + half, y), (x + half + 0.4, y), red, width=0.5 + 0.18 * abs(q))
-            ax.text(x + half + 0.43, y + 0.1, f"{-q:g}", ha="center", va="bottom", fontsize=7,
-                    color=red)
 
 
-def draw_graph_legend(ax, inflow: float) -> None:
-    """Write the key of panel (b) below the graph."""
+def draw_graph_labels(ax, inflow: float, terms: tuple = GRAPH_TERMS) -> None:
+    """Name the boundary inflow, the river, the recharge and the well of panel (b)."""
     blue, red, green = OKABE_ITO["blue"], OKABE_ITO["vermillion"], OKABE_ITO["green"]
-    ax.text(-1.3, -2.15, "boundary inflow", color=green, fontsize=7, va="center")
-    ax.text(0.65, -2.15, "recharge 1 per cell", color=blue, fontsize=7, va="center")
-    ax.text(2.95, -2.15, "river", color=red, fontsize=7, va="center")
-    ax.plot(3.75, -2.15, marker="v", color=red, ms=5)
-    ax.text(3.9, -2.15, f"well {inflow:g}", color=red, fontsize=7, va="center")
+    xy = graph_positions()
+    half = 0.45
+    x_in, y_in = xy[term_cells(terms, "CHD")].mean(axis=0)  # between the two inflow arrows
+    ax.text(x_in - half - 0.22, y_in, "inflow", ha="center", va="center", fontsize=7,
+            color=green)
+    x_riv, y_riv = xy[term_cells(terms, "RIV")].mean(axis=0)
+    ax.text(x_riv + half + 0.2, y_riv, "river", ha="center", va="center", fontsize=7,
+            color=red)
+    x_well, y_well = xy[term_cells(terms, "WEL")[0]]
+    ax.text(x_well, y_well - half - 0.1, f"well {inflow:g}", ha="center", va="top", fontsize=7,
+            color=red)
+    ax.text(xy[0][0] - half, y_well - half - 0.1, "recharge 1 per cell", ha="left", va="top",
+            fontsize=7, color=blue)
 
 
 def draw_gross_net(ax, numbers: dict[str, float]) -> None:
-    """Panel (c): the weak well's cell, and the water attributed to it in both accountings."""
-    red, blue = OKABE_ITO["vermillion"], OKABE_ITO["blue"]
+    """Panel (c): the weak well's cell, and the water credited to the well in each accounting.
+    The gross bar takes the well's colour (its pumping), the net bar the inflow's (the cell's
+    throughflow)."""
+    red = OKABE_ITO["vermillion"]
     cell_box(ax, (0.0, 1.45), 0.9)
     ax.plot(0.0, 1.45, marker="v", color=red, ms=6)
     arrow(ax, (-1.3, 1.45), (-0.45, 1.45), MUTED, width=2.2)
-    ax.text(-0.88, 1.56, f"{numbers['cell_inflow']:.1f} in", ha="center", va="bottom",
-            fontsize=7)
+    ax.text(-0.88, 1.56, f"{numbers['cell_inflow']:.1f}", ha="center", va="bottom", fontsize=7)
     arrow(ax, (0.45, 1.45), (1.3, 1.45), MUTED, width=2.0)
-    ax.text(0.88, 1.56, f"{numbers['passed_on']:.1f} on", ha="center", va="bottom", fontsize=7)
+    ax.text(0.88, 1.56, f"{numbers['passed_on']:.1f}", ha="center", va="bottom", fontsize=7)
     arrow(ax, (0.0, 1.0), (0.0, 0.55), red, width=1.0)
     ax.text(0.12, 0.75, f"well {numbers['pumping']:.1f}", ha="left", va="center", fontsize=7,
             color=red)
-    ax.text(0.0, 2.05, "weak-sink cell, tutorial 02 (m³/d)", ha="center", va="bottom",
-            fontsize=7)
-    ax.text(-1.65, 0.15, "water attributed to the well (m³/d)", ha="left", va="center",
-            fontsize=7)
-    bars = (("gross", numbers["attributed_gross"], numbers["f_gross"], blue),
-            ("net", numbers["attributed_net"], numbers["f_net"], red))
-    x0, scale = -0.75, 1.65 / numbers["attributed_net"]
-    for row, (name, value, f, colour) in enumerate(bars):
-        y = -0.4 - 0.75 * row
-        ax.add_patch(Rectangle((x0, y - 0.2), value * scale, 0.4, color=colour, lw=0))
-        ax.text(x0 - 0.08, y + 0.1, name, ha="right", va="center", fontsize=7)
-        ax.text(x0 - 0.08, y - 0.17, f"F = {f:.2f}", ha="right", va="center", fontsize=7,
-                color=MUTED)
+    ax.text(0.0, 2.05, "weak-sink cell (m³/d)", ha="center", va="bottom", fontsize=7)
+    ax.text(0.0, 0.1, "credited to the well (m³/d)", ha="center", va="center", fontsize=7)
+    bars = (("gross", numbers["attributed_gross"], red),
+            ("net", numbers["attributed_net"], MUTED))
+    x0, scale = -0.85, 2.05 / numbers["attributed_net"]
+    for row, (name, value, colour) in enumerate(bars):
+        y = -0.35 - 0.55 * row
+        ax.add_patch(Rectangle((x0, y - 0.18), value * scale, 0.36, color=colour, lw=0))
+        ax.text(x0 - 0.08, y, name, ha="right", va="center", fontsize=7)
         ax.text(x0 + 0.05 + value * scale, y, f"{value:.1f}", ha="left", va="center",
                 fontsize=7)
-    ratio = numbers["attributed_net"] / numbers["attributed_gross"]
-    ax.text(0.0, -1.95, f"net = {ratio:.1f} × pumping", ha="center", va="center",
-            fontsize=7.5, fontweight="bold")
-    blank_axes(ax, (-1.7, 1.7), (-2.2, 2.45))
+    blank_axes(ax, (-1.9, 1.9), (-1.2, 2.45))
 
 
 def water_cell(ax, xy: tuple[float, float], size: float, level: float, shade: float,
@@ -293,99 +299,91 @@ def water_cell(ax, xy: tuple[float, float], size: float, level: float, shade: fl
     ax.text(xy[0], y0 + 0.6 * level * size, text, ha="center", va="center", fontsize=7)
 
 
-def draw_snapshot_cell(ax, xy: tuple[float, float] = (2.4, 1.9), size: float = 1.0) -> None:
+def cell_terms(ax, x: float, y: float, h: float, inflow_y: float) -> None:
+    """Draw a cell's intercell in- and outflow, its recharge and its well, unlabelled."""
+    blue, red = OKABE_ITO["blue"], OKABE_ITO["vermillion"]
+    arrow(ax, (x - h - 0.6, inflow_y), (x - h, inflow_y))
+    arrow(ax, (x + h, inflow_y), (x + h + 0.6, inflow_y))
+    arrow(ax, (x - 0.25, y + h + 0.55), (x - 0.25, y + h), blue, width=1.4)
+    arrow(ax, (x + 0.25, y + h), (x + 0.25, y + h + 0.55), red, width=1.4)
+
+
+def draw_snapshot_cell(ax, xy: tuple[float, float] = (2.4, 1.7), size: float = 1.0) -> None:
     """Panel (d), left: one step traced on its own flows, storage release as a source term."""
     blue, red = OKABE_ITO["blue"], OKABE_ITO["vermillion"]
     x, y, h = xy[0], xy[1], size / 2
     cell_box(ax, xy, size)
-    ax.text(x, y, "$G_i$", ha="center", va="center", fontsize=8)
-    arrow(ax, (x - h - 0.75, y), (x - h, y))
-    ax.text(x - h - 0.38, y + 0.08, "$q_{ji}$", ha="center", va="bottom", fontsize=7)
-    arrow(ax, (x + h, y), (x + h + 0.75, y))
-    ax.text(x + h + 0.38, y + 0.08, "$q_{ik}$", ha="center", va="bottom", fontsize=7)
-    arrow(ax, (x - 0.25, y + h + 0.6), (x - 0.25, y + h), blue, width=1.4)
-    ax.text(x - 0.37, y + h + 0.42, "tagged source $s_i$\n(recharge)", ha="right",
-            va="center", fontsize=7, color=blue)
-    arrow(ax, (x + 0.25, y + h), (x + 0.25, y + h + 0.6), red, width=1.4)
-    ax.text(x + 0.37, y + h + 0.35, "well", ha="left", va="center", fontsize=7, color=red)
+    ax.text(x, y, "$i$", ha="center", va="center", fontsize=9)
+    cell_terms(ax, x, y, h, y)
+    ax.text(x - 0.37, y + h + 0.3, "recharge", ha="right", va="center", fontsize=7, color=blue)
+    ax.text(x + 0.37, y + h + 0.3, "well", ha="left", va="center", fontsize=7, color=red)
     arrow(ax, (x, y - h - 0.65), (x, y - h), MUTED, width=2.2)
-    ax.text(x + 0.15, y - h - 0.38, "storage release:\na source term\nof unknown origin",
-            ha="left", va="center", fontsize=7, color=MUTED)
-    ax.text(0.2, y - h - 0.38, "no water carried\nbetween steps", ha="left", va="center",
-            fontsize=7)
-    ax.text(0.2, 0.12, "$G_i = (\\Sigma_j\\, q_{ji}\\, G_j + s_i)\\, /\\, I_i$",
-            ha="left", va="center", fontsize=7.5)
+    ax.text(x + 0.15, y - h - 0.35, "storage release,\norigin unknown", ha="left",
+            va="center", fontsize=7, color=MUTED)
 
 
-def draw_tracking_cells(ax, x0: float = 6.4, y: float = 1.9, size: float = 1.0,
+def draw_tracking_cells(ax, x0: float = 7.0, y: float = 1.7, size: float = 1.0,
                         gap: float = 2.4) -> None:
     """Panel (d), right: the same cell i at three times. The water stored at the end of step n
     is mixed with the inflows of step n+1; outflows and the water stored at the end of step n+1
     carry the mixture."""
-    blue, red = OKABE_ITO["blue"], OKABE_ITO["vermillion"]
     xa, xb, xc, h = x0, x0 + gap, x0 + 2 * gap, size / 2
     water_cell(ax, (xa, y), size, 0.6, 0.25)
     water_cell(ax, (xb, y), size, 0.55, 0.42, "mixed")
     water_cell(ax, (xc, y), size, 0.5, 0.42)
+    cell_terms(ax, xb, y, h, y + 0.3)
     low = y - h + 0.15
     for x_from, x_to in ((xa + h, xb - h), (xb + h, xc - h)):
         arrow(ax, (x_from, low), (x_to, low), MUTED, width=2.2)
-        ax.text(0.5 * (x_from + x_to), low + 0.07, "stored water\ncarried on", ha="center",
-                va="bottom", fontsize=7, color=MUTED)
-    arrow(ax, (xc + h, low), (xc + h + 0.6, low), MUTED, width=2.2, linestyle=(0, (2, 1.5)))
-    ax.text(xc + h + 0.65, low, "step $n$+2", ha="left", va="center", fontsize=7, color=MUTED)
+    ax.text(0.5 * (xa + xb), low + 0.07, "stored\nwater", ha="center", va="bottom", fontsize=7,
+            color=MUTED)
     time_y = y - h - 0.12
     arrow(ax, (xa - h, time_y), (xc + h + 0.6, time_y), MUTED, width=0.6)
     ax.text(xc + h + 0.65, time_y, "time", ha="left", va="center", fontsize=7, color=MUTED)
-    high = y + 0.4
-    arrow(ax, (xb - h - 0.55, high), (xb - h, high))
-    ax.text(xb - h - 0.6, high, "$q_{ji}\\, c_j^{n+1}$", ha="right", va="center", fontsize=7)
-    arrow(ax, (xb + h, high), (xb + h + 0.85, high))
-    ax.text(xb + h + 0.5, high + 0.08, "$q_{ik}\\, c_i^{n+1}$", ha="center", va="bottom",
-            fontsize=7)
-    arrow(ax, (xb - 0.25, y + h + 0.6), (xb - 0.25, y + h), blue, width=1.4)
-    ax.text(xb - 0.45, y + h + 0.42, "tagged source $s_i$\n(recharge)", ha="right",
-            va="center", fontsize=7, color=blue)
-    arrow(ax, (xb + 0.25, y + h), (xb + 0.25, y + h + 0.6), red, width=1.4)
-    ax.text(xb + 0.37, y + h + 0.35, "well", ha="left", va="center", fontsize=7, color=red)
     for x, text in ((xa, "end of step $n$\n$V_i^{n},\\ c_i^{n}$"),
-                    (xb, "during step $n$+1"),
+                    (xb, "step $n$+1"),
                     (xc, "end of step $n$+1\n$V_i^{n+1},\\ c_i^{n+1}$")):
-        ax.text(x, y - h - 0.28, text, ha="center", va="top", fontsize=7)
-    ax.text(xb, 0.12, "$V_i^{n+1}\\, c_i^{n+1} = V_i^{n}\\, c_i^{n} + \\Delta t\\, (\\Sigma_j\\,"
-            " q_{ji}\\, c_j^{n+1} + s_i - O_i\\, c_i^{n+1})$", ha="center", va="center",
-            fontsize=7.5)
+        ax.text(x, y - h - 0.25, text, ha="center", va="top", fontsize=7)
 
 
 def draw_transient(ax) -> None:
     """Panel (d): a snapshot of one step against transient tracking from step n to n+1."""
     draw_snapshot_cell(ax)
-    ax.plot([5.0, 5.0], [0.0, 3.3], color=GRID, lw=0.8)
-    ax.text(0.2, 3.3, "snapshot, step $n$+1", ha="left", va="top", fontsize=7.5)
-    ax.text(5.3, 3.3, "transient tracking: the same cell $i$ from step $n$ to $n$+1",
-            ha="left", va="top", fontsize=7.5)
-    ax.text(13.9, 2.95, "shading: tagged fraction $c$", ha="right", va="top", fontsize=7,
-            color=MUTED)
+    ax.plot([5.0, 5.0], [0.3, 3.3], color=GRID, lw=0.8)
+    ax.text(0.2, 3.3, "snapshot", ha="left", va="top", fontsize=7.5)
+    ax.text(5.3, 3.3, "transient tracking", ha="left", va="top", fontsize=7.5)
     draw_tracking_cells(ax)
-    blank_axes(ax, (0.0, 14.0), (-0.1, 3.35))
+    blank_axes(ax, (0.0, 14.0), (0.3, 3.35))
+
+
+def check_fig1_numbers(f: np.ndarray, inflow: float, numbers: dict[str, float],
+                       terms: tuple = GRAPH_TERMS) -> None:
+    """Assert the Fig. 1 numbers quoted in the text: F = 6/11 in (b), 5.0 vs 33.7 m³/d in (c)."""
+    well = term_cells(terms, "WEL")[0]
+    assert inflow == 6.0 and abs(f[well] - 6 / 11) < 1e-12, (inflow, f[well])
+    assert round(numbers["pumping"], 1) == 5.0, numbers
+    assert round(numbers["attributed_gross"], 1) == 5.0, numbers
+    assert round(numbers["attributed_net"], 1) == 33.7, numbers
+    assert round(numbers["f_gross"], 2) == 0.15, numbers
 
 
 def make_fig1(out_dir: Path, numbers: dict[str, float]) -> list[Path]:
     """Fig. 1: method schematic, three panels in the top row and the transient panel below."""
     step = graph_step()
     f, inflow, _ = graph_fractions(step)
-    fig = plt.figure(figsize=(FULL_WIDTH, 4.45))
-    outer = fig.add_gridspec(2, 1, height_ratios=(2.2, 1.72), hspace=0.1, left=0.01,
-                             right=0.99, top=0.945, bottom=0.01)
+    check_fig1_numbers(f, inflow, numbers)
+    fig = plt.figure(figsize=(FULL_WIDTH, 3.9))
+    outer = fig.add_gridspec(2, 1, height_ratios=(2.0, 1.55), hspace=0.14, left=0.01,
+                             right=0.99, top=0.94, bottom=0.01)
     top = outer[0].subgridspec(1, 3, width_ratios=(1.0, 1.65, 1.05), wspace=0.08)
     axes = [fig.add_subplot(top[0, i]) for i in range(3)] + [fig.add_subplot(outer[1])]
     draw_single_cell(axes[0])
     draw_graph(axes[1], f)
-    draw_graph_legend(axes[1], inflow)
+    draw_graph_labels(axes[1], inflow)
     draw_gross_net(axes[2], numbers)
     draw_transient(axes[3])
-    titles = ("(a) one fully mixed cell", "(b) backward fraction F to the well (gross)",
-              "(c) gross vs net, weak sink", "(d) transient models: snapshot vs transient tracking")
+    titles = ("(a) one fully mixed cell", "(b) backward fraction F to a well",
+              "(c) gross vs net accounting", "(d) snapshot vs transient tracking")
     for ax, title in zip(axes, titles):
         ax.apply_aspect()
         box = ax.get_position()
