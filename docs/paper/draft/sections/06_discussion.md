@@ -26,7 +26,7 @@ Transient tracking needs a porosity. It also needs the budget of every time step
 
 2. **Choose the threshold by how much the zone may miss.** The F > 0.5 area holds the cells where most of the water ends at the well. On Neversink, almost all of its cells were published contributing cells (Section 5.2). <!-- envelope_prt.csv (all, P>0.5, F>0.5: coverage 0.590, f_zone_inside_prt 0.917); NS §2, Table 1 (417 of 445 cells published, 43 % of the published area); NS §5, Table 3a --> Where the zone must err on the side of caution, draw the F > 0.1 area instead. It held the reference area in every synthetic test, at the cost of being larger (Section 4.3). <!-- DS §5, Summary --> On Neversink it still missed 27 % of the published area, partly at weak sinks and partly through mixing between sinks (Sections 5.2 and 5.3). <!-- envelope_prt.csv (all, P>0.5, F>0.1: coverage 0.871, 89 missed); NS §2 (711 of 980 published contributing cells inside F > 0.1), §5, Table 3a -->
 
-3. **Check the edge with particles where the area ends at a weak sink**, such as a buried stream cell. Run particles once stopping at these cells and once passing them. The difference shows how far the edge depends on that rule (Section 5.3; Fig. 7).
+3. **Check the edge with particles where the area ends at a weak sink**, such as a buried stream cell. Run particles once stopping at these cells and once passing them. The difference shows how far the edge depends on that rule (Section 5.3).
 
 4. **Use gross accounting by default.** It credits each well with its pumping, as MODALL and GWT transport do (Sections 2.3 and 4.1). One trace also covers every well (Section 2.4). Keep net accounting for reproducing FlowSource studies (Section 6.2).
 

@@ -1,4 +1,4 @@
-"""Paper figures 5 to 9 and supporting-information Fig. S3: the Neversink/Rondout case study,
+"""Paper figures 5 to 8 and supporting-information Fig. S3: the Neversink/Rondout case study,
 at Groundwater sizes.
 
 Every figure is drawn from existing outputs of the case study (studies/neversink/output, the
@@ -11,11 +11,9 @@ USGS sparse checkout in studies/neversink/external; both git-ignored); nothing i
 - Fig. 6, F of the uppermost active cell in classes (viridis, edges 0.01, 0.1, 0.25, 0.5, 0.75,
   1) with streams as cells and as a network, the SFR reaches, the wells and the published
   contributing cells outlined; equal windows and one scale bar.
-- Fig. 7, overlap (Jaccard index) with the published contributing cells by method and
-  convention, full mixing with gross and net accounting.
-- Fig. 8, published probability against ensemble mean F (paper-size version of
+- Fig. 7, published probability against ensemble mean F (paper-size version of
   docs/figures/neversink_probability_maps.png), in the classes, windows and overlays of Fig. 6.
-- Fig. 9, median contributing area against pumping, relative to base.
+- Fig. 8, median contributing area against pumping, relative to base.
 - Fig. S3 (supporting information), growth mechanism: stream share of the wells' water against pumping, and, per
   realisation, the excess of area growth over pumping growth against the drop in stream share.
 
@@ -583,7 +581,7 @@ def probability_maps(
     segments: np.ndarray,
     maps_file: Path = ENS_DIR / "probability_maps.npz",
 ) -> Path:
-    """Fig. 8: published probability against ensemble mean F, base pumping, in the classes and
+    """Fig. 7: published probability against ensemble mean F, base pumping, in the classes and
     windows of Fig. 6."""
     paper_style()
     maps = np.load(maps_file)
@@ -604,124 +602,10 @@ def probability_maps(
         "probability or mean F (grey: below 0.01)",
         "published probability 0.5 (outline)",
     )
-    return save(fig, fig_dir, "fig8_probability_maps")
+    return save(fig, fig_dir, "fig7_probability_maps")
 
 
-# ---------------------------------------------------------------- Fig. 7: overlap
-
-FLUX_LABELS = {  # prt_comparison.csv (release, thin_weak_sinks) -> label
-    ("volume", True): "cell volume, weight-losing",
-    ("z0.5", True): "mid-cell, weight-losing",
-    ("z1", True): "water table, weight-losing",
-    ("volume", False): "cell volume, losing weight only at wells",
-}
-FLUX_KEYS = {
-    ("volume", True): "volume, thinned",
-    ("volume", False): "volume, plain",
-    ("z1", True): "z1, thinned",
-    ("z0.5", True): "z0.5, thinned",
-}
-REPRO_LABELS = {  # mp7_reproduction.csv variant -> label (NS Section 3 reproduction table)
-    "distributed_no_drape": "MF6 default, no draping",
-    "distributed": "MF6 default",
-    "no_drape": "without draping",
-    "mp7_conventions": "published conventions",
-}
-MIXING_ROWS = (  # (key, label, column of net_vs_gross_mp7.csv)
-    ("F > 0.1", "F > 0.1", "jaccard_F>0.1"),
-    ("F > 0.5", "F > 0.5", "jaccard_F>0.5"),
-    ("area-matched", "area-matched (980 cells)", "jaccard_area_matched"),
-)
-GROUPS = {
-    "full mixing": "Full mixing, gross accounting",
-    "full mixing, net": "Full mixing, net accounting",
-    "flow-weighted": "PRT, flow-weighted, P > 0.5",
-    "published starts": "PRT, published starts",
-}
-
-
-def agreement_table(out: Path = OUT, mixing_rows: tuple = MIXING_ROWS) -> pd.DataFrame:
-    """Return group, key, label and overlap (Jaccard index) of every method with the published
-    contributing cells; full mixing with gross and net accounting."""
-    rows = []
-    mixing = pd.read_csv(out / "agreement_with_mp7.csv").set_index("method")["jaccard"]
-    for key, label, _ in mixing_rows:
-        rows.append(("full mixing", key, label, mixing[f"full mixing, {key}"]))
-    modes = pd.read_csv(out / "net_vs_gross_mp7.csv").set_index(["group", "accounting"])
-    for key, label, column in mixing_rows:
-        gross = modes.loc[("priority", "gross"), column]
-        assert np.isclose(gross, mixing[f"full mixing, {key}"], rtol=1e-12), f"gross {key}"
-        rows.append(("full mixing, net", key, label, modes.loc[("priority", "net"), column]))
-    prt = pd.read_csv(out / "prt_comparison.csv")
-    prt = prt.set_index(["release", "thin_weak_sinks"])["jaccard_mp7_prt>0.5"]
-    for idx, label in FLUX_LABELS.items():
-        rows.append(("flow-weighted", FLUX_KEYS[idx], label, prt[idx]))
-    repro = pd.read_csv(out / "mp7_reproduction.csv").set_index("variant")["jaccard"]
-    for key, label in REPRO_LABELS.items():
-        rows.append(("published starts", key, label, repro[key]))
-    table = pd.DataFrame(rows, columns=["group", "key", "label", "jaccard"])
-    for _, r in table.iterrows():
-        assert_doc(r["jaccard"], DOC_JACCARD[(r["group"], r["key"])], f"overlap {r['label']}")
-    return table
-
-
-def agreement_chart(fig_dir: Path, table: pd.DataFrame) -> Path:
-    """Fig. 7: dot chart of the overlap, grouped by method and convention.
-
-    Net accounting is drawn as open circles, everything else as filled markers.
-    """
-    paper_style()
-    color = {
-        "full mixing": COLORS["cells"],
-        "full mixing, net": COLORS["cells"],
-        "flow-weighted": COLORS["prt"],
-        "published starts": COLORS["prt"],
-    }
-    marker = {"full mixing": "o", "full mixing, net": "o", "flow-weighted": "o",
-              "published starts": "D"}
-    ticks, labels, bold, y = [], [], [], 0.0
-    fig, ax = plt.subplots(figsize=(SINGLE, 3.85), constrained_layout=True)
-    for group, part in table.groupby("group", sort=False):
-        ticks.append(y)
-        labels.append(GROUPS[group])
-        bold.append(True)
-        y -= 1
-        for _, r in part.iterrows():
-            ax.plot([0, r["jaccard"]], [y, y], color=GRID, lw=1.2, zorder=1)
-            hollow = group == "full mixing, net"
-            ax.plot(
-                r["jaccard"],
-                y,
-                marker[group],
-                ms=4.6 if hollow else 5,
-                mfc=SURFACE if hollow else color[group],
-                mec=color[group] if hollow else SURFACE,
-                mew=1.1 if hollow else 0.8,
-                zorder=2,
-            )
-            text = f"{r['jaccard']:.3f}" if r["jaccard"] > 0.99 else f"{r['jaccard']:.2f}"
-            ax.text(r["jaccard"] + 0.025, y, text, va="center", fontsize=7)
-            ticks.append(y)
-            labels.append(r["label"])
-            bold.append(False)
-            y -= 1
-        y -= 0.4
-    ax.set_yticks(ticks, labels)
-    for tick, is_bold in zip(ax.get_yticklabels(), bold):
-        tick.set_fontweight("bold" if is_bold else "normal")
-        tick.set_color(INK if is_bold else MUTED)
-    ax.tick_params(axis="y", length=0)
-    ax.set_xlim(0, 1.12)
-    ax.set_ylim(y + 0.6, 0.6)
-    ax.set_xticks([0, 0.5, 1.0], ["0", "0.5", "1"])
-    ax.set_xticks([0.25, 0.75], minor=True)
-    ax.set_xlabel("overlap with the\npublished contributing cells")
-    for side in ("top", "right", "left"):
-        ax.spines[side].set_visible(False)
-    return save(fig, fig_dir, "fig7_agreement")
-
-
-# ---------------------------------------------------------------- Fig. 9: area growth
+# ---------------------------------------------------------------- Fig. 8: area growth
 
 
 def growth_table(scenario_dir: Path = SCENARIO_DIR, mech_dir: Path = MECH_DIR) -> pd.DataFrame:
@@ -779,7 +663,7 @@ def spread_labels(values: pd.Series, gap: float = LABEL_GAP) -> pd.Series:
 
 
 def growth_chart(fig_dir: Path, table: pd.DataFrame) -> Path:
-    """Fig. 9: median contributing area relative to base pumping, with the pumping ratio dashed.
+    """Fig. 8: median contributing area relative to base pumping, with the pumping ratio dashed.
 
     The value at maximum pumping is written at the right, behind the series' own marker.
     """
@@ -807,7 +691,7 @@ def growth_chart(fig_dir: Path, table: pd.DataFrame) -> Path:
     ax.set_xlabel("pumping fraction f (0 = base, 1 = maximum)")
     ax.set_ylabel("median contributing area / base")
     ax.legend(loc="upper left", handlelength=2.2)
-    return save(fig, fig_dir, "fig9_area_growth")
+    return save(fig, fig_dir, "fig8_area_growth")
 
 
 # ---------------------------------------------------------------- Fig. S3: growth mechanism
@@ -935,7 +819,6 @@ def main(
     fig6: bool = True,
     fig7: bool = True,
     fig8: bool = True,
-    fig9: bool = True,
     figS3: bool = True,
     fig_dir: Path = FIG_DIR,
 ) -> list[Path]:
@@ -944,10 +827,10 @@ def main(
     idomain = wf.grid_idomain(MODEL_DIR)
     shape = idomain.shape[1:]
     wells = wf.PRIORITY_WELLS
-    if fig5 or fig6 or fig8:
+    if fig5 or fig6 or fig7:
         mask = published_mask(shape)
         windows = capture_windows(idomain, wells, mask)
-    if fig5 or fig6 or fig8:
+    if fig5 or fig6 or fig7:
         segments = model_segments(MODEL_DIR, shape[0])
     if fig5:
         regions = region_grids(wf.read_endpoints(columns=("node0",)), shape)
@@ -957,10 +840,8 @@ def main(
     if fig6:
         paths.append(capture_maps(fig_dir, idomain, wells, mask, windows, segments))
     if fig7:
-        paths.append(agreement_chart(fig_dir, agreement_table()))
-    if fig8:
         paths.append(probability_maps(fig_dir, idomain, wells, windows, segments))
-    if fig9:
+    if fig8:
         paths.append(growth_chart(fig_dir, growth_table()))
     if figS3:
         summaries = {q: realisation_summary(q) for q in FIXED_QRATS}
