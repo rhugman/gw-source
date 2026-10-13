@@ -34,7 +34,7 @@ where $\mathbf{R}$ holds the share of each cell's inflow that enters through eac
 
 ## 2.3 Gross and net accounting
 
-Equation (2) needs a rule for weak sinks (Section 1). Our default is gross accounting. Each sink term then takes its share of the cell's total outflow, and the rest passes on to the neighbours. A well is credited with what it pumps, as in a transport model (Section 4.1).
+Equation (2) needs a rule for weak sinks (Section 1). Our default is gross accounting. Each sink term then takes its share of the cell's total outflow, and the rest passes on to the neighbours. A well is credited with what it pumps, as in MODALL (Potter et al. 2008) and in a transport model (Section 4.1). <!-- Potter p. 336, Fig. 1: the sink cell's capture fraction is the well's outflow over the cell's total inflow, drawn for a weak sink -->
 
 Net accounting credits a sink with all the water that passes through its cell, as FlowSource does (Foley and Black 2013). The destination cells are fixed at $F = 1$, so all the water that passes through them counts as reaching the destination ({SI: net accounting, fixed cells}). In the example of Fig. 1b, gross accounting credits the well with the 6 m³/d it pumps. Net accounting also credits it with the 5 m³/d that flow on through its cell to the river.
 
@@ -72,7 +72,7 @@ and $\circ$ is the cell-by-cell product ({SI: travel-time identity}). In words: 
 
 ## 2.7 Transient models: snapshots and transient tracking
 
-Existing full-mixing methods treat a transient model as a series of snapshots (Foley and Black 2013; Environment Agency 2019). A snapshot traces one time step as if its flows were steady. Storage release is a source term and storage gain a sink term. Nothing is carried from one step to the next (Fig. 1d, left). Snapshots therefore have no travel lag between steps. Nor can they say where the water released from storage came from. On the seasonal example model of Section 4.4, such water makes up as much as 50 % of the well's water in summer. <!-- README_method.md Fig. 4a caption; studies/paper/transient_figure.py (summer storage peak 49.7 %); tutorial 08 §2 -->
+Existing full-mixing methods treat a transient model as a series of snapshots (Foley and Black 2013; Environment Agency 2019). A snapshot traces one time step as a steady state. Storage release is a source term and storage gain a sink term. Nothing is carried from one step to the next (Fig. 1d, left). Snapshots therefore have no travel lag between steps. Nor can they say where the water released from storage came from. On the seasonal example model of Section 4.4, such water makes up as much as 50 % of the well's water in summer. <!-- README_method.md Fig. 4a caption; studies/paper/transient_figure.py (summer storage peak 49.7 %); tutorial 08 §2 -->
 
 Transient tracking extends full mixing through time. Water from the chosen sources is tagged, as a tracer would be, and carried through storage from step to step (Fig. 1d, right). Each cell, and each reach, lake or well added as an extra cell (Section 3.1), is a fully mixed volume of water. Storage terms change this volume from $V_i^{\mathrm{old}}$ at the start of a step to $V_i^{\mathrm{new}}$ at its end. Let $c_i$ be the tagged fraction of a cell's water. Step $n$ of length $\Delta t$ is then
 

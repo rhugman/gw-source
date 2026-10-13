@@ -65,7 +65,7 @@ The SI should be assembled in label order: Texts S1–S12, then Tables S1–S6, 
 
 ## Notes on labels
 
-- **Table S1** holds three tables under one heading: (a) largest error per check, (b) steady and snapshot checks per model, (c) transient tracking checks per model. Since round 4 the test models are described in {SI: example and test models}, not in a preamble to Table S1. Label them Table S1a–c, or Tables S1–S3 if the journal wants one number per table; in that case every later Table label moves up by two.
+- **Table S1** holds three tables under one heading: (a) largest error per check, (b) steady-state and snapshot checks per model, (c) transient tracking checks per model. Since round 4 the test models are described in {SI: example and test models}, not in a preamble to Table S1. Label them Table S1a–c, or Tables S1–S3 if the journal wants one number per table; in that case every later Table label moves up by two.
 - **Figure S1** is the PNG docs/paper/figures/figS1_numerical_dispersion.png (panels a–n), redrawn by studies/paper/si_dispersion_figure.py from the outputs behind DS Figs 1, 3 and 5; its caption is in si/C.md.
 - **Figure S2** is the PNG docs/paper/figures/figS2_net_and_envelope.png (formerly figS1_net_and_envelope.png).
 - **Figure S3** is the PNG docs/paper/figures/figS3_growth_mechanism.png (formerly Fig. 10 of the main text, fig10_growth_mechanism.png).

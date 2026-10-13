@@ -58,7 +58,7 @@ Pollock, D.W. 1988. Semianalytical computation of path lines for finite-differen
 
 Pollock, D.W. 2016. User guide for MODPATH Version 7—A particle-tracking model for MODFLOW. U.S. Geological Survey Open-File Report 2016–1086. Reston, Virginia: USGS. https://doi.org/10.3133/ofr20161086 <!-- DOI from the suggested citation in references/docs/text/2016_Pollock_MODPATH7_OFR2016-1086.txt; bibliography.md gives the PDF URL -->
 
-Potter, S.T., E. Moreno-Barbero, and C.E. Divine. 2008. MODALL: A practical tool for designing and optimizing capture systems. *Ground Water* 46, no. 2: 335–340. https://doi.org/10.1111/j.1745-6584.2007.00410.x
+Potter, S.T., E. Moreno-Barbero, and C.E. Divine. 2008. MODALL: A practical tool for designing and optimizing capture systems. *Ground Water* 46, no. 2: 335–340. https://doi.org/10.1111/j.1745-6584.2007.00410.x <!-- checked against the article PDF (references/docs/, 2026-10-13): authors Scott T. Potter, Elena Moreno-Barbero and Craig E. Divine; a Methods Note; p. 335 footer "Vol. 46, No. 2—GROUND WATER—March–April 2008 (pages 335–340)" and doi 10.1111/j.1745-6584.2007.00410.x -->
 
 Provost, A.M., C.D. Langevin, and J.D. Hughes. 2017. Documentation for the "XT3D" option in the Node Property Flow (NPF) Package of MODFLOW 6. U.S. Geological Survey Techniques and Methods, book 6, chap. A56. Reston, Virginia: USGS. https://doi.org/10.3133/tm6A56 <!-- not in bibliography.md; suggested citation on the USGS Publications Warehouse page pubs.usgs.gov/publication/tm6A56 -->
 
