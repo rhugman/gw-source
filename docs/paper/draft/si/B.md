@@ -6,7 +6,7 @@ Net accounting has no cell budget error term. The water it attributes to a group
 
 ## {SI: travel-time identity}
 
-Multiplying each cell's travel-time equation (Eq. 7) by its outflow and adding over all cells gives, with the cell budget errors $r_i$,
+Multiplying each cell's travel-time equation (Eq. 8) by its outflow and adding over all cells gives, with the cell budget errors $r_i$,
 
 $$\sum_i \mathrm{Src}_i\, m_i - \sum_i r_i\, m_i = \sum_i V_i F_i .$$
 
@@ -18,7 +18,7 @@ The mean travel time $m_i/F_i$ of Section 2.6 includes the residence in the cell
 
 Equations (3) and (4) of the main text are solved in flow order. Where the cell-to-cell flows contain no loop, the matrix is permuted to triangular form, with every cell after the cells it depends on, and solved by substitution. This is the flow-order algorithm of FlowSource (Foley and Black 2013) in matrix form. Where there are loops, the matrix is permuted to block-triangular form. Each block is one strongly connected component of the flow graph, that is, one flow loop or one single cell, and the blocks are in flow order. The matrix is then factorised once by sparse LU in that order. Fill-in stays inside the loop blocks. <!-- src/gwsource/solve.py module docstring (topological and block solvers) -->
 
-Each cell's outflow shares add up to at most 1, so $\mathbf{I} - \mathbf{P}$ is a weakly row-diagonally dominant M-matrix. Its factorisation therefore needs no pivoting, the row swaps that otherwise guard against round-off growth. The matrix is singular only on a closed recirculation loop, a set of cells with no outflow to any sink or to a cell outside the set. Water in such a loop never reaches a sink. These loops are found before the solve, given $F = 0$ and reported. Under gross accounting, one factorisation serves every destination group, and it is reused for the travel-time system of Eq. (7). In transient tracking, each step is solved in the same way, with one matrix for all tagged groups. <!-- src/gwsource/solve.py module docstring ("Pivoting is not needed: I - P is a (weakly) row-diagonally dominant M-matrix"; isolate_closed_loops; factorize() reuse for gwsource.traveltime); moved from §2.4 and §2.7 in round 5 -->
+Each cell's outflow shares add up to at most 1, so $\mathbf{I} - \mathbf{P}$ is a weakly row-diagonally dominant M-matrix. Its factorisation therefore needs no pivoting, the row swaps that otherwise guard against round-off growth. The matrix is singular only on a closed recirculation loop, a set of cells with no outflow to any sink or to a cell outside the set. Water in such a loop never reaches a sink. These loops are found before the solve, given $F = 0$ and reported. Under gross accounting, one factorisation serves every destination group, and it is reused for the travel-time system of Eq. (8). In transient tracking, each step is solved in the same way, with one matrix for all tagged groups. <!-- src/gwsource/solve.py module docstring ("Pivoting is not needed: I - P is a (weakly) row-diagonally dominant M-matrix"; isolate_closed_loops; factorize() reuse for gwsource.traveltime); moved from §2.4 and §2.7 in round 5 -->
 
 ## {SI: water volume options}
 

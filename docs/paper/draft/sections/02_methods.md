@@ -54,9 +54,13 @@ Four checks tell the user whether a trace agrees with the model's water budget. 
 
 $$\sum_i F_i\, \mathrm{Src}_i - \sum_i F_i\, r_i = \sum_i d_i. \tag{5}$$
 
-The check says that the water entering through every source term, weighted by its $F$ and corrected for the cell budget errors, equals the water that leaves through the destination. Its mirror image is the forward closure check: $\sum_i G_i\, \mathrm{Snk}_i + \sum_i G_i\, r_i = \sum_i s_i$. The third is the forward–backward check:
+The check says that the water entering through every source term, weighted by its $F$ and corrected for the cell budget errors, equals the water that leaves through the destination. Its mirror image is the forward closure check:
 
-$$\sum_i F_i\, s_i - \sum_i G_i\, d_i = \sum_i F_i\, G_i\, r_i. \tag{6}$$
+$$\sum_i G_i\, \mathrm{Snk}_i + \sum_i G_i\, r_i = \sum_i s_i. \tag{6}$$
+
+The third is the forward–backward check:
+
+$$\sum_i F_i\, s_i - \sum_i G_i\, d_i = \sum_i F_i\, G_i\, r_i. \tag{7}$$
 
 So the volume from a source to a destination is the same whether it is traced backward or forward, once the cell budget errors are included. The fourth is the boundary-control check. In every cell with outflow, the backward fractions to all sink terms must add up to 1. Maps of these fractions (boundary-control maps) show where each cell's water goes.
 
@@ -66,7 +70,7 @@ Because the checks include the flow model's budget errors $r_i$, a failed check 
 
 Fractions say how much water arrives, not when. Let $V_i$ be the volume of water in cell $i$, which is porosity times saturated volume. Its mean residence time is $\tau_i = V_i/O_i$. The mean travel time from entering cell $i$ to leaving the model through the destination is then $m_i/F_i$, where
 
-$$(\mathbf{I} - \mathbf{P})\,\mathbf{m} = \boldsymbol{\tau} \circ \mathbf{F} \tag{7}$$
+$$(\mathbf{I} - \mathbf{P})\,\mathbf{m} = \boldsymbol{\tau} \circ \mathbf{F} \tag{8}$$
 
 and $\circ$ is the cell-by-cell product ({SI: travel-time identity}). Each cell adds its residence time, weighted by its $F$, and passes the sum upstream with the outflow shares. Travel times are defined under gross accounting. A mean travel time averages fast and slow water that have mixed in the cells. It should not be used alone to draw a time-of-travel zone (Section 6.4).
 
@@ -76,7 +80,7 @@ Existing full-mixing methods treat a transient model as a series of snapshots (F
 
 Transient tracking extends full mixing through time. Water from the chosen sources is tagged, as a tracer would be, and carried through storage from step to step (Fig. 1d, right). Each cell, and each reach, lake or well added as an extra cell (Section 3.1), is a fully mixed volume of water. Storage terms change this volume from $V_i^{\mathrm{old}}$ at the start of a step to $V_i^{\mathrm{new}}$ at its end. Let $c_i$ be the tagged fraction of a cell's water. Step $n$ of length $\Delta t$ is then
 
-$$V_i^{\mathrm{new}} c_i^n - V_i^{\mathrm{old}} c_i^{n-1} = \Delta t \Big[ \sum_j q_{ji}\, c_j^n + s_i^n - (O_i + r_i)\, c_i^n \Big], \tag{8}$$
+$$V_i^{\mathrm{new}} c_i^n - V_i^{\mathrm{old}} c_i^{n-1} = \Delta t \Big[ \sum_j q_{ji}\, c_j^n + s_i^n - (O_i + r_i)\, c_i^n \Big], \tag{9}$$
 
 where $O_i$ now leaves out storage. Each cell's tagged water at the end of a step is its tagged water at the start, plus arrivals from upstream cells and source terms, less what leaves at the cell's end-of-step mix.
 
@@ -92,6 +96,6 @@ Forward transient tracking is not new (Section 1; Table 1). What we add is backw
 
 The same run gives the fractions of each cell's water that leave through other sinks or are still stored at the end. Together with $w$, they add up to 1, apart from the flow-error correction and the step-boundary changes of the "gwt" volumes. With every source and the initial water tagged, the run splits the destination's outflow by source term, time step and initial water. The transient forward–backward check is
 
-$$\sum_n \Delta t \sum_i d_i^n c_i^n = \sum_n \Delta t \sum_i s_i^n w_i^n + \sum_i V_i^0 c_i^0 w_i^1, \tag{9}$$
+$$\sum_n \Delta t \sum_i d_i^n c_i^n = \sum_n \Delta t \sum_i s_i^n w_i^n + \sum_i V_i^0 c_i^0 w_i^1, \tag{10}$$
 
 where $V_i^0$ and $c_i^0$ are the water volume and tagged fraction of cell $i$ at the start. This check says that the tagged water the destination takes, found by forward tracking, equals the tagged inflow and initial water, each multiplied by its share that later reaches the destination. The check holds exactly for either volume option (Section 4.2).
