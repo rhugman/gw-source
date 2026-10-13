@@ -1,4 +1,4 @@
-"""Method and verification figures of the paper (Figs 1 to 3, Table 2); outline in docs/paper/outline.md.
+"""Method and verification figures of the paper (Figs 1 to 3, Table S1); outline in docs/paper/outline.md.
 
 - Fig. 1, method schematic, one idea per panel and no tutorial names in the figure. (a) One
   cell with intercell flows, recharge and a well, and the definitions of total inflow I, total
@@ -9,10 +9,11 @@
   of tutorial 02. (d) A snapshot treats storage release as a source term of unknown origin;
   transient tracking carries the cell's stored water from the end of one step into the next
   (symbolic, no numbers). The quoted numbers are asserted in check_fig1_numbers().
-- Table 2 and Fig. 2, verification. studies/paper/verification.py runs the exact checks over the
-  synthetic test models 1 to 10 (and the hand-built network of the sub-step test) and records
-  the error reached per model and check; Fig. 2 plots them on a log scale with machine epsilon
-  and the test tolerances, in two blocks: steady and snapshot checks, transient tracking checks.
+- Table S1 (supporting information) and Fig. 2, verification. studies/paper/verification.py
+  runs the exact checks over the synthetic test models 1 to 10 (and the hand-built network of
+  the sub-step test) and records the error reached per model and check; Fig. 2 plots them on
+  a log scale with machine precision and the test tolerances, in two blocks: steady and
+  snapshot checks, transient tracking checks.
 - Fig. 3, numerical dispersion. The two convergence figures of docs/dispersion_study.md
   (problem A, analytical reference; problem B, PRT reference) are merged into one figure of two
   rows: the band width carries the h^0.5 message, the F >= 0.1 area error the "conservative
@@ -411,6 +412,15 @@ MODEL_STYLES = {  # model: (colour, marker)
     "fb13_example": (INK, "*"),
 }
 ZERO_AT = 1e-18  # where exact zeros are drawn on the log axis
+MARKER_SIZE = 4.5  # pt, model markers in Fig. 2 and its legend
+MARKER_SCALE = {"*": 1.5, "P": 1.15, "X": 1.15, "D": 0.9}  # same apparent size as a circle
+TOLERANCE_GREY = "#9a9a9a"
+ROW_GRID = "#ececec"
+FIG2_MODEL_LABELS = {  # reader-facing legend labels that differ from verification.MODEL_LABELS
+    "fb13_example": "Foley and Black (2013)\nexample, net accounting",
+    "substep_network": "hand-built 15-cell\nnetwork (not MF6)",
+}
+FIG2_CHECK_LABELS = {"reference_example": "Foley and Black (2013) example"}
 
 
 def model_offsets(models: list[str], spread: float = 0.32) -> dict[str, float]:
@@ -435,15 +445,16 @@ def check_rows(check_groups: dict, checks: list[str]) -> tuple[dict, list]:
     return rows, headings
 
 
-def draw_tolerances(ax, table: pd.DataFrame, rows: dict) -> None:
-    """Mark each check's test tolerance(s) as a short vertical bar across its row."""
+def draw_tolerances(ax, table: pd.DataFrame, rows: dict, colour: str = TOLERANCE_GREY) -> None:
+    """Mark each check's test tolerance(s) as a short grey bar across its row."""
     for check, row in rows.items():
         for tol in sorted(set(table[table.check == check].tolerance.dropna())):
-            ax.plot([tol, tol], [row - 0.42, row + 0.42], color=MUTED, lw=2.2,
+            ax.plot([tol, tol], [row - 0.4, row + 0.4], color=colour, lw=2.2,
                     solid_capstyle="butt", zorder=2)
 
 
-def draw_errors(ax, table: pd.DataFrame, rows: dict, labels: dict) -> list:
+def draw_errors(ax, table: pd.DataFrame, rows: dict, labels: dict,
+                ms: float = MARKER_SIZE) -> list:
     """Plot each model's error per check (exact zeros at ZERO_AT); return legend handles."""
     ok = table[table.status == "ok"]
     offsets = {}
@@ -456,7 +467,7 @@ def draw_errors(ax, table: pd.DataFrame, rows: dict, labels: dict) -> list:
         sel = ok[ok.model == model]
         y = [rows[c] + offsets[(model, c)] for c in sel.check]
         x = np.where(sel.error.to_numpy() == 0.0, ZERO_AT, sel.error.to_numpy())
-        size = 6.5 if marker == "*" else 4.2
+        size = ms * MARKER_SCALE.get(marker, 1.0)
         handles.append(ax.plot(x, y, ls="none", marker=marker, color=colour, ms=size,
                                mec="white", mew=0.4, zorder=4, label=labels[model])[0])
     return handles
@@ -473,9 +484,30 @@ def axis_break(ax, x: float = 1.7e-17) -> None:
             bbox={"facecolor": "white", "edgecolor": "none", "pad": 0.3})
 
 
+def x_ticks(ax, decades: tuple = (-16, -12, -8, -4, 0)) -> None:
+    """Label the 'exact' slot and every fourth decade; mark the decades between unlabelled."""
+    ticks = [ZERO_AT] + [10.0 ** d for d in decades]
+    ax.set_xticks(ticks, ["exact"] + [f"$10^{{{d}}}$" for d in decades])
+    minor = [10.0 ** d for d in range(decades[0], decades[-1], 2) if d not in decades]
+    ax.set_xticks(minor, [""] * len(minor), minor=True)
+    ax.tick_params(axis="x", which="minor", length=2.0)
+
+
+def fig2_legends(fig, handles: list) -> None:
+    """Put the model key top right and the reference key (precision, tolerance) below it."""
+    fig.legend(handles=handles, loc="upper left", bbox_to_anchor=(0.72, 0.985),
+               title="model", title_fontsize=7, alignment="left", handletextpad=0.3,
+               labelspacing=0.45)
+    eps = plt.Line2D([], [], color=INK, ls="--", lw=0.9, label="machine precision")
+    tol = plt.Line2D([], [], color=TOLERANCE_GREY, ls="none", marker="|", ms=9, mew=2.2,
+                     label="test tolerance")
+    fig.legend(handles=[eps, tol], loc="lower left", bbox_to_anchor=(0.72, 0.085),
+               handletextpad=0.3, labelspacing=0.45)
+
+
 def make_fig2(out_dir: Path, table: pd.DataFrame, model_labels: dict,
               check_labels: dict, check_order: tuple, check_groups: dict) -> list[Path]:
-    """Fig. 2: error per check and model on a log axis, with machine epsilon and tolerances."""
+    """Fig. 2: error per check and model on a log axis, with machine precision and tolerances."""
     checks = [c for c in check_order if c in set(table.check)]
     rows, headings = check_rows(check_groups, checks)
     n_rows = len(rows) + len(headings)
@@ -488,26 +520,20 @@ def make_fig2(out_dir: Path, table: pd.DataFrame, model_labels: dict,
     ax.set_xscale("log")
     ax.set_xlim(3e-19, 1.0)
     axis_break(ax)
-    ticks = [1e-18, 1e-16, 1e-14, 1e-12, 1e-10, 1e-8, 1e-6, 1e-4, 1e-2, 1.0]
-    ax.set_xticks(ticks, ["exact"] + [f"$10^{{{int(np.log10(t))}}}$" for t in ticks[1:]])
-    ax.set_xticks([], minor=True)
+    x_ticks(ax)
     ax.set_yticks(list(rows.values()), [check_labels[c] for c in rows])
     ax.set_ylim(n_rows - 0.5, -0.5)
     for row in range(1, n_rows):
-        ax.axhline(row - 0.5, color=GRID, lw=0.5, zorder=0)
+        ax.axhline(row - 0.5, color=ROW_GRID, lw=0.5, zorder=0)
     for row, name in headings:
         ax.axhspan(row - 0.5, row + 0.5, color="white", zorder=3)
         ax.text(0.01, row, name, transform=ax.get_yaxis_transform(), ha="left", va="center",
                 fontsize=7.5, fontweight="bold", zorder=4)
         if row > 0:
             ax.axhline(row - 0.5, color=MUTED, lw=0.8, zorder=3)
-    ax.set_xlabel("error reached (measure per check in Table 2)")
+    ax.set_xlabel("error reached (measure per check in Table S1)")
     ax.tick_params(axis="y", length=0)
-    eps = plt.Line2D([], [], color=INK, ls="--", lw=0.9, label="machine epsilon")
-    tol = plt.Line2D([], [], color=MUTED, ls="none", marker="|", ms=9, mew=2.2,
-                     label="test tolerance")
-    fig.legend(handles=[*handles, eps, tol], loc="center left", bbox_to_anchor=(0.72, 0.53),
-               title="test model", title_fontsize=7, handletextpad=0.3, labelspacing=0.45)
+    fig2_legends(fig, handles)
     return save(fig, out_dir, "fig2_verification")
 
 
@@ -620,7 +646,7 @@ def find_mf6(bin_dir: Path = REPO / "bin") -> Path:
 
 
 def run_verification(out_dir: Path, work: Path) -> pd.DataFrame:
-    """Run the verification checks and write Table 2 (CSV and markdown)."""
+    """Run the verification checks and write Table S1 (CSV and markdown)."""
     import verification as ver
 
     table = ver.collect(work / "verification", ver.find_exes())
@@ -653,10 +679,9 @@ def main(
         print(ver.summary_by_check(table).to_string(index=False))
     if fig2:
         table = pd.read_csv(out_dir / "verification_table.csv")
-        # two Table 2 labels are too long for one legend line
-        labels = {**ver.MODEL_LABELS, "fb13_example": "[FB13] worked example,\nnet accounting",
-                  "substep_network": "hand-built 15-cell\nnetwork (not MF6)"}
-        print("wrote", make_fig2(out_dir, table, labels, ver.CHECK_LABELS, ver.CHECK_ORDER,
+        model_labels = {**ver.MODEL_LABELS, **FIG2_MODEL_LABELS}
+        check_labels = {**ver.CHECK_LABELS, **FIG2_CHECK_LABELS}
+        print("wrote", make_fig2(out_dir, table, model_labels, check_labels, ver.CHECK_ORDER,
                                  ver.CHECK_GROUPS))
     if fig3:
         print("wrote", make_fig3(out_dir, dispersion_out))
