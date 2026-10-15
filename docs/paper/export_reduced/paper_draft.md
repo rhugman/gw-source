@@ -114,7 +114,7 @@ Transient tracking has so far been tested on synthetic models only. Its memory g
 
 # 7. Code and Data Availability
 
-The code, `gwsource`, is open source under the MIT licence at https://github.com/rhugman/gw-source [check: public URL]. This paper uses version 0.0.1 [check: release version and tag]. Each example ships with the code as a Jupyter notebook that reproduces its numbers and figure (Supporting Information, Text S2). The Neversink model is in a USGS data release (Fienen and Corson-Dosch 2021). The files behind every figure will be archived on Zenodo [check: DOI].
+The code, `gwsource`, is open source under the MIT licence at https://github.com/rhugman/gw-source [check: public URL]. This paper uses version 0.0.1 [check: release version and tag]. Each example ships with the code as a Jupyter notebook that reproduces its numbers and figure (Supporting Information, Text S2). The same release holds the verification tables (docs/verification.md), the test models (tests/models/README.md) and the notes of the Neversink study (docs/neversink_study.md). The Neversink model is in a USGS data release (Fienen and Corson-Dosch 2021). The files behind every figure will be archived on Zenodo [check: DOI].
 
 # References
 
