@@ -1,34 +1,43 @@
-"""Paper figures 5 to 9 and supporting-information Fig. S3: the Neversink/Rondout case study,
-at Groundwater sizes.
+"""Paper Figure 12 and supporting-information Figs S3 and S5 to S9: the Neversink/Rondout case
+study, at Groundwater sizes.
 
 Every figure is drawn from existing outputs of the case study (studies/neversink/output, the
-USGS sparse checkout in studies/neversink/external; both git-ignored); nothing is rerun.
+USGS sparse checkout in studies/neversink/external; both git-ignored); nothing is rerun. Git
+worktrees do not share these untracked folders, so find_data_dir falls back to the study folder
+of the main checkout when this checkout has no output folder.
 
-- Fig. 5, location map: active model area, SFR reaches as a network, the three MODPATH 7 regions
-  (start cells of the published runs), the published contributing cells of the calibrated model
-  and the eight priority wells by cluster. Coordinates are km from the grid origin; the north
-  arrow shows true north, computed from the model's EPSG:5070 grid.
-- Fig. 6, F of the uppermost active cell in classes (viridis, edges 0.01, 0.1, 0.25, 0.5, 0.75,
+- Fig. 12, one row in the U-cluster window: (a) F of the calibrated model with the published
+  contributing cells outlined (as Fig. S6a), (b) the F > 0.1 area against the published cells
+  (as Fig. S7a), (c) against the P > 0.5 area of the weight-losing PRT particles (as Fig. S7d),
+  (d) ensemble mean F with the published probability 0.5 outlined (as Fig. S8d), and a locator
+  map of the whole model with the window (in place of Fig. S5).
+- Fig. S5, location map: active model area, SFR reaches as a network, the three MODPATH 7
+  regions (start cells of the published runs), the published contributing cells of the
+  calibrated model and the eight priority wells by cluster. Coordinates are km from the grid
+  origin; the north arrow shows true north, computed from the model's EPSG:5070 grid.
+- Fig. S6, F of the uppermost active cell in classes (viridis, edges 0.01, 0.1, 0.25, 0.5, 0.75,
   1) with streams as cells and as a network, the SFR reaches, the wells and the published
   contributing cells outlined; equal windows and one scale bar.
-- Fig. 7, overlap maps in the windows and overlays of Fig. 6: the F > 0.1 area (gross, streams
+- Fig. S7, overlap maps in the windows and overlays of Fig. S6: the F > 0.1 area (gross, streams
   as cells) against the published contributing cells and against the area P > 0.5 of the
   weight-losing PRT particles released over the cell volume; three classes (in both, the other
   area only, F > 0.1 only) on the uppermost active cells.
-- Fig. 8, published probability against ensemble mean F (paper-size version of
-  docs/figures/neversink_probability_maps.png), in the classes, windows and overlays of Fig. 6.
-- Fig. 9, median contributing area against pumping, relative to base.
-- Fig. S3 (supporting information), growth mechanism: stream share of the wells' water against pumping, and, per
+- Fig. S8, published probability against ensemble mean F (paper-size version of
+  docs/figures/neversink_probability_maps.png), in the classes, windows and overlays of Fig. S6.
+- Fig. S9, median contributing area against pumping, relative to base.
+- Fig. S3, growth mechanism: stream share of the wells' water against pumping, and, per
   realisation, the excess of area growth over pumping growth against the drop in stream share.
 
 Map conventions, colours and helpers follow studies/neversink/figures.py. Categorical colours
 are the first slots of the validated default palette (blue, orange, aqua) plus ink and grey,
 with markers or line styles as a second encoding. Sizes: single column 3.5 in, double column
 7 in; fonts 7 to 8 pt. Each figure is saved as PNG (300 dpi) and PDF. Numbers that the captions
-quote are checked against docs/neversink_study.md (DOC_* constants) before plotting.
+quote are checked against docs/neversink_study.md and docs/paper/figures/README.md (DOC_*
+constants) before plotting.
 """
 
 import json
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -79,13 +88,13 @@ CLUSTERS = {  # as studies/neversink/growth_mechanisms.CLUSTERS
 }
 WINDOW_ASPECT = 1.3  # width / height of every map panel
 WINDOW_NAMES = {"U": "U", "SV north": "SV_W", "SV south": "SV_S"}  # nf.cluster_windows keys
-F_EDGES = (0.01, 0.1, 0.25, 0.5, 0.75, 1.0)  # Fig. 6 colour classes of F; below 0.01: grey
+F_EDGES = (0.01, 0.1, 0.25, 0.5, 0.75, 1.0)  # Fig. S6 colour classes of F; below 0.01: grey
 F_COLORMAP = "viridis_r"  # perceptual; light for low F, dark for high F
-F6_BAR_KM = 2.0  # length of the one scale bar of Fig. 6
+F6_BAR_KM = 2.0  # length of the one scale bar of Fig. S6
 FIXED_QRATS = nf.QRAT_FRACTION  # baserat to maxrat and their pumping fraction f
 PRT_RUN = "prt_volume_thin1"  # weight-losing particles over the cell volume (net_and_envelope)
-F_ZONE, P_ZONE = 0.1, 0.5  # Fig. 7: the F > 0.1 area against the P > 0.5 area
-# Fig. 7 overlap classes, codes 0 to 3: rest of the active area, in both, the other area only
+F_ZONE, P_ZONE = 0.1, 0.5  # Fig. S7: the F > 0.1 area against the P > 0.5 area
+# Fig. S7 overlap classes, codes 0 to 3: rest of the active area, in both, the other area only
 # (published cells or P > 0.5), F > 0.1 only. Dark and light blue for the F > 0.1 area, orange
 # for what it misses (as Fig. S2); every pair is at least 17 apart (OKLab x 100) under protan,
 # deutan and tritan simulation.
@@ -104,6 +113,14 @@ DOC_OVERLAP = {
     "P > 0.5": 691,
     "P > 0.5 inside F > 0.1": 0.87,
 }
+# figures/README.md Figs S5 and S7, U window: published cells, and in both / other area only /
+# F > 0.1 only against the published cells and against the P > 0.5 area
+DOC_U_WINDOW = {
+    "published": 688,
+    "published classes": (538, 150, 1090),
+    "P classes": (495, 86, 1133),
+}
+FIG12_WINDOW = "U"  # cluster window of Fig. 12
 
 
 # ---------------------------------------------------------------- style and output
@@ -156,7 +173,7 @@ def well_ij(wells: dict, shape: tuple) -> dict:
     return {name: ((n % (nrow * ncol)) // ncol, n % ncol) for name, n in wells.items()}
 
 
-# ---------------------------------------------------------------- Fig. 5: location map
+# ---------------------------------------------------------------- Fig. S5: location map
 
 
 def read_dis_origin(dis_file: Path) -> tuple[float, float]:
@@ -222,7 +239,6 @@ def stream_segments(
     down = xy.loc[[b for _, b in pairs]].to_numpy()
     keep = np.hypot(*(down - up).T) <= max_km
     return np.stack([up[keep], down[keep]], axis=1)
-
 
 
 def model_segments(model_dir: Path, nrow: int) -> np.ndarray:
@@ -303,7 +319,7 @@ def location_map(
     segments: np.ndarray,
     north: float,
 ) -> Path:
-    """Fig. 5: active area, streams, MODPATH regions, published cells and the priority wells."""
+    """Fig. S5: active area, streams, MODPATH regions, published cells and the priority wells."""
     paper_style()
     nrow, ncol = idomain.shape[1:]
     extent = (0, ncol * nf.CELL_KM, 0, nrow * nf.CELL_KM)
@@ -379,10 +395,10 @@ def location_map(
     ax.set_aspect("equal")
     ax.set_xlabel("x from grid origin (km)")
     ax.set_ylabel("y from grid origin (km)")
-    return save(fig, fig_dir, "fig5_location_map")
+    return save(fig, fig_dir, "figS5_location_map")
 
 
-# ---------------------------------------------------------------- Figs 6 to 8: maps
+# ---------------------------------------------------------------- Figs S6 to S8: maps
 
 
 def fit_aspect(window: tuple, shape: tuple, aspect: float = WINDOW_ASPECT) -> tuple:
@@ -427,7 +443,7 @@ def capture_fields(idomain: np.ndarray, out: Path = OUT) -> dict:
 
 
 def capture_windows(idomain: np.ndarray, wells: dict, mask: np.ndarray, out: Path = OUT) -> dict:
-    """Return the cluster windows of Fig. S2; Figs 6 to 8 enlarge them to one size."""
+    """Return the cluster windows of Fig. S2; Figs S6 to S8 enlarge them to one size."""
     return map_windows(capture_fields(idomain, out), mask, wells)
 
 
@@ -468,7 +484,7 @@ def class_panel(
     f_map: tuple,
     title: str,
 ) -> AxesImage:
-    """Draw one panel of Figs 6 and 8: classes, SFR reaches, outline (haloed) and wells."""
+    """Draw one panel of Figs S6 and S8: classes, SFR reaches, outline (haloed) and wells."""
     r0, r1, c0, c1 = window
     nrow = field.shape[0]
     cmap, norm = f_map
@@ -493,7 +509,7 @@ def class_panel(
 def frame_panel(
     ax: plt.Axes, window: tuple, nrow: int, wells_ij: list, segments: np.ndarray, title: str
 ) -> None:
-    """Draw the SFR reaches and the wells of a map panel (Figs 6 to 8) and fit it to window."""
+    """Draw the SFR reaches and the wells of a map panel (Figs S6 to S8) and fit it to window."""
     r0, r1, c0, c1 = window
     extent = window_extent(window, nrow)
     ax.add_collection(LineCollection(segments, colors=STREAM, linewidths=0.5, zorder=2))
@@ -509,7 +525,7 @@ def frame_panel(
 
 
 def class_legend(fig: plt.Figure, outline_label: str) -> None:
-    """Draw the legend of Figs 6 and 8 below the panels."""
+    """Draw the legend of Figs S6 and S8 below the panels."""
     handles = [
         plt.Line2D(
             [], [], ls="", marker="o", ms=4, mfc=COLORS["prt"], mec=INK, mew=0.7, label="wells"
@@ -531,7 +547,7 @@ def class_maps(
     outline_label: str,
     bar_km: float = F6_BAR_KM,
 ) -> plt.Figure:
-    """Return a figure of class maps (Figs 6 and 8): one row per field, one column per cluster,
+    """Return a figure of class maps (Figs S6 and S8): one row per field, one column per cluster,
     equal windows, one scale bar in the first panel."""
     nrow, ncol = outline.shape
     wells_ij = list(well_ij(wells, (nrow, ncol)).values())
@@ -569,7 +585,7 @@ def capture_maps(
     segments: np.ndarray,
     out: Path = OUT,
 ) -> Path:
-    """Fig. 6: F of the uppermost active cell in classes, streams as cells and as a network."""
+    """Fig. S6: F of the uppermost active cell in classes, streams as cells and as a network."""
     paper_style()
     fig = class_maps(
         capture_fields(idomain, out),
@@ -581,10 +597,10 @@ def capture_maps(
         "F, uppermost active cell (grey: below 0.01)",
         "published contributing cells (outline)",
     )
-    return save(fig, fig_dir, "fig6_capture_maps")
+    return save(fig, fig_dir, "figS6_capture_maps")
 
 
-# ---------------------------------------------------------------- Fig. 7: overlap maps
+# ---------------------------------------------------------------- Fig. S7: overlap maps
 
 OVERLAP_ROWS = {"published": "published cells", "P": "particles, P > 0.5"}  # row titles
 OVERLAP_LABELS = (  # codes 0 to 3, as OVERLAP_COLORS
@@ -643,7 +659,7 @@ def overlap_codes(f_zone: np.ndarray, other: np.ndarray, active: np.ndarray) -> 
 def overlap_legend(
     fig: plt.Figure, colors: tuple = OVERLAP_COLORS, labels: tuple = OVERLAP_LABELS
 ) -> None:
-    """Draw the legend of Fig. 7 below the panels: the classes, the wells and the SFR reaches."""
+    """Draw the legend of Fig. S7 below the panels: the classes, the wells and the SFR reaches."""
     handles = [Patch(facecolor=colors[k], edgecolor="none", label=labels[k]) for k in (1, 3, 2, 0)]
     handles += [
         plt.Line2D(
@@ -665,8 +681,8 @@ def overlap_maps(
     rows: dict = OVERLAP_ROWS,
     bar_km: float = F6_BAR_KM,
 ) -> Path:
-    """Fig. 7: the F > 0.1 area against (a-c) the published cells and (d-f) the P > 0.5 area of
-    the weight-losing particles, in the windows of Fig. 6."""
+    """Fig. S7: the F > 0.1 area against (a-c) the published cells and (d-f) the P > 0.5 area of
+    the weight-losing particles, in the windows of Fig. S6."""
     paper_style()
     zones = overlap_zones(idomain, mask, out)
     check_overlap(zones, out)
@@ -674,27 +690,17 @@ def overlap_maps(
     nrow, ncol = mask.shape
     wells_ij = list(well_ij(wells, (nrow, ncol)).values())
     windows = equal_windows(windows, (nrow, ncol))
-    cmap = ListedColormap(OVERLAP_COLORS).with_extremes(bad=SURFACE)
     fig, axes = plt.subplots(2, len(windows), figsize=(DOUBLE, 4.05), constrained_layout=True)
     letters = iter("abcdef")
     for row, (key, label) in enumerate(rows.items()):
         codes = overlap_codes(zones["F"], zones[key], active)
         for col, (name, window) in enumerate(windows.items()):
-            r0, r1, c0, c1 = window
-            ax = axes[row, col]
-            ax.imshow(
-                codes[r0 : r1 + 1, c0 : c1 + 1],
-                cmap=cmap,
-                vmin=-0.5,
-                vmax=len(OVERLAP_COLORS) - 0.5,
-                extent=window_extent(window, nrow),
-                interpolation="nearest",
-            )
-            frame_panel(ax, window, nrow, wells_ij, segments, f"({next(letters)}) {name}: {label}")
+            title = f"({next(letters)}) {name}: {label}"
+            overlap_panel(axes[row, col], codes, window, wells_ij, segments, title)
     x0, _, y0, _ = window_extent(windows[next(iter(windows))], nrow)
     scale_bar(axes[0, 0], x0 + 0.4, y0 + 0.4, bar_km)
     overlap_legend(fig)
-    return save(fig, fig_dir, "fig7_overlap_maps")
+    return save(fig, fig_dir, "figS7_overlap_maps")
 
 
 def probability_maps(
@@ -705,8 +711,8 @@ def probability_maps(
     segments: np.ndarray,
     maps_file: Path = ENS_DIR / "probability_maps.npz",
 ) -> Path:
-    """Fig. 8: published probability against ensemble mean F, base pumping, in the classes and
-    windows of Fig. 6."""
+    """Fig. S8: published probability against ensemble mean F, base pumping, in the classes and
+    windows of Fig. S6."""
     paper_style()
     maps = np.load(maps_file)
     active = nf.top_active(idomain) >= 0
@@ -726,10 +732,200 @@ def probability_maps(
         "probability or mean F (grey: below 0.01)",
         "published probability 0.5 (outline)",
     )
-    return save(fig, fig_dir, "fig8_probability_maps")
+    return save(fig, fig_dir, "figS8_probability_maps")
 
 
-# ---------------------------------------------------------------- Fig. 9: area growth
+# ---------------------------------------------------------------- Fig. 12: one row, U window
+
+FIG12_TITLES = (
+    "(a) F",
+    "(b) F > 0.1, published cells",
+    "(c) F > 0.1, particles P > 0.5",
+    "(d) ensemble mean F",
+)
+FIG12_OVERLAP_LABELS = (  # codes 0 to 3, as OVERLAP_COLORS
+    "rest of the active area",
+    "in both",
+    "published only (b),\nparticles only (c)",
+    "F > 0.1 only",
+)
+
+
+def window_counts(codes: np.ndarray, window: tuple) -> tuple[int, int, int]:
+    """Return the cells in both areas, in the other area only and in F > 0.1 only in window."""
+    r0, r1, c0, c1 = window
+    part = codes[r0 : r1 + 1, c0 : c1 + 1]
+    return tuple(int(np.sum(part == code)) for code in (1, 2, 3))
+
+
+def row_maps(idomain: np.ndarray, mask: np.ndarray, out: Path, maps_file: Path) -> dict:
+    """Return the fields, outlines and overlap codes of the four panels of Fig. 12."""
+    zones = overlap_zones(idomain, mask, out)
+    check_overlap(zones, out)
+    active = nf.top_active(idomain) >= 0
+    maps = np.load(maps_file)
+    return {
+        "F": capture_fields(idomain, out)["streams as cells"],
+        "mean F": np.where(active, maps["cells:mean_F"], np.nan),
+        "published": mask,
+        "probability 0.5": maps["mp7"] > 0.5,
+        "codes published": overlap_codes(zones["F"], zones["published"], active),
+        "codes P": overlap_codes(zones["F"], zones["P"], active),
+    }
+
+
+def check_window(maps: dict, window: tuple, doc: dict = DOC_U_WINDOW) -> None:
+    """Assert the published cells and the overlap classes in window against the quoted counts."""
+    r0, r1, c0, c1 = window
+    published = int(maps["published"][r0 : r1 + 1, c0 : c1 + 1].sum())
+    assert published == doc["published"], f"published cells in window: {published}"
+    for key in ("published", "P"):
+        counts = window_counts(maps[f"codes {key}"], window)
+        assert counts == doc[f"{key} classes"], f"classes against {key}: {counts}"
+
+
+def overlap_panel(
+    ax: plt.Axes,
+    codes: np.ndarray,
+    window: tuple,
+    wells_ij: list,
+    segments: np.ndarray,
+    title: str,
+    colors: tuple = OVERLAP_COLORS,
+) -> None:
+    """Draw one overlap map (Figs 12 and S7): the classes, SFR reaches and wells in window."""
+    r0, r1, c0, c1 = window
+    nrow = codes.shape[0]
+    ax.imshow(
+        codes[r0 : r1 + 1, c0 : c1 + 1],
+        cmap=ListedColormap(colors).with_extremes(bad=SURFACE),
+        vmin=-0.5,
+        vmax=len(colors) - 0.5,
+        extent=window_extent(window, nrow),
+        interpolation="nearest",
+    )
+    frame_panel(ax, window, nrow, wells_ij, segments, title)
+
+
+def locator_panel(
+    ax: plt.Axes,
+    idomain: np.ndarray,
+    regions: dict,
+    wells_ij: list,
+    segments: np.ndarray,
+    window: tuple,
+) -> None:
+    """Draw the locator map of Fig. 12: active area, SFR reaches, MODPATH 7 regions, wells and
+    the window."""
+    nrow, ncol = idomain.shape[1:]
+    extent = (0, ncol * nf.CELL_KM, 0, nrow * nf.CELL_KM)
+    active = (idomain > 0).any(axis=0)
+    ax.imshow(
+        np.where(active, 1.0, np.nan),
+        cmap=ListedColormap([ACTIVE_FILL]),
+        extent=extent,
+        interpolation="nearest",
+    )
+    ax.add_collection(LineCollection(segments, colors=STREAM, linewidths=0.25, zorder=2))
+    yy, xx = np.mgrid[0:nrow, 0:ncol]
+    xk, yk = grid_km(yy, xx, nrow)
+    for grid in regions.values():
+        ax.contour(xk, yk, grid, levels=[0.5], colors=MUTED, linewidths=0.5, linestyles="--")
+    ij = np.array(wells_ij)
+    x, y = grid_km(ij[:, 0], ij[:, 1], nrow)
+    ax.plot(x, y, "o", ms=2.2, mfc=COLORS["prt"], mec=INK, mew=0.4, zorder=5)
+    x0, x1, y0, y1 = window_extent(window, nrow)
+    ax.add_patch(
+        plt.Rectangle((x0, y0), x1 - x0, y1 - y0, fill=False, edgecolor=INK, lw=0.9, zorder=6)
+    )
+    ax.set_xlim(extent[:2])
+    ax.set_ylim(extent[2:])
+    ax.set_aspect("equal")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_xlabel("inset: whole model", fontsize=7, labelpad=2)
+
+
+def row_key(ax: plt.Axes, image: AxesImage, edges: tuple = F_EDGES) -> None:
+    """Draw the horizontal colour bar of panels (a) and (d) in the upper part of ax."""
+    ax.axis("off")
+    cax = ax.inset_axes([0.04, 0.5, 0.92, 0.15])
+    bar = plt.colorbar(
+        image, cax=cax, orientation="horizontal", extend="min", ticks=edges, spacing="uniform"
+    )
+    bar.ax.set_xticklabels([f"{edge:g}" for edge in edges])
+    bar.outline.set_visible(False)
+    bar.ax.tick_params(labelsize=7)
+    bar.ax.set_title("F (a), mean F (d); grey: below 0.01", fontsize=7, loc="left")
+
+
+def row_legend(
+    ax: plt.Axes, colors: tuple = OVERLAP_COLORS, labels: tuple = FIG12_OVERLAP_LABELS
+) -> None:
+    """Draw the legend of Fig. 12: the overlap classes of (b, c), then wells, SFR reaches,
+    outlines and regions."""
+    ax.axis("off")
+    handles = [Patch(facecolor=colors[k], edgecolor="none", label=labels[k]) for k in (1, 3, 2, 0)]
+    handles += [
+        plt.Line2D(
+            [], [], ls="", marker="o", ms=4, mfc=COLORS["prt"], mec=INK, mew=0.7, label="wells"
+        ),
+        plt.Line2D([], [], color=STREAM, lw=1, label="SFR reaches"),
+        plt.Line2D(
+            [], [], color=INK, lw=0.8, label="outline: published cells (a),\nprobability 0.5 (d)"
+        ),
+        plt.Line2D([], [], color=MUTED, lw=0.8, ls="--", label="MODPATH 7 regions (inset)"),
+    ]
+    ax.legend(
+        handles=handles, loc="center", ncol=2, handlelength=1.6, frameon=False, columnspacing=1.2
+    )
+
+
+def neversink_row(
+    fig_dir: Path,
+    idomain: np.ndarray,
+    wells: dict,
+    maps: dict,
+    window: tuple,
+    segments: np.ndarray,
+    regions: dict,
+    titles: tuple = FIG12_TITLES,
+    bar_km: float = F6_BAR_KM,
+) -> Path:
+    """Fig. 12: (a) F with the published cells, (b, c) the F > 0.1 area against the published
+    cells and the P > 0.5 area, (d) ensemble mean F, in one window, and a locator map."""
+    paper_style()
+    nrow, ncol = idomain.shape[1:]
+    wells_ij = list(well_ij(wells, (nrow, ncol)).values())
+    f_map = f_classes()
+    fig = plt.figure(figsize=(DOUBLE, 2.65), layout="constrained")
+    top, bottom = fig.subfigures(2, 1, height_ratios=(1.0, 0.62))
+    axes = top.subplots(1, 4)
+    image = class_panel(
+        axes[0], maps["F"], maps["published"], wells_ij, window, segments, f_map, titles[0]
+    )
+    overlap_panel(axes[1], maps["codes published"], window, wells_ij, segments, titles[1])
+    overlap_panel(axes[2], maps["codes P"], window, wells_ij, segments, titles[2])
+    class_panel(
+        axes[3],
+        maps["mean F"],
+        maps["probability 0.5"],
+        wells_ij,
+        window,
+        segments,
+        f_map,
+        titles[3],
+    )
+    x0, _, y0, _ = window_extent(window, nrow)
+    scale_bar(axes[0], x0 + 0.4, y0 + 0.4, bar_km)
+    ax_key, ax_legend, ax_loc = bottom.subplots(1, 3, width_ratios=(1.25, 2.2, 0.9))
+    row_key(ax_key, image)
+    row_legend(ax_legend)
+    locator_panel(ax_loc, idomain, regions, wells_ij, segments, window)
+    return save(fig, fig_dir, "fig12_neversink")
+
+
+# ---------------------------------------------------------------- Fig. S9: area growth
 
 
 def growth_table(scenario_dir: Path = SCENARIO_DIR, mech_dir: Path = MECH_DIR) -> pd.DataFrame:
@@ -787,7 +983,7 @@ def spread_labels(values: pd.Series, gap: float = LABEL_GAP) -> pd.Series:
 
 
 def growth_chart(fig_dir: Path, table: pd.DataFrame) -> Path:
-    """Fig. 9: median contributing area relative to base pumping, with the pumping ratio dashed.
+    """Fig. S9: median contributing area relative to base pumping, with the pumping ratio dashed.
 
     The value at maximum pumping is written at the right, behind the series' own marker.
     """
@@ -815,7 +1011,7 @@ def growth_chart(fig_dir: Path, table: pd.DataFrame) -> Path:
     ax.set_xlabel("pumping fraction f (0 = base, 1 = maximum)")
     ax.set_ylabel("median contributing area / base")
     ax.legend(loc="upper left", handlelength=2.2)
-    return save(fig, fig_dir, "fig9_area_growth")
+    return save(fig, fig_dir, "figS9_area_growth")
 
 
 # ---------------------------------------------------------------- Fig. S3: growth mechanism
@@ -932,6 +1128,22 @@ def mechanism_chart(fig_dir: Path, bands: pd.DataFrame, excess: pd.DataFrame) ->
 # ---------------------------------------------------------------- main
 
 
+def find_data_dir(neversink: Path = NEVERSINK, repo: Path = REPO) -> Path:
+    """Return the study folder that holds output/: this checkout's, else the main checkout's."""
+    if (neversink / "output").is_dir():
+        return neversink
+    common = subprocess.run(
+        ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    main_dir = Path(common).parent / neversink.relative_to(repo)
+    assert (main_dir / "output").is_dir(), f"no output folder in {neversink} or {main_dir}"
+    return main_dir
+
+
 def published_mask(shape: tuple, out: Path = OUT) -> np.ndarray:
     """Return the published contributing cells of the calibrated model as a (row, column) grid."""
     mp7 = np.load(out / "mp7_priority.npz")
@@ -939,39 +1151,59 @@ def published_mask(shape: tuple, out: Path = OUT) -> np.ndarray:
 
 
 def main(
-    fig5: bool = True,
-    fig6: bool = True,
-    fig7: bool = True,
-    fig8: bool = True,
-    fig9: bool = True,
-    figS3: bool = True,
+    fig12: bool = True,
+    figS5: bool = False,
+    figS6: bool = False,
+    figS7: bool = False,
+    figS8: bool = False,
+    figS9: bool = False,
+    figS3: bool = False,
     fig_dir: Path = FIG_DIR,
+    data_dir: Path | None = None,
 ) -> list[Path]:
-    """Make the selected figures in fig_dir; return the PNG paths."""
+    """Make the selected figures in fig_dir from the study folder data_dir (default:
+    find_data_dir); return the PNG paths."""
+    data_dir = find_data_dir() if data_dir is None else data_dir
+    out = data_dir / "output"
+    model_dir = out / "optimal"
+    ens_dir = out / "ensemble"
+    scenario_dir = out / "scenarios"
+    mp_dir = (
+        data_dir / "external" / "neversink_workflow" / "output" / "neversink_mp7_optimal_output"
+    )
     paths = []
-    idomain = wf.grid_idomain(MODEL_DIR)
+    idomain = wf.grid_idomain(model_dir)
     shape = idomain.shape[1:]
     wells = wf.PRIORITY_WELLS
-    if fig5 or fig6 or fig7 or fig8:
-        mask = published_mask(shape)
-        windows = capture_windows(idomain, wells, mask)
-    if fig5 or fig6 or fig7 or fig8:
-        segments = model_segments(MODEL_DIR, shape[0])
-    if fig5:
-        regions = region_grids(wf.read_endpoints(columns=("node0",)), shape)
-        x0, y0 = read_dis_origin(MODEL_DIR / "neversink.dis")
+    maps_needed = fig12 or figS5 or figS6 or figS7 or figS8
+    if maps_needed:
+        mask = published_mask(shape, out)
+        windows = capture_windows(idomain, wells, mask, out)
+        segments = model_segments(model_dir, shape[0])
+    if fig12 or figS5:
+        regions = region_grids(wf.read_endpoints(mp_dir, columns=("node0",)), shape)
+    if fig12:
+        window = equal_windows(windows, shape)[FIG12_WINDOW]
+        maps = row_maps(idomain, mask, out, ens_dir / "probability_maps.npz")
+        check_window(maps, window)
+        paths.append(neversink_row(fig_dir, idomain, wells, maps, window, segments, regions))
+    if figS5:
+        x0, y0 = read_dis_origin(model_dir / "neversink.dis")
         north = true_north_angle(x0 + shape[1] * 25.0, y0 + shape[0] * 25.0)
         paths.append(location_map(fig_dir, idomain, wells, mask, regions, segments, north))
-    if fig6:
-        paths.append(capture_maps(fig_dir, idomain, wells, mask, windows, segments))
-    if fig7:
-        paths.append(overlap_maps(fig_dir, idomain, wells, mask, windows, segments))
-    if fig8:
-        paths.append(probability_maps(fig_dir, idomain, wells, windows, segments))
-    if fig9:
-        paths.append(growth_chart(fig_dir, growth_table()))
+    if figS6:
+        paths.append(capture_maps(fig_dir, idomain, wells, mask, windows, segments, out))
+    if figS7:
+        paths.append(overlap_maps(fig_dir, idomain, wells, mask, windows, segments, out))
+    if figS8:
+        maps_file = ens_dir / "probability_maps.npz"
+        paths.append(probability_maps(fig_dir, idomain, wells, windows, segments, maps_file))
+    if figS9:
+        paths.append(
+            growth_chart(fig_dir, growth_table(scenario_dir, scenario_dir / "mechanisms60"))
+        )
     if figS3:
-        summaries = {q: realisation_summary(q) for q in FIXED_QRATS}
+        summaries = {q: realisation_summary(q, ens_dir, scenario_dir) for q in FIXED_QRATS}
         excess = excess_table(summaries["baserat"], summaries["maxrat"])
         paths.append(mechanism_chart(fig_dir, share_bands(summaries), excess))
     return paths
