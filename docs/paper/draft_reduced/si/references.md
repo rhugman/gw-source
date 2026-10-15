@@ -2,11 +2,15 @@
 
 <!-- Reduced draft: works cited in si/ but not in the main text, copied from the full draft list with their source comments. Works cited in both are in the main reference list. -->
 
+Black, A., and C. Foley. 2013. FlowSource: A program to efficiently delineate volumetric capture areas, pathways and source areas in groundwater models. In *Proceedings of MODFLOW and More 2013: Translating Science into Practice*, Golden, Colorado, June 2–5, 2013, 652–663. Golden, Colorado: IGWMC, Colorado School of Mines. https://groundwater-science.co.uk/wp-content/uploads/2013_FSv6_ApplicationPaper.pdf <!-- pages from a secondary citation: the reference list of Maurice et al. (2021), checked in references/docs/text/2021_Maurice_etal_Chalk_karst_groundwater_protection.txt; the proceedings were not seen -->
+
 Campana, M.E., and E.S. Simpson. 1984. Groundwater residence times and recharge rates using a discrete-state compartment model and C-14 data. *Journal of Hydrology* 72, no. 1–2: 171–185. https://doi.org/10.1016/0022-1694(84)90190-2 <!-- not in bibliography.md; from the reference list of references/docs/text/2011_Partington_etal_hydraulic_mixing_cell.txt; issue and DOI from Crossref -->
 
 Chowdhury, M.A. 2016. Assessing the connectivity of groundwater wells to surface-water using a volumetric capture delineation tool. MASc thesis, University of Waterloo, Waterloo, Ontario, Canada. http://hdl.handle.net/10012/10981
 
 Cornaton, F., and P. Perrochet. 2006. Groundwater age, life expectancy and transit time distributions in advective–dispersive systems: 1. Generalized reservoir theory. *Advances in Water Resources* 29, no. 9: 1267–1291. https://doi.org/10.1016/j.advwatres.2005.10.009
+
+Corson-Dosch, N.T., M.N. Fienen, J.S. Finkelstein, A.T. Leaf, J.T. White, J. Woda, and J.H. Williams. 2022. Areas contributing recharge to priority wells in valley-fill aquifers in the Neversink River and Rondout Creek drainage basins, New York. U.S. Geological Survey Scientific Investigations Report 2021–5112. Reston, Virginia: USGS. https://doi.org/10.3133/sir20215112
 
 Hughes, J.D., C.D. Langevin, S.R. Paulinski, J.D. Larsen, and D. Brakenhoff. 2024. FloPy workflows for creating structured and unstructured MODFLOW models. *Groundwater* 62, no. 1: 124–139. https://doi.org/10.1111/gwat.13327 <!-- not in bibliography.md; the FloPy paper the FloPy README ("How to Cite") and its model-splitting example cite; details from Crossref (online 12 June 2023, issue January 2024) -->
 
@@ -19,8 +23,6 @@ Langevin, C.D., J.D. Hughes, E.R. Banta, R.G. Niswonger, S. Panday, and A.M. Pro
 McLane, C., and L. Cecan. 2009. Comment on "MODALL: A practical tool for designing and optimizing capture systems," by S.T. Potter, E. Moreno-Barbero, and C.E. Divine. *Ground Water* 47, no. 2: 172–173. https://doi.org/10.1111/j.1745-6584.2008.00527_1.x <!-- checked against the article PDF (references/docs/): volume, issue, pages 172–173 and authors' affiliation; the PDF gives the first author as "Charles McLane", with no middle initial; DOI 00527_1.x confirmed on Crossref (2026-10-12); the 00527.x printed in the PDF footer is Potter et al.'s reply -->
 
 Nogueira, G.E.H., C. Schmidt, D. Partington, P. Brunner, and J.H. Fleckenstein. 2022. Spatiotemporal variations in water sources and mixing spots in a riparian zone. *Hydrology and Earth System Sciences* 26, no. 7: 1883–1905. https://doi.org/10.5194/hess-26-1883-2022 <!-- not in bibliography.md; journal, volume, first page and DOI from brief.md (key map) and docs/paper/outline.md §7 item 8; authors, title, issue and last page from Crossref -->
-
-Partington, D., P. Brunner, C.T. Simmons, R. Therrien, A.D. Werner, G.C. Dandy, and H.R. Maier. 2011. A hydraulic mixing-cell method to quantify the groundwater component of streamflow within spatially distributed fully integrated surface water–groundwater flow models. *Environmental Modelling & Software* 26, no. 7: 886–898. https://doi.org/10.1016/j.envsoft.2011.02.007
 
 Partington, D., P. Brunner, C.T. Simmons, A.D. Werner, R. Therrien, H.R. Maier, and G.C. Dandy. 2012. Evaluation of outputs from automated baseflow separation methods against simulated baseflow from a physically based, surface water–groundwater flow model. *Journal of Hydrology* 458–459: 28–39. https://doi.org/10.1016/j.jhydrol.2012.06.029 <!-- not in bibliography.md; from the authors' manuscript, references/docs/text/2012_Partington_etal_JHydrol_baseflow_separation.txt; DOI from Crossref -->
 

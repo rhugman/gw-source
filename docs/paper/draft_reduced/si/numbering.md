@@ -1,4 +1,4 @@
-<!-- PLAN, NOT FOR THE BUILD: SI numbering of the reduced draft (docs/paper/draft_reduced). The page builder (draft_page_alt/build_draft.py, si_plan) reads the first table: the type of each item and, in the third column, the item an alias marker is merged into. It numbers the items itself, by first citation in the main text; the labels below are those it assigns to this draft. Items moved out of the full draft's main text: the seven worked examples of its Sections 4.2-4.7 and 4.10 (si/G_examples.md, Texts and Figures), its Figures 1, 12 and 13 (si/G_examples.md) and its Table 1 (si/H_tables.md). References cited only in the SI are in si/references.md, which the builder appends after the items. -->
+<!-- PLAN, NOT FOR THE BUILD: SI numbering of the reduced draft (docs/paper/draft_reduced). The page builder (draft_page_alt/build_draft.py, si_plan) reads the first table: the type of each item and, in the third column, the item an alias marker is merged into. It numbers the items itself, by first citation in the main text; the labels below are those it assigns to this draft. Items moved out of the full draft's main text: the seven worked examples of its Sections 4.2-4.7 and 4.10 (si/G_examples.md, Texts and Figures), its Figures 1, 12 and 13 (si/G_examples.md) and its Table 1 (si/H_tables.md). References cited only in the SI are in si/references.md, which the builder appends after the items. Round 2 (reviews/reduced_r1.md): the main text now has the method figure and the gallery, and the old main-text Figures 1-3 (full-draft Figures 2, 9 and 10) are SI figures at the end of si/G_examples.md. Labels and first citations below were regenerated from the build. -->
 
 # SI numbering plan (reduced draft)
 
@@ -35,21 +35,24 @@ Order: first citation in the main text (sections/ in file order, with each displ
 | {SI: ensemble statistics} | Table S6 | – | not cited in the main text |
 | {SI: method schematic} | Figure S1 | – | 02_methods.md |
 | {SI: verification on the test models} | Figure S2 | – | 03_software.md |
-| {SI: Neversink full-mixing maps} | Figure S3 | – | 05_neversink.md |
-| {SI: numerical dispersion maps and time steps} | Figure S4 | – | 06_tradeoffs.md |
-| {SI: numerical dispersion} | Figure S4 | {SI: numerical dispersion maps and time steps} | 06_tradeoffs.md |
-| {SI: net attribution and PRT-area maps} | Figure S5 | – | not cited in the main text |
-| {SI: Neversink model and published regions} | Figure S6 | – | not cited in the main text |
-| {SI: Neversink backward fractions} | Figure S7 | – | not cited in the main text |
-| {SI: Neversink areas against particle tracking} | Figure S8 | – | not cited in the main text |
-| {SI: Neversink probability of contribution} | Figure S9 | – | not cited in the main text |
-| {SI: the worked example of Foley and Black (2013) and a small well} | Figure S10 | – | not cited in the main text |
-| {SI: forward fractions of river water and field recharge} | Figure S11 | – | not cited in the main text |
-| {SI: backward fractions on different grids} | Figure S12 | – | not cited in the main text |
-| {SI: seasonal snapshots} | Figure S13 | – | not cited in the main text |
-| {SI: mean travel time against particles} | Figure S14 | – | not cited in the main text |
-| {SI: backward fractions through streams and a multi-aquifer well} | Figure S15 | – | not cited in the main text |
-| {SI: the unit-concentration example rebuilt} | Figure S16 | – | not cited in the main text |
-| {SI: numerical dispersion against cell size} | Figure S17 | – | not cited in the main text |
+| {SI: Neversink full-mixing maps} | Figure S6 | – | 05_neversink.md |
+| {SI: numerical dispersion maps and time steps} | Figure S7 | – | not cited in the main text |
+| {SI: numerical dispersion} | Figure S7 | {SI: numerical dispersion maps and time steps} | 06_tradeoffs.md |
+| {SI: net attribution and PRT-area maps} | Figure S9 | – | not cited in the main text |
+| {SI: Neversink model and published regions} | Figure S10 | – | not cited in the main text |
+| {SI: Neversink backward fractions} | Figure S11 | – | not cited in the main text |
+| {SI: Neversink areas against particle tracking} | Figure S12 | – | not cited in the main text |
+| {SI: Neversink probability of contribution} | Figure S13 | – | not cited in the main text |
+| {SI: the worked example of Foley and Black (2013) and a small well} | Figure S14 | – | not cited in the main text |
+| {SI: forward fractions of river water and field recharge} | Figure S15 | – | not cited in the main text |
+| {SI: backward fractions on different grids} | Figure S16 | – | not cited in the main text |
+| {SI: seasonal snapshots} | Figure S17 | – | not cited in the main text |
+| {SI: mean travel time against particles} | Figure S18 | – | not cited in the main text |
+| {SI: backward fractions through streams and a multi-aquifer well} | Figure S19 | – | not cited in the main text |
+| {SI: the unit-concentration example rebuilt} | Figure S20 | – | not cited in the main text |
+| {SI: numerical dispersion against cell size} | Figure S8 | – | 06_tradeoffs.md |
+| {SI: contributing area against particle tracking} | Figure S3 | – | 04_examples.md |
+| {SI: snapshots and transient tracking over 30 years} | Figure S4 | – | 04_examples.md |
+| {SI: probability of contribution before and after history matching} | Figure S5 | – | 04_examples.md |
 
 Labels are reassigned on every build. Recheck them with the build rather than editing them by hand.

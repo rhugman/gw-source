@@ -4,10 +4,6 @@
 
 Bedekar, V., C. Neville, M.J. Tonkin, R.D. Bartlett, and P. Plato. 2024. A unit-concentration method to quantify source contribution. *Groundwater* 62, no. 2: 303–309. https://doi.org/10.1111/gwat.13333 <!-- checked against the full-text PDF (references/docs/): Methods Brief, Groundwater 62, no. 2 (March–April 2024), pp. 303–309, doi 10.1111/gwat.13333. Received January 2023, accepted June 2023, © 2023 NGWA, so it appeared online in 2023. Dated 2024, the year of the issue, as the journal's own running footer does. -->
 
-Black, A., and C. Foley. 2013. FlowSource: A program to efficiently delineate volumetric capture areas, pathways and source areas in groundwater models. In *Proceedings of MODFLOW and More 2013: Translating Science into Practice*, Golden, Colorado, June 2–5, 2013, 652–663. Golden, Colorado: IGWMC, Colorado School of Mines. https://groundwater-science.co.uk/wp-content/uploads/2013_FSv6_ApplicationPaper.pdf <!-- pages from a secondary citation: the reference list of Maurice et al. (2021), checked in references/docs/text/2021_Maurice_etal_Chalk_karst_groundwater_protection.txt; the proceedings were not seen -->
-
-Corson-Dosch, N.T., M.N. Fienen, J.S. Finkelstein, A.T. Leaf, J.T. White, J. Woda, and J.H. Williams. 2022. Areas contributing recharge to priority wells in valley-fill aquifers in the Neversink River and Rondout Creek drainage basins, New York. U.S. Geological Survey Scientific Investigations Report 2021–5112. Reston, Virginia: USGS. https://doi.org/10.3133/sir20215112
-
 Environment Agency. 2019. *Manual for the Production of Groundwater Source Protection Zones*. Bristol, UK: Environment Agency. https://assets.publishing.service.gov.uk/media/5d41a020e5274a0a0bf7757c/Manual-for-the-production-of-Groundwater-Source-Protection-Zones.pdf
 
 Fienen, M.N., and N.T. Corson-Dosch. 2021. Groundwater model archive and workflow for Neversink/Rondout Basin, New York, source water delineation. U.S. Geological Survey data release. https://doi.org/10.5066/P9HWSOHP <!-- creators, year and title from the DataCite record of the DOI; DOI from bibliography.md [COR22] and docs/neversink_study.md §1 -->
@@ -23,6 +19,8 @@ Langevin, C.D., A.M. Provost, S. Panday, and J.D. Hughes. 2022. Documentation fo
 Langevin, C.D., J.D. Hughes, A.M. Provost, M.J. Russcher, M.J. Reno, W.P. Bonelli, E.D. Morway, S. Titus, R.G. Niswonger, S. Panday, D. Merrick, and E.R. Banta. 2026. MODFLOW 6 Modular Hydrologic Model version 6.8.1. U.S. Geological Survey Software Release, 23 September 2026. https://doi.org/10.5066/P1PGE9XW <!-- not in bibliography.md; the citation given with release 6.8.1 at github.com/MODFLOW-ORG/modflow6/releases, the latest release on 2026-10-11. Cited for PRT, which has no USGS report of its own (USGS MODFLOW 6 software page; MODFLOW 6 README). The runs used a 6.9 development build; change the version if the runs are pinned to a release (sections/09_availability.md:3) -->
 
 Neupauer, R.M., and J.L. Wilson. 1999. Adjoint method for obtaining backward-in-time location and travel time probabilities of a conservative groundwater contaminant. *Water Resources Research* 35, no. 11: 3389–3398. https://doi.org/10.1029/1999WR900190
+
+Partington, D., P. Brunner, C.T. Simmons, R. Therrien, A.D. Werner, G.C. Dandy, and H.R. Maier. 2011. A hydraulic mixing-cell method to quantify the groundwater component of streamflow within spatially distributed fully integrated surface water–groundwater flow models. *Environmental Modelling & Software* 26, no. 7: 886–898. https://doi.org/10.1016/j.envsoft.2011.02.007
 
 Pollock, D.W. 2016. User guide for MODPATH Version 7—A particle-tracking model for MODFLOW. U.S. Geological Survey Open-File Report 2016–1086. Reston, Virginia: USGS. https://doi.org/10.3133/ofr20161086 <!-- DOI from the suggested citation in references/docs/text/2016_Pollock_MODPATH7_OFR2016-1086.txt; bibliography.md gives the PDF URL -->
 

@@ -1,6 +1,6 @@
 ## {SI: method in full}
 
-Section 2 of the main text gives the backward fraction (Eq. 1) and describes the rest of the method in words. This text gives the method in full. It defines the cell budget, derives the equations and shows how they are solved and why the water-budget checks must hold. {SI: method schematic} illustrates the method. It then gives net accounting, the mean travel time and transient tracking in full. Equation numbers without an S refer to the main text. <!-- assembled in alt round 1 from the si/B.md items "net accounting, fixed cells", "travel-time identity", "solution of the linear systems" and "water volume options", and from previous/02_methods.md §§2.3, 2.4, 2.5, 2.7 and 2.8 (main-text Methods of the earlier draft) -->
+Section 2 of the main text gives the backward fraction (Eq. 1) and describes the rest of the method in words. This text gives the method in full. It defines the cell budget, derives the equations and shows how they are solved and why the water-budget checks must hold. It then gives net accounting, the mean travel time and transient tracking in full. Equation numbers without an S refer to the main text. {SI: method schematic} illustrates the method. <!-- assembled in alt round 1 from the si/B.md items "net accounting, fixed cells", "travel-time identity", "solution of the linear systems" and "water volume options", and from previous/02_methods.md §§2.3, 2.4, 2.5, 2.7 and 2.8 (main-text Methods of the earlier draft) -->
 
 ### The backward and forward fractions
 
@@ -126,7 +126,7 @@ With "flow" volumes, a cell whose volume would fall below zero stops the run wit
 
 #### Transport sub-steps
 
-Implicit time steps spread tagged water in time, by an amount that grows with the step length. Long steps therefore make tagged water arrive too early (Section 4.2). Sub-steps reduce this effect without a change to the flow model. Each flow step is split into $m$ equal transport sub-steps of length $\Delta t/m$. The flows stay constant within the flow step. The water volumes change linearly between $V^{\mathrm{old}}$ and $V^{\mathrm{new}}$, which is what a constant storage flow gives. Outputs are reported at the ends of the flow steps. With $m = 1$ the scheme is the one above. <!-- src/gwsource/tracking.py module docstring (sub-steps: equal transport sub-steps of dt/m, flows constant, volumes interpolated linearly; per-step outputs at flow-step boundaries; m = 1 reproduces the unsplit scheme exactly) -->
+Implicit time steps spread tagged water in time, by an amount that grows with the step length. Long steps therefore make tagged water arrive too early ({SI: transient checks on the seasonal example model}). Sub-steps reduce this effect without a change to the flow model. Each flow step is split into $m$ equal transport sub-steps of length $\Delta t/m$. The flows stay constant within the flow step. The water volumes change linearly between $V^{\mathrm{old}}$ and $V^{\mathrm{new}}$, which is what a constant storage flow gives. Outputs are reported at the ends of the flow steps. With $m = 1$ the scheme is the one above. <!-- src/gwsource/tracking.py module docstring (sub-steps: equal transport sub-steps of dt/m, flows constant, volumes interpolated linearly; per-step outputs at flow-step boundaries; m = 1 reproduces the unsplit scheme exactly) -->
 
 ### Backward tracking in time
 
@@ -138,7 +138,7 @@ The transpose swaps the roles of inflow and outflow. So the solve runs against t
 
 The same backward equations give the other fates of the water. With every remaining sink as the destination, they give the fraction that leaves through any sink. With no destination, and the end volumes as the condition at the last step, they give the fraction still stored at the end. The fraction to the destination, the fraction to other sinks and the fraction still stored add up to 1 in every cell and step. The flow-imbalance correction and, with "gwt" volumes, the step-boundary changes remove a small remainder. The code reports this remainder. <!-- src/gwsource/tracking.py module docstring (fraction_through + fraction_to_other_sinks + fraction_in_storage_at_end + fraction_unaccounted = 1) -->
 
-The transient forward–backward check follows from Eqs. (S13) and (S7). Multiply Eq. (S13) by $\mathbf{w}^n$ and Eq. (S14) by $\mathbf{c}^n$, and add each over all steps. The terms in $\mathbf{A}^n$ are equal and cancel. The terms in $\mathbf{B}$ cancel from one step to the next, except at the first step. What remains is
+The transient forward–backward check follows from Eqs. (S13) and (S14). Multiply Eq. (S13) by $\mathbf{w}^n$ and Eq. (S14) by $\mathbf{c}^n$, and add each over all steps. The terms in $\mathbf{A}^n$ are equal and cancel. The terms in $\mathbf{B}$ cancel from one step to the next, except at the first step. What remains is
 
 $$\sum_n \Delta t^n\, \mathbf{d}^n \cdot \mathbf{c}^n = \sum_n \Delta t^n\, \mathbf{s}^n \cdot \mathbf{w}^n + \sum_i V_i^{\mathrm{old},1}\, c_i^0\, w_i^1 . \tag{S15}$$
 
