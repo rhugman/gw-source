@@ -8,7 +8,7 @@ The paper demonstrates an open-source tool to practitioners. It is not a methods
 
 - **Results are worked examples.** Each example answers one practitioner question on a small model that a reader can rerun in seconds. Each example shows the output a practitioner would use and checks it against an independent approach where one exists.
 - **The order of the examples follows the tutorial notebooks.** The paper describes each example model in its own words. The notebooks are the runnable version of the same examples.
-- **All nine examples stay for now.** Cutting happens in review.
+- **All ten examples stay for now.** Cutting happens in review. Tutorial 10 (the Bedekar et al. 2024 unit-concentration example) was added on main on 2026-10-14 and merged into this branch.
 - **Neversink becomes a short demonstration at the end.** It shows cost at scale and an ensemble on a real regional model. It explains in prose why our areas differ from the published MODPATH 7 areas. The detail moves to the Supporting Information (SI).
 - **Limitations and trade-offs get their own section.** These are the limits of full mixing and of the code, with numbers from the examples.
 - **Methods shrink to what a user needs to read the outputs.** Equations stay. Derivations and the solver detail move to the SI.
@@ -17,11 +17,12 @@ Model papers named by the author: Hugman and White (2026, *Groundwater*, pyEMU e
 
 ## 2. Title, impact statement and key messages
 
-Working titles (the title says what the tool gives the user):
+Title (author's choice, 2026-10-15): a practitioner's question, then what the tool is.
 
-1. *Where does my well's water come from? Open-source flow tracing for MODFLOW 6*
-2. *Contributing areas, water sources and travel times from MODFLOW 6 budgets in seconds: the gwsource tool*
-3. Keep the current title: *Contributing areas and sources of water for any MODFLOW 6 sink, in steady-state and transient flow*
+- *Where does my well's water come from? Open-source flow tracing for MODFLOW 6* (chosen)
+- Variants in the same style:
+  - *Which land feeds my well? Open-source flow tracing for MODFLOW 6*
+  - *Where does a well's water come from, and how old is it? Open-source flow tracing for MODFLOW 6*
 
 Key messages, one per paragraph of the conclusions:
 
@@ -40,12 +41,12 @@ Word budgets are first guesses for a *Groundwater* research paper. [check] the j
 | 1 | Introduction | 900 | — |
 | 2 | Method in brief | 1,100 | Fig. 1 (schematic) |
 | 3 | The software | 600 | Table 1 (inputs and outputs) |
-| 4 | Worked examples (nine) | 3,600 (about 400 each) | Figs 2–10 |
-| 5 | A regional model: Neversink | 600 | Fig. 11 |
-| 6 | Trade-offs and limitations | 900 | Fig. 12 (dispersion) or SI |
+| 4 | Worked examples (ten) | 4,000 (about 400 each) | Figs 2–11 |
+| 5 | A regional model: Neversink | 600 | Fig. 12 |
+| 6 | Trade-offs and limitations | 900 | Fig. 13 (dispersion) or SI |
 | 7 | Conclusions | 300 | — |
 | 8 | Code and data availability | 150 | — |
-| | Total | about 8,150 | 12 figures (too many; cut in review) |
+| | Total | about 8,550 | 13 figures (too many; cut in review) |
 
 ### 3.1 Introduction (about 900 words)
 
@@ -89,7 +90,7 @@ Only what a reader needs to read the outputs. Each concept is explained in plain
   - Memory: Neversink peaked at 2.5 GB, plus about 0.19 GB per extra group.
   - Use under the PEST++ run manager is untested.
   - Neversink timings stay in §5.
-- **Testing.** The test suite runs ten test models and the published worked example. The full verification table (current Fig. 2 and Table S1) moves to the SI.
+- **Testing.** The test suite runs ten test models and the published worked example. The full verification table (current Fig. 2 and Table S1) moves to the SI (decided). The main text uses the checks in the examples.
 - Table 1: inputs, selections and outputs in one table, each with the example that shows it.
 
 ### 3.4 Worked examples (about 3,600 words)
@@ -99,9 +100,7 @@ Only what a reader needs to read the outputs. Each concept is explained in plain
 - recharge of 5 × 10⁻⁴ m/d;
 - a constant head of 10 m on the west edge;
 - a north–south river (stage 6 m) 1.5 km from the west edge;
-- a supply well pumping 800 m³/d 100 m west of the river. Each example changes this model where its question needs it. Say once that each example ships as a runnable notebook (Section 8).
-
-**Decision for the author.** The rule so far is "never write 'tutorial' in the main text". I suggest one sentence in this opening paragraph naming the notebooks, because for a tool paper they are part of the contribution.
+- a supply well pumping 800 m³/d 100 m west of the river. Each example changes this model where its question needs it. One sentence names the notebooks (decided): each example ships as a runnable notebook that reproduces its numbers and figure (Section 8). This replaces the earlier rule of never writing "tutorial" in the main text. Elsewhere, the text still describes the models in its own words rather than pointing to notebooks.
 
 Each subsection follows the same pattern:
 1. the question;
@@ -275,11 +274,22 @@ Each subsection follows the same pattern:
   - memory for exact quantiles: 4 GB per series for 1,000 realisations of 1 million cells, 24 GB for the six series of this example;
   - the same grid is needed in every realisation;
   - prior only.
-- Figure: probability maps beside the source-share box plot.
+- Figure: probability maps beside the source-share box plot. Once the PEST++ run exists, show prior against posterior P(F > 0.5).
+- PEST++ (decided: run it). The notebook conditions the ensemble on heads with PEST++ IES and traces the posterior realisations. That shows the practitioner output that matters: how history matching narrows the capture probability.
 - [tutorial]:
-  - the PEST++ section is "described, not run": either run it or drop it from the paper;
+  - make the PEST++ section run end to end. It currently has an undefined `write_parameters` and a hard-coded `f[1234]`. pestpp-ies is not installed yet;
   - the grid-and-mixing column is hard-coded text;
   - the travel-time range is quoted two ways.
+
+#### 4.10 Does it reproduce a published unit-concentration study? (tutorial 10)
+
+- Model: the Bedekar et al. (2024) example, rebuilt in MODFLOW 6, including the values the paper leaves open.
+- Output: the well's water by source over 25 years (lateral inflow, recharge, stream, stored water). Backward time-limited contributing areas show where the pumped recharge and stream water entered.
+- Checks: against four MF6 GWT unit-concentration runs (≤ 1.5 × 10⁻¹⁰), and against the paper's Figure 2 (≤ 1.3 percentage points). Over long times it tends to the steady-state result.
+- Why it matters: one tracking run replaces four transport runs, one per source, and it adds the backward view.
+- Limit: transport sub-steps are needed for arrival fronts. Run time is about 2.5 min, the longest of the examples.
+- Figure: the well's source shares over time, set against the published curves.
+- [check] This entry was written from the tutorials README only. Read the notebook before drafting.
 
 ### 3.5 A regional model: Neversink (about 600 words, one figure)
 
@@ -312,8 +322,8 @@ Each subsection follows the same pattern:
   - (d) ensemble mean F;
   - a locator inset replaces the current Fig. 5.
 - **To the SI.** The current §5 in full, with Figs 5–9 and Figures S2–S3: the reproduction table, end states, net attribution, ensemble statistics and pumping scenarios.
-  - Decision: drop or keep the pumping scenarios (Fig. 9, Tables S5–S6, Text S11, Figure S3).
-  - Text S10 stays in either case, because it holds the Monte Carlo offsets that the ensemble comparison needs.
+  - The pumping scenarios are dropped (decided): Fig. 9, Tables S5–S6, Text S11 and Figure S3.
+  - The scenario rule in Text S10 goes too. Its first half, the Monte Carlo offsets, stays, because the ensemble comparison needs it.
 
 ### 3.6 Trade-offs and limitations (about 900 words)
 
@@ -342,7 +352,7 @@ The five key messages of section 2, one short paragraph each.
 
 ### 3.8 Code and data availability (about 150 words)
 
-The repository, the version used, the nine example notebooks with their run times, the Neversink scripts and the published model archive.
+The repository, the version used, the ten example notebooks with their run times, the Neversink scripts and the published model archive.
 
 ## 4. Supporting Information
 
@@ -362,7 +372,7 @@ The repository, the version used, the nine example notebooks with their run time
 
 The paper and the notebooks must give the same numbers.
 
-1. **Rerun all nine notebooks** on the current code. Tutorial 02's outputs predate the net-accounting change of 2026-10-10.
+1. **Rerun all ten notebooks** on the current code. Tutorial 02's outputs predate the net-accounting change of 2026-10-10.
 2. **Independent checks for tutorials 01 and 03.**
    - 01: cite PRT from 06, or add a short PRT comparison.
    - 03: add a GWT-at-equilibrium comparison.
@@ -378,12 +388,10 @@ The paper and the notebooks must give the same numbers.
 6. **Remove references to `PLAN.md`** and other internal notes. They appear in tutorials 01, 02, 03, 04, 06, 07, 08 and 09.
 7. **Runtimes.** The README and the notebook headers disagree; print the measured times.
 
-## 6. Decisions for the author
+## 6. Decisions (author, 2026-10-15)
 
-1. Name the notebooks once in the §4 opening, or only in §8?
-2. Verification:
-   - test-model table to the SI, with the main text using the example checks (suggested), or
-   - keep the current Fig. 2 in the main text.
-3. Neversink pumping scenarios: keep in the SI or drop.
-4. Tutorial 09's PEST++ section: run it, or leave it out of the paper. Use under the PEST++ run manager is untested so far.
-5. Title.
+1. Name the notebooks once in the §4 opening: yes.
+2. Test-model verification moves to the SI. The main text uses the checks in the examples.
+3. Neversink pumping scenarios: dropped.
+4. Tutorial 09's PEST++ section: run it.
+5. Title: *Where does my well's water come from? Open-source flow tracing for MODFLOW 6*, or one in that style.
