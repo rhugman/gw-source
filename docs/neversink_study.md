@@ -110,6 +110,22 @@ The difference is large only at wells that take a small share of their cell's ou
 
 Net accounting brings the sum of F close to the published count (978 against 980) and raises the Jaccard index at F > 0.5 from 0.41 to 0.44; at F > 0.1 it is about the same. This does not hold per well. At the three strong-sink wells both modes give about 410 cells against 514 published. At the five weak-sink wells gross accounting gives 502 and net accounting more than the published 466: 690 as a sum of single-well traces, which credit the 608 m³/d passing from U___7's cell into U___8's to both wells. The largest departures are U___7 (94 to 214, published 58) and U___8 (229 to 249, published 163). SV_487 (65 to 94, published 97) and U__55 (81 to 97, published 116) move towards the published counts. The close group total is therefore partly differences of both signs cancelling: an excess at weak-sink wells under net accounting against a shortfall at strong-sink wells that both modes share. One reading is that the stopping rule acts like net accounting at the wells: a particle that enters a weak-sink well cell is credited to the well, so all water reaching that cell counts (the 466 particles above). The per-well counts do not support this, since gross accounting is closer at the weak-sink wells, and we have not tested it further.
 
+**Table 2c. Per well, gross / net accounting against the published cells**
+
+| well | well's share of its cell's outflow | net attribution (m³/d) | published cells | sum of F (gross / net) | Jaccard F > 0.1 | Jaccard F > 0.5 | Jaccard, same number of cells |
+|---|---|---|---|---|---|---|---|
+| SV_193 | 1.00 | 63 | 48 | 26 / 26 | 0.37 / 0.37 | 0.00 / 0.00 | 0.30 / 0.30 |
+| SV_227 | 1.00 | 199 | 115 | 69 / 74 | 0.29 / 0.29 | 0.16 / 0.19 | 0.25 / 0.26 |
+| SV_407 | 0.91 | 103 | 32 | 34 / 37 | 0.29 / 0.26 | 0.16 / 0.25 | 0.60 / 0.60 |
+| SV_487 | 0.69 | 545 | 97 | 65 / 94 | 0.18 / 0.10 | 0.04 / 0.15 | 0.17 / 0.17 |
+| U_917 | 1.00 | 1,054 | 351 | 313 / 314 | 0.56 / 0.56 | 0.53 / 0.53 | 0.68 / 0.68 |
+| U__55 | 0.85 | 293 | 116 | 81 / 97 | 0.06 / 0.16 | 0.00 / 0.00 | 0.13 / 0.13 |
+| U___7 | 0.44 | 1,167 | 58 | 94 / 214 | 0.20 / 0.08 | 0.00 / 0.00 | 0.05 / 0.05 |
+| U___8 | 0.93 | 1,197 | 163 | 229 / 249 | 0.10 / 0.10 | 0.00 / 0.00 | 0.22 / 0.22 |
+| all eight | – | 3,944 | 980 | 910 / 978 | 0.30 / 0.28 | 0.41 / 0.44 | 0.41 / 0.40 |
+
+Source: `net_vs_gross_mp7.csv` and `net_vs_gross_wells.csv`. Under gross accounting the per-well sums of F add up to the group's 910 cells. Under net accounting they add up to 1,104 cells against the group's 978, because a trace of one well fixes only that well's cell. At the three wells that take all of their cell's outflow, net accounting changes the sum of F by at most 5 cells (SV_227, 69.3 to 73.9). This table was Table S5 of the reduced paper draft's Supporting Information until its first SI revision.
+
 ## 3. Results: particle tracking on the same flow field
 
 **Table 3. Agreement with the published cells (Jaccard, priority wells)**
@@ -139,11 +155,13 @@ P is the flow-weighted share of the water released in a cell that reaches the we
 
 **Why the first PRT runs captured too little.** An earlier version of the PRT helper captured 1,940 m³/d (53 %, water table) and 3,005 m³/d (82 %, mid-cell) with thinning. Running PRT without a stop zone and evaluating both rules on the same tracks separates two defects of that version, both in the helper rather than in either method. The `diagnose_prt` gate of `workflow.py` repeats this evaluation and writes the totals per rule and per well to `prt_diagnosis.csv`.
 
-| release | first well cell only (earlier rule) | weight followed on (current) |
-|---|---|---|
-| water table | 1,940 (53 %) | 2,413 (66 %) |
-| mid-cell | 3,005 (82 %) | 3,722 (101 %) |
-| four heights through the cell | 3,015 (82 %) | 3,736 (102 %) |
+| release | first well cell only (earlier rule) | weight followed on (current) | weight lost only at the wells, followed on (plain) |
+|---|---|---|---|
+| water table | 1,940 (53 %) | 2,413 (66 %) | 7,685 (209 %) |
+| mid-cell | 3,005 (82 %) | 3,722 (101 %) | 9,182 (250 %) |
+| four heights through the cell | 3,015 (82 %) | 3,736 (102 %) | 9,555 (260 %) |
+
+Shares are of the wells' inflow, 3,671 m³/d (`prt_diagnosis.csv`, `captured_first_cell` and `captured_whole_path`, `thin_weak_sinks` True and False).
 
 - **Weight dropped in partial well cells** (+720 m³/d, 20 % of the inflow). The earlier rule stopped a particle in the first well cell it entered and credited the well with the share d/O that the well takes of the cell's outflow; the rest was dropped. The well of U___7 takes 44 % of its cell's outflow, but 97 % of the water in that cell reaches a priority well (F = 0.97): most of what passes on flows to U___8 and U_917. Followed on, the particles credit U___8 with 609 m³/d and U_917 with 111 m³/d more. The helper now applies the gross accounting along the whole path: in each cell, the destination takes d/O of the remaining weight and the cell's sinks remove Snk/O; there is no stop zone.
 - **Particles trapped at the water table** (−1,300 m³/d at the water table against mid-cell). MF6 spreads recharge and the other boundary sources over the cell volume, and PRT's velocity field matches that. The helper now releases at several heights through the saturated thickness by default.
