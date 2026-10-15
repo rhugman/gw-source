@@ -19,6 +19,7 @@ Stresses are given on (row, col) of the tutorial grid; the river reaches carry t
 'river_north' and 'river_south', and wells carry their own names.
 """
 
+import importlib.util
 import shutil
 import sys
 from dataclasses import dataclass, field, replace
@@ -41,6 +42,9 @@ IMS_SETTINGS = {
     "rcloserecord": 1.0e-8,
     "linear_acceleration": "bicgstab",
 }
+VORONOI_BACKGROUND = 50.0  # m: vorflow mesh size away from the features (as the DIS cells)
+VORONOI_WELL_SIZE = 10.0  # m: vorflow mesh size at the wells
+VORONOI_RIVER_SIZE = 12.5  # m: vorflow mesh size along the river
 SEASONS = ("winter", "spring", "summer", "autumn")
 SEASON_RECHARGE = (1.8, 1.0, 0.1, 1.1)  # multipliers of AquiferSpec.rech
 SEASON_PUMPING = (0.8, 1.0, 1.4, 0.8)  # multipliers of the well rates
@@ -74,11 +78,6 @@ def exe_path(name: str, bin_dir: Path | None = None) -> Path:
 def mf6_exe() -> Path:
     """Return the MODFLOW 6 executable in <repo>/bin."""
     return exe_path("mf6")
-
-
-def triangle_exe() -> Path:
-    """Return the triangle executable in <repo>/bin (Voronoi grids)."""
-    return exe_path("triangle")
 
 
 def work_dir(name: str, clean: bool = False) -> Path:
@@ -351,21 +350,74 @@ def build_layered(
 # ---------------------------------------------------------------- (c) DISV Voronoi and DISU
 
 
-def voronoi_gridprops(ws: Path, exe: Path, spec: AquiferSpec, max_area: float) -> dict:
-    """Build a Voronoi grid over the tutorial domain with Triangle; return DISV properties."""
-    from flopy.utils.triangle import Triangle
-    from flopy.utils.voronoi import VoronoiGrid
+def require_vorflow():
+    """Return the vorflow module, failing with an install hint if it is missing."""
+    assert importlib.util.find_spec("vorflow") is not None, (
+        "the Voronoi grid needs vorflow, an optional dependency of the tutorials only "
+        "(gwsource itself does not need it): pip install vorflow"
+    )
+    import vorflow
 
-    tri_ws = Path(ws) / "triangle"
-    tri_ws.mkdir(parents=True, exist_ok=True)
-    tri = Triangle(model_ws=str(tri_ws), exe_name=str(exe), maximum_area=max_area, angle=30.0)
-    tri.add_polygon([(0.0, 0.0), (spec.lx, 0.0), (spec.lx, spec.ly), (0.0, spec.ly)])
-    tri.build(verbose=False)
-    return VoronoiGrid(tri).get_disv_gridprops()
+    return vorflow
+
+
+def vorflow_cells(
+    spec: AquiferSpec,
+    background: float = VORONOI_BACKGROUND,
+    well_size: float = VORONOI_WELL_SIZE,
+    river_size: float = VORONOI_RIVER_SIZE,
+):
+    """Mesh the tutorial domain with vorflow; return its Voronoi cells as a GeoDataFrame.
+
+    background is the mesh size away from the features [m]. The mesh is refined to well_size
+    at each well (a point) and to river_size along the river (a line), and grows back to
+    background with vorflow's default growth factor (1.2 from cell to cell). Each well point
+    is the centre of its cell, and the river cells are centred on the river line.
+    """
+    from shapely.geometry import LineString, Point, box
+
+    vorflow = require_vorflow()
+    vorflow.set_verbosity(0)  # no progress messages; warnings and errors still show
+    riv_x = (spec.riv_col + 0.5) * spec.delr
+    blueprint = vorflow.ConceptualMesh()
+    blueprint.add_polygon(box(0.0, 0.0, spec.lx, spec.ly), zone_id=1)
+    blueprint.add_line(LineString([(riv_x, 0.0), (riv_x, spec.ly)]), "river", river_size)
+    for bname, rc, _ in spec.wells:
+        blueprint.add_point(Point(spec.xy(rc)), bname, well_size)
+    polys, lines, points = blueprint.generate()
+    mesher = vorflow.MeshGenerator(background_lc=background)
+    mesher.generate(polys, lines, points)
+    return vorflow.VoronoiTessellator(mesher, blueprint).generate()
+
+
+def disv_gridprops(cells, decimals: int = 6) -> dict:
+    """Return DISV ncpl, nvert, vertices and cell2d of Voronoi cells (clockwise, shared vertices).
+
+    cells is a GeoDataFrame of polygons with the generator of each cell in columns x and y.
+    The generator is the cell centre, so each connection is perpendicular to its shared face.
+    Vertices that agree to `decimals` decimal places [m] are merged.
+    """
+    from shapely.geometry.polygon import orient
+
+    index, vertices, cell2d = {}, [], []
+    for icell, (polygon, xc, yc) in enumerate(zip(cells.geometry, cells["x"], cells["y"])):
+        ring = orient(polygon, sign=-1.0).exterior.coords[:-1]  # MF6 needs clockwise vertices
+        iverts = []
+        for x, y in ring:
+            key = (round(x, decimals), round(y, decimals))
+            if key not in index:
+                index[key] = len(vertices)
+                vertices.append([len(vertices), x, y])
+            iverts.append(index[key])
+        cell2d.append([icell, float(xc), float(yc), len(iverts), *iverts])
+    return {"ncpl": len(cell2d), "nvert": len(vertices), "vertices": vertices, "cell2d": cell2d}
 
 
 def voronoi_stress_cells(gridprops: dict, spec: AquiferSpec) -> dict[str, list[int]]:
-    """Place the stresses on Voronoi cells by geometry: west edge, river line, well points."""
+    """Place the stresses on Voronoi cells by geometry: west edge, river line, well points.
+
+    The river cells are the cells that the river line crosses over a length > 0.
+    """
     from flopy.utils.gridintersect import GridIntersect
     from shapely.geometry import LineString, Point
 
@@ -377,7 +429,8 @@ def voronoi_stress_cells(gridprops: dict, spec: AquiferSpec) -> dict[str, list[i
     gi = GridIntersect(mg)
     riv_x = (spec.riv_col + 0.5) * spec.delr
     river = LineString([(riv_x, 0.0), (riv_x, spec.ly)])
-    riv = sorted(int(i) for i in gi.intersects(river, dataframe=False).cellids)
+    crossed = gi.intersect(river, geo_dataframe=False)
+    riv = sorted(int(i) for i, length in zip(crossed.cellids, crossed.lengths) if length > 0.0)
     xv = np.array([v[1] for v in gridprops["vertices"]])
     chd = [i for i, c in enumerate(gridprops["cell2d"]) if xv[np.array(c[4:], int)].min() < 1e-6]
     wells = [int(gi.intersects(Point(spec.xy(rc)), dataframe=False).cellids[0])
@@ -388,19 +441,21 @@ def voronoi_stress_cells(gridprops: dict, spec: AquiferSpec) -> dict[str, list[i
 def build_voronoi(
     ws: Path,
     exe: Path,
-    triangle: Path,
     spec: AquiferSpec | None = None,
-    max_area: float = 2500.0,
+    background: float = VORONOI_BACKGROUND,
+    well_size: float = VORONOI_WELL_SIZE,
+    river_size: float = VORONOI_RIVER_SIZE,
 ) -> ModelRun:
     """Steady 1-layer DISV Voronoi version of the quickstart model (same physical problem).
 
-    max_area is Triangle's largest triangle area [m2]; the Voronoi cells are about that size.
-    The river conductance is shared so that its total matches the DIS model.
+    The grid comes from vorflow (vorflow_cells): cells about `background` m across, refined
+    to well_size at the wells and to river_size along the river. The river conductance is
+    shared equally among the river cells so that its total matches the DIS model.
     """
     spec = AquiferSpec() if spec is None else spec
     name = "voronoi"
     ws = Path(ws)
-    gridprops = voronoi_gridprops(ws, triangle, spec, max_area)
+    gridprops = disv_gridprops(vorflow_cells(spec, background, well_size, river_size))
     cells = voronoi_stress_cells(gridprops, spec)
     ncpl = gridprops["ncpl"]
     sim, gwf = make_sim(name, ws, exe, STEADY)
