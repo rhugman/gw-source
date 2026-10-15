@@ -82,7 +82,7 @@ A narrower posterior is not necessarily a correct one. The posterior gives a pro
 
 On a fully unstructured (DISU) grid that holds the regular cells, F equals the regular-grid result in every cell. On a Voronoi grid the contributing area has the same shape (Fig. 2h). Its edge is wider. F falls from 0.5 to 0.1 over 186 m north of the well, against 121 m on the regular grid (Supporting Information, Text S7).
 
-In seasonal snapshots, the F > 0.5 area grows from 0.59 km² in the wet season to 1.35 km² in the dry season. Cells with F > 0.5 in all or some of 36 snapshots form nested zones (Fig. 2e; Supporting Information, Text S8). The transient tracking example above compares snapshots with transient tracking.
+In seasonal snapshots, the F > 0.5 area grows from 0.59 km² in the wet season to 1.35 km² in the dry season. Cells with F > 0.5 in all or some of 36 snapshots form nested zones (Fig. 2e; Supporting Information, Text S8). Snapshots have no travel lag. The transient tracking example above shows what that leaves out.
 
 With a porosity, the backward trace also gives mean travel times (Fig. 2d). Weight-losing particles give a mean travel time to the well of 45.7 years, against 45.9 years for full mixing (Supporting Information, Text S9). Both means follow from nearly the same water volume. This agreement is therefore not an independent test. Cell by cell, the two differ most outside the F > 0.5 area.
 
