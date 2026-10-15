@@ -13,8 +13,9 @@ notebooks' numbers.
   (b, c) net and gross F of the 5 m3/d well in layer 3, log scale, in a window around it.
 - Fig. 4 (Section 4.3, notebook 03): (a) G of river water near the well; (b) G of the recharge
   on a 300 m field, log scale; (c) the fate of the water from each source.
-- Fig. 5 (Section 4.4, notebook 04): F on the regular grid (a) and on a Voronoi grid (b), with
-  grid close-ups as insets; (c) F with XT3D and rotating anisotropy, flow-loop cells marked.
+- Fig. 5 (Section 4.4, notebook 04): F on the regular grid (a) and on a Voronoi grid refined
+  around the well and the river (b), with grid close-ups as insets; (c) F with XT3D and
+  rotating anisotropy, flow-loop cells marked.
 - Fig. 6 (Section 4.5, notebook 05): (a-d) F in the middle step of each season of the last
   year; (e) nested zones from statistics over the 36 seasonal steps.
 
@@ -64,8 +65,7 @@ CHLORIDE = {"river": 80.0, "west edge": 25.0, "recharge": 5.0}  # mg/L, invented
 FORWARD_SOURCES = {"river": "RIV", "west edge": "CHD", "recharge": "RCH"}
 RIVER_WINDOW = ((1250.0, 1650.0), (775.0, 1175.0))  # (x, y) limits (m) of Fig. 4a
 WEAK_WINDOW = ((0.0, 1000.0), (950.0, 1450.0))  # (x, y) limits (m) of Fig. 3b, c
-GRID_WINDOW = ((1250.0, 1650.0), (775.0, 1175.0))  # (x, y) limits (m) of the Fig. 5 insets
-VORONOI_MAX_AREA = 2500.0  # m2: Voronoi cells about 50 m across
+GRID_WINDOW = ((1325.0, 1625.0), (825.0, 1125.0))  # (x, y) limits (m) of the Fig. 5 insets
 N_YEARS = 3
 STEPS_PER_SEASON = 3
 SNAPSHOT_SOURCES = {
@@ -127,10 +127,12 @@ QUOTED = {
         "G field at well": 0.0222, "nitrate at well (mg/L)": 1.11, "chloride at well (mg/L)": 18.6,
     },
     "fig5": {
-        "cells DIS": 1600, "cells DISV": 1322, "expected area DIS (km2)": 1.173,
-        "expected area DISV (km2)": 1.082, "expected area change (%)": -7.8,
-        "river share DIS": 0.142, "river share DISV": 0.213,
-        "river distance DIS (m)": 100.0, "river distance DISV (m)": 70.0,
+        "cells DIS": 1600, "cells DISV": 3241, "expected area DIS (km2)": 1.173,
+        "expected area DISV (km2)": 1.178, "expected area change (%)": 0.4,
+        "river share DIS": 0.142, "river share DISV": 0.140,
+        "river distance DIS (m)": 100.0, "river distance DISV (m)": 100.0,
+        "west edge share DIS": 0.148, "west edge share DISV": 0.133,
+        "west edge in DIS (m3/d)": 323.9, "west edge in DISV (m3/d)": 289.9,
         "loops": 5, "loop cells": 40, "circulation (m3/d)": 4.42,
         "net F change, edges deleted": 0.155, "cells above 0.01, edges deleted": 24,
     },
@@ -369,12 +371,14 @@ def trace_well(run, well: str = WELL) -> tuple[gs.FlowStep, gs.BackwardResult]:
     return step, gs.backward(step, {well: gs.select(step, boundnames=[well])})
 
 
-def compute_grids(hbd, work: Path, mf6_exe: Path, triangle: Path,
-                  max_area: float = VORONOI_MAX_AREA) -> dict:
-    """Build notebook 04's DIS, DISV, DISU and XT3D models and trace the well on each."""
+def compute_grids(hbd, work: Path, mf6_exe: Path) -> dict:
+    """Build notebook 04's DIS, DISV, DISU and XT3D models and trace the well on each.
+
+    The DISV grid is notebook 04's vorflow grid (hbd.build_voronoi with its default sizes).
+    """
     runs = {
         "DIS": hbd.build_quickstart(work / "grids_dis", mf6_exe),
-        "DISV": hbd.build_voronoi(work / "grids_disv", mf6_exe, triangle, max_area=max_area),
+        "DISV": hbd.build_voronoi(work / "grids_disv", mf6_exe),
         "DISU": hbd.build_disu(work / "grids_disu", mf6_exe, with_vertices=True),
         "XT3D": hbd.build_xt3d(work / "grids_xt3d", mf6_exe),
     }
@@ -412,8 +416,11 @@ def grids_values(hbd, data: dict) -> dict:
         f, area = results[label].fraction_through[WELL], steps[label].area
         values[f"cells {label}"] = steps[label].n_cells
         values[f"expected area {label} (km2)"] = km2(float(f @ area))
-        values[f"river share {label}"] = float(
-            hbd.volume_from_table(results[label], WELL)["share"]["RIV"])
+        shares = hbd.volume_from_table(results[label], WELL)["share"]
+        values[f"river share {label}"] = float(shares["RIV"])
+        values[f"west edge share {label}"] = float(shares["CHD"])
+        chd = gs.select(steps[label], package="CHD")
+        values[f"west edge in {label} (m3/d)"] = float(steps[label].term_flow[chd.terms].sum())
         values[f"river distance {label} (m)"] = river_distance(hbd, runs[label], steps[label],
                                                                results[label])
     values["expected area change (%)"] = 100.0 * (
@@ -802,7 +809,7 @@ def grid_inset(ax, hbd, run, step: gs.FlowStep, res: gs.BackwardResult,
     draw_cells(inset, run.grb_file, step, hbd.feature_cells(step, "RIV"), RIVER_COLOUR)
     pmv = flopy.plot.PlotMapView(modelgrid=model_grid(run.grb_file), ax=inset)
     pmv.plot_grid(linewidth=0.3, color="#6e6e6e")
-    draw_well(inset, run.grb_file, np.flatnonzero(res.selections[WELL].cells), size=45)
+    draw_well(inset, run.grb_file, np.flatnonzero(res.selections[WELL].cells), size=20)  # small: refined cells stay visible
     inset.set_xlim(*window[0])
     inset.set_ylim(*window[1])
     inset.set_aspect("equal")
@@ -929,7 +936,7 @@ def main(
         check_quoted(values, quoted["fig4"])
         print("wrote", make_fig4(out_dir, hbd, data))
     if fig5:
-        data = compute_grids(hbd, work, mf6_exe, hbd.triangle_exe())
+        data = compute_grids(hbd, work, mf6_exe)
         values = grids_values(hbd, data)
         report("Fig. 5", values)
         check_quoted(values, quoted["fig5"])
