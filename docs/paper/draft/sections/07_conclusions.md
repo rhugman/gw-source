@@ -1,0 +1,11 @@
+# 7. Conclusions
+
+This paper presents `gwsource`, open-source code that answers a water manager's questions about a supply well from the cell-by-cell flows a MODFLOW 6 model already saves. It maps contributing areas, splits a sink's water by source, gives mean travel times and follows the water from a source to where it leaves the model. The code builds on the full-mixing method of FlowSource (Foley and Black 2013) and extends it to MODFLOW 6.
+
+Every result comes with water-budget checks that must hold exactly. The code reproduced the worked example of Foley and Black (2013) and the unit-concentration study of Bedekar et al. (2024). It agreed with MODFLOW 6 GWT within the solver tolerance. It also agreed with MODFLOW 6 particle tracking (PRT) in the water delivered to the well and in the mean travel time. Cell by cell, the two methods differ at the edge of a contributing area, where full mixing gives in-between values. <!-- Sections 4.1 (799.9 of 800 m³/d; edge cells), 4.2 (Foley and Black 2013 to 10⁻¹⁴), 4.3, 4.8 and 4.10 (GWT), 4.6 (−0.5 %), 4.10 (Bedekar et al. 2024) -->
+
+The answers come in seconds on small models. On a published regional model of 1.68 million cells, one trace of nine destination groups took 2–3 s. At this cost, every realisation of an ensemble of hundreds can be traced. <!-- Sections 3.4 and 5 -->
+
+The code reads every MODFLOW 6 grid type and simulations made of several linked models. It traces water through stream networks, movers and multi-aquifer wells. It works in steady-state and transient flow. For transient models it carries tagged water through storage, forward and backward in time. Backward tracking in time maps the area whose water reaches a well within a stated time. <!-- Sections 4.4, 4.7, 4.8 and 4.10 -->
+
+Full mixing has costs. Its areas are wider and more diffuse than particle areas. The threshold that draws an area therefore needs judgement and should be reported with it. Snapshots of a transient model have no travel lag. Transient tracking and ensemble percentiles need memory that grows with the number of time steps and realisations. Particle tracking remains the better tool where a sharp edge or a first arrival matters. Transport models remain the better tool where dispersion or reactions matter (Section 6).
