@@ -1,6 +1,6 @@
 # 2. Method in brief
 
-This section gives what a reader needs to read the outputs of the code. The derivations and the solution of the equations are given in the Supporting Information ({SI: method in full}).
+This section defines the quantities the code computes. The derivations and the solution of the equations are given in the Supporting Information ({SI: method in full}).
 
 ## 2.1 Full mixing and the cell budget
 
