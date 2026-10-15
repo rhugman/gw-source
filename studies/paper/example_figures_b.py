@@ -385,8 +385,8 @@ def make_fig7(out_dir: Path, data: dict) -> list[Path]:
     grid = gs.export.to_grid(step, t_zone)[0]
     closed = np.where(np.isfinite(grid), grid, 10.0 * TRAVEL_NORM[1])  # zones end at F = 0.5
 
-    fig, axes = plt.subplots(1, 2, figsize=(mfig.FULL_WIDTH, 2.9), layout="constrained",
-                             gridspec_kw={"width_ratios": [1.4, 1.0]})
+    fig, axes = plt.subplots(1, 2, figsize=(mfig.FULL_WIDTH, 2.45), layout="constrained",
+                             gridspec_kw={"width_ratios": [1.4, 1.0], "wspace": 0.12})
     ax = axes[0]
     image = draw_field(ax, grid, spec, cmap="magma_r", norm=LogNorm(*TRAVEL_NORM))
     lines = draw_contours(ax, closed, spec, ZONE_YEARS, colours=ZONE_COLOUR, linestyles=("-", "-"),
@@ -399,7 +399,8 @@ def make_fig7(out_dir: Path, data: dict) -> list[Path]:
     ax.set_ylim(*ZOOM_Y)
     ax.set_yticks((0.5, 1.0, 1.5))
     title(ax, "(a) Mean travel time to the well, F > 0.5")
-    colour_bar(fig, image, ax, "mean travel time (years)", shrink=0.62, pad=0.02)
+    ax.set_anchor("N")  # top level with panel (b)
+    colour_bar(fig, image, None, "mean travel time (years)", cax=ax.inset_axes((1.03, 0.0, 0.04, 1.0)))
 
     ax = axes[1]
     t_exit = tt.mean_time_to_exit_cell[WELL]
@@ -414,7 +415,8 @@ def make_fig7(out_dir: Path, data: dict) -> list[Path]:
     ax.set_ylabel("PRT particles (years)")
     ax.legend(loc="upper left")
     title(ax, "(b) Time per release cell")
-    colour_bar(fig, points, ax, "F in the release cell (-)", shrink=0.78, pad=0.02)
+    ax.set_anchor("N")
+    colour_bar(fig, points, None, "F in the release cell (-)", cax=ax.inset_axes((1.04, 0.0, 0.04, 1.0)))
     return mfig.save(fig, out_dir, "fig7_travel_time")
 
 
