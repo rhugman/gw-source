@@ -1,0 +1,35 @@
+## References cited only in the Supporting Information
+
+<!-- Reduced draft: works cited in si/ but not in the main text, copied from the full draft list with their source comments. Works cited in both are in the main reference list. -->
+
+Campana, M.E., and E.S. Simpson. 1984. Groundwater residence times and recharge rates using a discrete-state compartment model and C-14 data. *Journal of Hydrology* 72, no. 1–2: 171–185. https://doi.org/10.1016/0022-1694(84)90190-2 <!-- not in bibliography.md; from the reference list of references/docs/text/2011_Partington_etal_hydraulic_mixing_cell.txt; issue and DOI from Crossref -->
+
+Chowdhury, M.A. 2016. Assessing the connectivity of groundwater wells to surface-water using a volumetric capture delineation tool. MASc thesis, University of Waterloo, Waterloo, Ontario, Canada. http://hdl.handle.net/10012/10981
+
+Cornaton, F., and P. Perrochet. 2006. Groundwater age, life expectancy and transit time distributions in advective–dispersive systems: 1. Generalized reservoir theory. *Advances in Water Resources* 29, no. 9: 1267–1291. https://doi.org/10.1016/j.advwatres.2005.10.009
+
+Hughes, J.D., C.D. Langevin, S.R. Paulinski, J.D. Larsen, and D. Brakenhoff. 2024. FloPy workflows for creating structured and unstructured MODFLOW models. *Groundwater* 62, no. 1: 124–139. https://doi.org/10.1111/gwat.13327 <!-- not in bibliography.md; the FloPy paper the FloPy README ("How to Cite") and its model-splitting example cite; details from Crossref (online 12 June 2023, issue January 2024) -->
+
+Hugman, R., and O. Sanchez. 2026. vorflow: Voronoi mesh generation for MODFLOW 6. Version 0.2.0. Software, released 5 October 2026. https://github.com/rhugman/vorflow <!-- from the repository's CITATION.cff (cff-version 1.2.0), read 2026-10-15; no DOI -->
+
+Javandel, I., and C.-F. Tsang. 1986. Capture-zone type curves: A tool for aquifer cleanup. *Ground Water* 24, no. 5: 616–625. https://doi.org/10.1111/j.1745-6584.1986.tb03710.x <!-- not in bibliography.md; from docs/dispersion_study.md, References; DOI from Crossref -->
+
+Langevin, C.D., J.D. Hughes, E.R. Banta, R.G. Niswonger, S. Panday, and A.M. Provost. 2017. Documentation for the MODFLOW 6 Groundwater Flow Model. U.S. Geological Survey Techniques and Methods, book 6, chap. A55. Reston, Virginia: USGS. https://doi.org/10.3133/tm6A55 <!-- DOI and chapter from the suggested citation in references/docs/text/2017_Langevin_etal_MF6_GWF_TM6-A55.txt -->
+
+McLane, C., and L. Cecan. 2009. Comment on "MODALL: A practical tool for designing and optimizing capture systems," by S.T. Potter, E. Moreno-Barbero, and C.E. Divine. *Ground Water* 47, no. 2: 172–173. https://doi.org/10.1111/j.1745-6584.2008.00527_1.x <!-- checked against the article PDF (references/docs/): volume, issue, pages 172–173 and authors' affiliation; the PDF gives the first author as "Charles McLane", with no middle initial; DOI 00527_1.x confirmed on Crossref (2026-10-12); the 00527.x printed in the PDF footer is Potter et al.'s reply -->
+
+Nogueira, G.E.H., C. Schmidt, D. Partington, P. Brunner, and J.H. Fleckenstein. 2022. Spatiotemporal variations in water sources and mixing spots in a riparian zone. *Hydrology and Earth System Sciences* 26, no. 7: 1883–1905. https://doi.org/10.5194/hess-26-1883-2022 <!-- not in bibliography.md; journal, volume, first page and DOI from brief.md (key map) and docs/paper/outline.md §7 item 8; authors, title, issue and last page from Crossref -->
+
+Partington, D., P. Brunner, C.T. Simmons, R. Therrien, A.D. Werner, G.C. Dandy, and H.R. Maier. 2011. A hydraulic mixing-cell method to quantify the groundwater component of streamflow within spatially distributed fully integrated surface water–groundwater flow models. *Environmental Modelling & Software* 26, no. 7: 886–898. https://doi.org/10.1016/j.envsoft.2011.02.007
+
+Partington, D., P. Brunner, C.T. Simmons, A.D. Werner, R. Therrien, H.R. Maier, and G.C. Dandy. 2012. Evaluation of outputs from automated baseflow separation methods against simulated baseflow from a physically based, surface water–groundwater flow model. *Journal of Hydrology* 458–459: 28–39. https://doi.org/10.1016/j.jhydrol.2012.06.029 <!-- not in bibliography.md; from the authors' manuscript, references/docs/text/2012_Partington_etal_JHydrol_baseflow_separation.txt; DOI from Crossref -->
+
+Partington, D., P. Brunner, S. Frei, C.T. Simmons, A.D. Werner, R. Therrien, H.R. Maier, G.C. Dandy, and J.H. Fleckenstein. 2013. Interpreting streamflow generation mechanisms from integrated surface-subsurface flow models of a riparian wetland and catchment. *Water Resources Research* 49, no. 9: 5501–5519. https://doi.org/10.1002/wrcr.20405 <!-- not in bibliography.md; from the article header, references/docs/text/2013_Partington_etal_WRR_streamflow_generation_HMC.txt; issue from Crossref -->
+
+Provost, A.M., C.D. Langevin, and J.D. Hughes. 2017. Documentation for the "XT3D" option in the Node Property Flow (NPF) Package of MODFLOW 6. U.S. Geological Survey Techniques and Methods, book 6, chap. A56. Reston, Virginia: USGS. https://doi.org/10.3133/tm6A56 <!-- not in bibliography.md; suggested citation on the USGS Publications Warehouse page pubs.usgs.gov/publication/tm6A56 -->
+
+Rushton, K.R. 2003. *Groundwater Hydrology: Conceptual and Computational Models*. Chichester, UK: John Wiley and Sons. <!-- initials and place from library catalogue records (ISBN 978-0-470-85004-6); not in bibliography.md; from the reference lists of both 2013 conference papers (Foley and Black; Black and Foley), text copies in references/docs/text/; cited only in si/A.md:43 -->
+
+Schilling, O.S., C. Gerber, D.J. Partington, R. Purtschert, M.S. Brennwald, R. Kipfer, D. Hunkeler, and P. Brunner. 2017. Advancing physically-based flow simulations of alluvial systems through atmospheric noble gases and the novel ³⁷Ar tracer method. *Water Resources Research* 53, no. 12: 10465–10490. https://doi.org/10.1002/2017WR020754 <!-- not in bibliography.md; journal and DOI from docs/paper/outline.md §7 item 8; authors, title, volume, issue and pages from Crossref, checked against the article's HTML page (read in full) -->
+
+Tosco, T., A. Di Molfetta, and R. Sethi. 2010. Automatic delineation of capture zones for pump and treat systems: A case study in Piedmont, Italy. *Ground Water Monitoring & Remediation* 30, no. 2: 46–52. https://doi.org/10.1111/j.1745-6592.2010.01276.x <!-- not in bibliography.md; from the article, references/docs/text/2010_Tosco_etal_GWMR.txt (the DOI there is garbled by text extraction); DOI from Crossref -->
