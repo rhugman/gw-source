@@ -6,6 +6,25 @@ This text describes every model behind the worked examples of Section 4 and the 
 
 Every example model is a MODFLOW 6 model built with FloPy. Each saves what the code needs: the binary grid file, the budget of every time step with SAVE_FLOWS in every package, the heads, the saturation and the specific discharge. Packages that are traced as extra cells (SFR, MAW and MVR) also write their own budget files. The flow solver (IMS) uses the simple complexity option, BiCGSTAB acceleration, a head change criterion of 10⁻⁹ m for the outer iterations and 10⁻¹⁰ m for the inner iterations, and a residual criterion of 10⁻⁸ m³/d. Steady-state models have one stress period of 1 day with one time step. <!-- tutorials/herebedragons.py (module docstring; IMS_SETTINGS: complexity simple, outer_dvclose 1e-9, outer_maximum 200, inner_maximum 300, inner_dvclose 1e-10, rcloserecord 1e-8, bicgstab; STEADY = ((1.0, 1, 1.0),); add_npf_ic_oc: save_flows, save_saturation, save_specific_discharge, OC HEAD ALL and BUDGET ALL) -->
 
+### The example notebooks (Section 8)
+
+Each example of Section 4 ships with the code as a Jupyter notebook. The notebook builds the example model, runs MODFLOW 6 and reproduces the numbers and figure of its section. The table gives the run time that each notebook printed in its stored run. The run time of the ensemble notebook includes the PEST++ IES run on eight local workers.
+
+| section | notebook | run time |
+|---|---|---|
+| 4.1 | 01 Quickstart | 4 s |
+| 4.2 | 02 Accounting | 2 s |
+| 4.3 | 03 Forward mode | 1 s |
+| 4.4 | 04 Grids | 4 s |
+| 4.5 | 05 Transient snapshots | 4 s |
+| 4.6 | 06 Travel time | 4 s |
+| 4.7 | 07 Networks and multi-model | 3 s |
+| 4.8 | 08 Transient tracking | 16 s |
+| 4.9 | 09 Ensembles | 95 s |
+| 4.10 | 10 Unit concentration | about 2 min |
+
+<!-- moved from Section 8 (review alt_r1, §8 cuts; F6 run times). Titles: tutorials/README.md table. Run times: the run time each notebook prints in its last cell (01 4 s, 02 2 s, 03 1 s, 04 4 s, 05 4 s, 06 4 s, 07 3 s, 08 16 s, 09 95 s, checked 2026-10-15 in the cleanup pass; 04 prints 4 s in its stored output, whereas review alt_r1 F6 gave 5 s, close to its cell execution stamps, which span 5.1 s); notebook 10 prints none, its cell execution stamps span 109 s and tutorials/README.md gives about 2.5 min. Notebook 09 cell 28: 8 workers, 66 s for PEST++ IES. -->
+
 ### The shared example model (Sections 4.1, 4.3 and 4.6)
 
 The shared model is one convertible layer (DIS) of 40 × 40 cells of 50 m, 2 km on each side. The top is at 20 m and the bottom at −30 m. The hydraulic conductivity is 5 m/d everywhere. The starting head is 10 m. Constant heads of 10 m (CHD) fill the 40 cells of column 1. A river (RIV) fills the 40 cells of column 31, with a stage of 6 m, a bottom of 4 m and a conductance of 500 m²/d per cell. Its reaches in rows 1–20 carry the boundary name river_north, and those in rows 21–40 the name river_south. Recharge of 5 × 10⁻⁴ m/d (RCH) falls on every cell. The supply well (WEL, boundary name supply_well) pumps 800 m³/d from row 21, column 29. Its cell centre is 100 m west of the river cell centres and 1.4 km east of the constant heads. The model is steady state. <!-- tutorials/herebedragons.py (AquiferSpec: nrow = ncol = 40, delr = delc = 50, top 20, botm -30, k 5, strt 10, rech 5e-4, chd_head 10, riv_col 30 (0-based), riv_stage 6, riv_cond 500, riv_rbot 4, wells supply_well (20, 28) -800; riv_boundname; build_quickstart: icelltype 1) -->
@@ -58,6 +77,8 @@ This model is the seasonal model of Section 4.5 run for 30 years, with one time 
 
 The first ensemble holds 20 realisations of the shared model. They differ only in their hydraulic conductivity. Each field is $K = 5 \exp(0.8\, z)$. Here $z$ is white noise smoothed by a Gaussian filter with a width of four cells (200 m), then shifted and scaled to a mean of 0 and a standard deviation of 1. The geometric mean of $K$ is therefore 5 m/d. The standard deviation of $\ln K$ is 0.8. The random seed of each realisation is drawn from a master seed of 7. Mean travel times use a porosity of 0.3. The second ensemble, of 50 realisations, is the prior of the history matching. It and the history matching are described in {SI: ensemble and history-matching set-up}. <!-- tutorials/herebedragons.py (random_k_field: gaussian_filter of standard normal noise, correlation_cells 4, mode reflect, standardised, K = mean K × exp(sigma_lnk z); build_ensemble: seeds from default_rng(seed)); tutorials/09_ensembles/09_ensembles.ipynb settings (N_REAL 20, ENSEMBLE_SEED 7, SIGMA_LNK 0.8, CORRELATION_CELLS 4.0, POROSITY 0.3) -->
 
+Percentile maps need memory. Exact percentiles keep every realisation's value of each cell, at 4 bytes per value. For 1,000 realisations of 1 million cells, that is 4 GB for each output of each destination. The code can instead keep a histogram of 200 bins in each cell. The histograms then need about 0.8 GB for each output of each destination, whatever the number of realisations. <!-- moved from Section 6 (review alt_r1, §6 cuts). tutorials/09_ensembles/09_ensembles.ipynb §6, cell 16 (1,000,000 cells, six series: exact stack 24.00 GB for 1,000 realisations, histograms 4.8 GB for any number); src/gwsource/ensemble.py (histogram_bins 200; memory histogram_bins × cells × 4 bytes per output and group; stack_bytes 4 × n_real × n_cells × n_series) -->
+
 ### The rebuilt model of Bedekar et al. (2024) (Section 4.10)
 
 Bedekar et al. (2024, pp. 305–306 and Fig. 1) describe their model in MODFLOW-2005. We rebuilt it in MODFLOW 6 from that description. The grid has 101 × 101 cells of 10 m and three layers of 10 m, with the top at 30 m. The horizontal hydraulic conductivity is 10 and the vertical conductivity 1. The specific storage is 10⁻⁵ m⁻¹, the specific yield 0.1 and the porosity 0.1. Lateral inflow of 1.5 m³/d enters every cell of the west column in all three layers, as a well package, 454.5 m³/d in all. Recharge of 3 × 10⁻⁴ m/d falls on every cell of layer 1, 306.0 m³/d in all. A stream (RIV) fills the east column of all three layers, with a stage of 30 m and a conductance of 1,000 m²/d per cell. The pumping well takes 700 m³/d. The first stress period is a steady state of 1 day without pumping. The second is 25 years of pumping. <!-- tutorials/10_unit_concentration/10_unit_concentration.ipynb §1 table and budget (INFLOW 454.5, RCH 306.0, PUMP 700.0); tutorials/10_unit_concentration/helpers.py (SPEC: 101 × 101 cells of 10 m, top 30, k 10, rech 3e-4, riv_col 100, riv_stage 30, riv_cond 1000, well (50, 85) -700; LAYER_BOTM (20, 10, 0); build_bedekar: kv 1, ss 1e-5, sy 0.1, inflow_rate 1.5) -->
@@ -68,12 +89,15 @@ The paper leaves some values open. We made the following choices.
 - **Layer type.** All three layers are convertible. Only the cells near the well fall below the top of their layer.
 - **Stream bottom.** The river bottom is at the bottom of each cell, so the exchange with the stream stays linear in head.
 - **Well screen.** The well is in layer 2, where Fig. 1 of the paper draws its screen. It is at row 51, column 86, on the centre row and 150 m west of the stream cell centres.
-- **Time steps.** The paper gives neither the length of the pumping period nor its time steps. The pumping period is 25 years, the time axis of the paper's Fig. 2, in 300 equal steps of 30.4 days. Section 4.10 also reruns the first 15 years with four transport sub-steps, 7.6-day transport steps.
+- **Time steps.** The paper gives neither the length of the pumping period nor its time steps. The pumping period is 25 years, the time axis of the paper's Fig. 2, in 300 equal steps of 30.4 days. Section 4.10 also reruns the first 15 years with four transport sub-steps, 7.6-day transport steps. With these shorter steps, the largest difference from the read-off curves of the paper's Fig. 2 over the first 15 years falls from 1.3 to 0.6 percentage points.
 - **Stored water.** The paper fixes the concentration of the stored water at 1 during the first period. We tag all the water in the model at the start of the first period as initial water. In that 1-day period, about 760 m³ of water enters from the sources, against about 3.06 million m³ of water in the aquifer.
 
+<!-- tutorials/10_unit_concentration/10_unit_concentration.ipynb §6, cell 16 output ("30.4-day steps: largest |here - paper| up to year 15: 1.3 percentage points"; "7.6-day steps: ... 0.6 percentage points"), moved from Section 4.10 (review alt_r1 P5) -->
 <!-- tutorials/10_unit_concentration/10_unit_concentration.ipynb §1 table (assumptions: convertible layers, river bottom at the cell bottom, well in layer 2 at row 51, column 86, 25 years in 300 steps of 30.4 days, stored water tagged at the start; 760 m³ and 3.06 million m³), settings (SUBSTEPS 4, SUBSTEP_YEARS 15) -->
 
 The tagged groups are the lateral inflow, the recharge, the stream and the stored water. The tracking uses a porosity of 0.1 and the "gwt" water volumes. For the comparison, four MODFLOW 6 GWT models carry one group each. They have the settings of the GWT run of Section 4.3, except a porosity of 0.1 and looser solver criteria (10⁻⁸ for the outer and 10⁻⁹ for the inner iterations, and a residual criterion of 10⁻⁸). The stored-water model starts with a concentration of 1 in every cell and has no tagged inflow. <!-- tutorials/10_unit_concentration/10_unit_concentration.ipynb settings (POROSITY 0.1, SOURCES, INITIAL storage all, GWT_RUNS, GWT_IMS outer_dvclose 1e-8, inner_dvclose 1e-9, rcloserecord 1e-8) and §2 (TrackingConfig(porosity=POROSITY, initial_water=INITIAL, volume_mode="gwt")), §3 -->
+
+After 25 years of pumping the storage terms are close to zero. The flows are then nearly steady. The tracked shares at year 25 then lie within 0.2 percentage points of the shares from a steady-state backward trace of the last step's flows. The 0.2 % of stored water that the well still pumps makes up the difference. <!-- moved from Section 4.10 (review alt_r1 P5); tutorials/10_unit_concentration/10_unit_concentration.ipynb §5, cell 14 table (steady trace 0.483, 0.292, 0.225 against tracked 0.482, 0.292, 0.225; stored water 0.002) and cell 15 ("match the steady trace to within 0.2 percentage points. The 0.2 % of stored water still being pumped makes up the difference") -->
 
 ### The eight-cell example (Fig. 1b)
 

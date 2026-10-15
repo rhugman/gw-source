@@ -29,8 +29,12 @@ Order: first citation, reading `sections/` in file order, with each display capt
 | {SI: verification errors per check and model} | Table S4 | – | not cited in the main text; cited from {SI: verification on the test models} |
 | {SI: per-well gross and net} | Table S5 | – | not cited in the main text; cited from {SI: delineations on one flow field} |
 | {SI: diagnosis of the first PRT runs} | Text S8 | – | not cited in the main text; cited from {SI: delineations on one flow field} |
+| {SI: Neversink model and published regions} | Figure S4 | – | not cited in the main text; cited from {SI: delineations on one flow field} |
+| {SI: Neversink backward fractions} | Figure S5 | – | not cited in the main text; cited from {SI: delineations on one flow field} |
+| {SI: Neversink areas against particle tracking} | Figure S6 | – | not cited in the main text; cited from {SI: delineations on one flow field} |
+| {SI: Neversink probability of contribution} | Figure S7 | – | not cited in the main text; cited from {SI: ensemble statistics} |
 
-**Count:** 16 SI items: 8 Texts (S1–S8), 5 Tables (S1–S5), 3 Figures (S1–S3). Six further rows are aliases, so that older markers still resolve.
+**Count:** 20 SI items: 8 Texts (S1–S8), 5 Tables (S1–S5), 7 Figures (S1–S7). Six further rows are aliases, so that older markers still resolve.
 
 ## Where each item lives
 
@@ -48,6 +52,10 @@ Order: first citation, reading `sections/` in file order, with each display capt
 | Table S3 | {SI: delineations on one flow field} | si/D.md |
 | Text S5 | {SI: Monte Carlo offsets} | si/D.md (formerly {SI: Monte Carlo offsets and scenario rule}) |
 | Figure S3 | {SI: net attribution and PRT-area maps} | si/E.md (image docs/paper/figures/figS2_net_and_envelope.png) |
+| Figure S4 | {SI: Neversink model and published regions} | si/E.md (moved from display/D.md "## Figure S5"; image docs/paper/figures/figS5_location_map.png) |
+| Figure S5 | {SI: Neversink backward fractions} | si/E.md (moved from display/D.md "## Figure S6"; image docs/paper/figures/figS6_capture_maps.png) |
+| Figure S6 | {SI: Neversink areas against particle tracking} | si/E.md (moved from display/D.md "## Figure S7"; image docs/paper/figures/figS7_overlap_maps.png) |
+| Figure S7 | {SI: Neversink probability of contribution} | si/E.md (moved from display/D.md "## Figure S8"; image docs/paper/figures/figS8_probability_maps.png) |
 | Table S5 | {SI: per-well gross and net} | si/F_editor.md |
 | Text S6 | {SI: end states of the published particles} | si/F_editor.md |
 | Text S8 | {SI: diagnosis of the first PRT runs} | si/F_editor.md |
@@ -63,9 +71,14 @@ Order: first citation, reading `sections/` in file order, with each display capt
 6. **Deleted** (pumping scenarios dropped from the paper, outline §6 decision 3): {SI: scenario medians}, {SI: growth mechanism}, {SI: one convention at a time}, {SI: faster growth of weight-losing particles}, the scenario-rule half of {SI: Monte Carlo offsets and scenario rule} (now {SI: Monte Carlo offsets}) and the scenario paragraph of {SI: ensemble statistics}.
 7. **Kept although not cited in the main text:** {SI: per-well gross and net} and {SI: diagnosis of the first PRT runs}, because {SI: delineations on one flow field} cites both.
 
+## Changes in the cleanup pass
+
+1. **Neversink figures moved into the SI.** The blocks "## Figure S5" to "## Figure S8" of display/D.md are now the SI Figure items {SI: Neversink model and published regions}, {SI: Neversink backward fractions}, {SI: Neversink areas against particle tracking} and {SI: Neversink probability of contribution} in si/E.md. The builder's SI_FIGS map gives their images (figS5 to figS8). {SI: delineations on one flow field} cites the first three and {SI: ensemble statistics} the fourth. Their labels follow the cited items, as Figures S4–S7.
+2. **Deleted:** the "## Figure S9" block (pumping scenarios), display/D.md itself, and the image files figS9_area_growth and figS3_growth_mechanism (PNG and PDF).
+3. **Content moved out of the main text in review alt_r1:** the notebook names and run times, the percentile memory and the two Bedekar checks went into {SI: example and test models}; the Neversink run times and the net-accounting overlap into {SI: delineations on one flow field} and {SI: ensemble statistics}; the differences between the two water volume options into {SI: method in full}.
+
 ## Notes on labels
 
 - **Table S4** holds three tables under one heading: (a) largest error per check, (b) steady-state and snapshot checks per model, (c) transient tracking checks per model. Label them Table S4a–c, or Tables S4–S6 if the journal wants one number per table.
 - **Texts S6 and S8** and **Text S2** each hold short tables inside the text (end states of the particles; PRT delivery by crediting rule; the test models). **Text S4** holds the table of phi by iteration. They stay unnumbered parts of their Text.
-- The display files display/D.md ("## Figure S5" to "## Figure S9", the earlier Neversink figures) are not SI items and no marker places them. Their fixed labels do not clash with Figures S1–S3. Figure S9 serves the dropped pumping scenarios.
-- The labels above hold for the main text as of alt round 1. The builder renumbers on every build, so a new or moved citation changes them. Recheck with the build rather than editing labels by hand.
+- The labels above hold for the main text as of the cleanup pass after alt round 1. The builder renumbers on every build, so a new or moved citation changes them. Recheck with the build rather than editing labels by hand.

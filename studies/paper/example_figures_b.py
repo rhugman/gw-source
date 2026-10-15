@@ -11,9 +11,10 @@ plotting, so a figure stops if they drift.
   weight-losing particles against full mixing, both to the well cell, coloured by F.
 - Fig. 8 (Section 4.7), a stream fed by drains through the water mover. (a) F on the aquifer cells
   alone; (b) F with the stream reaches and the mover traced; (c) F of each reach.
-- Fig. 10 (Section 4.9), history matching with PEST++ IES. Prior and posterior P(F > 0.5) with the
-  true F > 0.5 outline, and the river share of each realisation. PEST++ runs serially here
-  (N_WORKERS = 0 in the notebook): its local TCP workers need ports. The posterior does not
+- Fig. 10 (Section 4.9), history matching with PEST++ IES. Prior and posterior probability of
+  contribution (the share of realisations with F > 0.5) with the true F > 0.5 outline, and the
+  river share of each realisation. PEST++ runs serially here (N_WORKERS = 0 in the notebook):
+  its local TCP workers need ports. The posterior does not
   depend on the number of workers, so the serial run gives the notebook's numbers.
 - Fig. 11 (Section 4.10), the unit-concentration example of Bedekar et al. (2024). (a) Tracked
   shares of the pumped water against the read-offs of their Figure 2. (b-e) Backward tracking in
@@ -609,7 +610,8 @@ def draw_share_spread(ax, shares: dict, truth: float) -> None:
 
 
 def make_fig10(out_dir: Path, data: dict) -> list[Path]:
-    """Fig. 10: prior and posterior P(F > 0.5) with the true zone, and the river-share spread."""
+    """Fig. 10: prior and posterior probability of contribution (share of realisations with
+    F > 0.5) with the true zone, and the river-share spread."""
     spec, step = data["spec"], data["base_step"]
     truth_grid = gs.export.to_grid(step, data["truth_res"].fraction_through[WELL])[0]
     fig, axes = plt.subplots(1, 3, figsize=(mfig.FULL_WIDTH, 2.75), layout="constrained",
@@ -631,7 +633,9 @@ def make_fig10(out_dir: Path, data: dict) -> list[Path]:
         mark_cell(ax, spec, spec.wells[0][1], WELL_STYLE)
         map_axes(ax, spec, (0, 1, 2), ylabel=i == 0)
         title(ax, text)
-    colour_bar(fig, image, axes[:2], "P(F > 0.5) (-)", shrink=0.9, pad=0.02)
+    colour_bar(fig, image, axes[:2],
+               "probability of contribution\n(the share of realisations with F > 0.5)",
+               shrink=0.9, pad=0.02)
 
     ax = axes[2]
     shares = {label: river_shares(data["ensembles"][label]["table"]).to_numpy() for label in titles}

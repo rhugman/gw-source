@@ -621,7 +621,7 @@ def source_bars(ax, volumes: list[float], shares: list[float], names: list[str],
 
 
 def make_fig2(out_dir: Path, hbd, data: dict) -> list[Path]:
-    """Fig. 2: F, the particle share P and the well's water by source (Section 4.1)."""
+    """Fig. 2: F, the particle share and the well's water by source (Section 4.1)."""
     run, step, f = data["run"], data["step"], data["f"]
     fig = plt.figure(figsize=(mfig.FULL_WIDTH, 2.7))
     ax_f = fig.add_axes((0.065, 0.16, 0.278, 0.72))
@@ -636,8 +636,8 @@ def make_fig2(out_dir: Path, hbd, data: dict) -> list[Path]:
     km_axes(ax_f)
     km_axes(ax_p, y_label=False)
     panel_title(ax_f, "(a) F, full mixing")
-    panel_title(ax_p, "(b) P, particles")
-    colour_bar(fig, image, cax, "F or P (-)")
+    panel_title(ax_p, "(b) particle share")
+    colour_bar(fig, image, cax, "F or particle share (-)")
     table = data["by_source"]
     names = [SOURCE_LABELS[p] for p in table.index]
     colours = [SOURCE_COLOURS[{"RCH": "recharge", "CHD": "west edge", "RIV": "river"}[p]]
