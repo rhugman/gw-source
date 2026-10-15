@@ -45,7 +45,7 @@ IMS_SETTINGS = {
 VORONOI_BACKGROUND = 50.0  # m: vorflow mesh size away from the features (as the DIS cells)
 VORONOI_WELL_SIZE = 10.0  # m: vorflow mesh size at the wells
 VORONOI_RIVER_SIZE = 12.5  # m: vorflow mesh size along the river
-SEASONS = ("winter", "spring", "summer", "autumn")
+SEASONS = ("wet", "wet-to-dry", "dry", "dry-to-wet")  # named by recharge (SEASON_RECHARGE)
 SEASON_RECHARGE = (1.8, 1.0, 0.1, 1.1)  # multipliers of AquiferSpec.rech
 SEASON_PUMPING = (0.8, 1.0, 1.4, 0.8)  # multipliers of the well rates
 FEATURE_STYLES = {  # package: scatter style for overlay_features()
@@ -577,7 +577,7 @@ def build_transient(
 ) -> ModelRun:
     """Quickstart model with STO: a steady first period, then seasonal recharge and pumping.
 
-    recharge and pumping are the four seasonal multipliers (winter, spring, summer, autumn).
+    recharge and pumping are the four seasonal multipliers (wet, wet-to-dry, dry, dry-to-wet).
     Every time step is saved. info holds the per-period multipliers and season names.
     """
     spec = AquiferSpec() if spec is None else spec
