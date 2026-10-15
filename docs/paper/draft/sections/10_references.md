@@ -70,9 +70,13 @@ Schilling, O.S., C. Gerber, D.J. Partington, R. Purtschert, M.S. Brennwald, R. K
 
 Tosco, T., A. Di Molfetta, and R. Sethi. 2010. Automatic delineation of capture zones for pump and treat systems: A case study in Piedmont, Italy. *Ground Water Monitoring & Remediation* 30, no. 2: 46–52. https://doi.org/10.1111/j.1745-6592.2010.01276.x <!-- not in bibliography.md; from the article, references/docs/text/2010_Tosco_etal_GWMR.txt (the DOI there is garbled by text extraction); DOI from Crossref -->
 
+Visser, A., R. Heerdink, H.P. Broers, and M.F.P. Bierkens. 2009. Travel time distributions derived from particle tracking in models containing weak sinks. *Ground Water* 47, no. 2: 237–245. https://doi.org/10.1111/j.1745-6584.2008.00542.x <!-- Crossref checked 2026-10-15; cited in §4.1 as the precedent for splitting particles at weak sinks (abstract: a fraction of each particle leaves at the weak sink, set by the ratio of sink flux to cell inflow); [check] read the methods section before submission: exact ratio and whether the weight compounds over successive weak sinks -->
+
 White, J.T. 2018. A model-independent iterative ensemble smoother for efficient history-matching and uncertainty quantification in very high dimensions. *Environmental Modelling & Software* 109: 191–201. https://doi.org/10.1016/j.envsoft.2018.06.009 <!-- cited in sections/04c_examples.md (PEST++ IES); title, volume, pages and DOI checked against Crossref 2026-10-15 -->
 
 White, J.T., R.J. Hunt, M.N. Fienen, and J.E. Doherty. 2020. Approaches to highly parameterized inversion: PEST++ Version 5, a software suite for parameter estimation, uncertainty analysis, management optimization and sensitivity analysis. U.S. Geological Survey Techniques and Methods 7C26. Reston, Virginia: USGS. https://doi.org/10.3133/tm7C26 <!-- not in bibliography.md; cited at sections/05_neversink.md:37 for the PEST++ iES posterior; chosen as the documentation of the PEST++ version 5 code, iES included (White 2018, Environmental Modelling & Software 109: 191–201, is the single-author iES paper); the Neversink ensemble came from PEST++ version 5 (SIR 2021–5112 abstract; data release description); details from pubs.usgs.gov/publication/tm7C26 -->
+
+Winston, R.B., L.F. Konikow, and G.Z. Hornberger. 2018. Volume-weighted particle-tracking method for solute-transport modeling; Implementation in MODFLOW–GWT. U.S. Geological Survey Techniques and Methods, book 6, chap. A58. Reston, Virginia: USGS. https://doi.org/10.3133/tm6A58 <!-- Crossref checked 2026-10-15; cited in §4.1 (particle weights reduced at sinks in proportion to the water removed) -->
 
 <!--
 PROBLEMS FOUND WHILE COMPILING THE LIST
