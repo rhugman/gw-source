@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Create or update the "gw-source" mamba environment, install FloPy develop,
 # regenerate FloPy's MF6 classes from the MF6 develop DFNs, and download the
-# MF6 nightly build (plus triangle, used by the Voronoi test model) into bin/.
+# MF6 nightly build (plus triangle, used by the Voronoi test model) and PEST++
+# (used by tutorial 09) into bin/.
 #
 # Usage: scripts/setup_env.sh
 # Environment overrides: MAMBA (mamba/micromamba/conda executable), ENV_NAME.
@@ -43,7 +44,7 @@ run_in_env python -m pip install "flopy[codegen] @ ${FLOPY_URL}"
 echo "==> Regenerating FloPy MF6 classes from MODFLOW 6 develop DFNs"
 run_in_env python -m flopy.mf6.utils.generate_classes --ref develop
 
-# 4. Download the MF6 nightly build, and triangle for the Voronoi test grid.
+# 4. Download the MF6 nightly build, triangle for the Voronoi test grid, and PEST++.
 echo "==> Downloading MODFLOW 6 nightly build into ${BIN_DIR}"
 #    Archives go to a throwaway folder rather than get-modflow's default ~/Downloads.
 mkdir -p "${BIN_DIR}"
@@ -51,6 +52,8 @@ DOWNLOADS_DIR="$(mktemp -d)"
 trap 'rm -rf "${DOWNLOADS_DIR}"' EXIT
 run_in_env get-modflow --repo modflow6-nightly-build --downloads-dir "${DOWNLOADS_DIR}" "${BIN_DIR}"
 run_in_env get-modflow --repo executables --subset triangle --downloads-dir "${DOWNLOADS_DIR}" "${BIN_DIR}"
+echo "==> Downloading PEST++ (pyemu's get-pestpp) into ${BIN_DIR}"
+run_in_env get-pestpp --downloads-dir "${DOWNLOADS_DIR}" "${BIN_DIR}"
 
 # 5. Record versions.
 echo "==> Versions"
