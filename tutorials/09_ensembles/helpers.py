@@ -1,17 +1,19 @@
-"""Helpers local to tutorial 09 (ensembles): per-realisation summaries, a process-pool check,
-the face-routing comparison and a small PEST++ IES history match.
+"""Helpers local to tutorial 09 (ensembles): the pilot-point ensemble, per-realisation
+summaries, a process-pool check, the face-routing comparison and a small PEST++ IES history match.
+
+The ensemble describes ln K with pilot points on a regular grid. The pilot-point values are
+drawn with a Gaussian correlation exp(-(r / L)^2) and kriged to every cell with simple kriging
+around ln(mean K). Each realisation is rerun in a folder of its own, so that gwsource can trace
+it. The same folders and functions serve the prior (section 1 of the notebook) and the PEST++
+IES posterior (section 9).
 
 gwsource.run_ensemble folds per-cell outputs into statistics over the realisations. The
 well's split by source package is a sum over cells, not a per-cell output, so this module
 traces each realisation once more to tabulate it (cheap for a small model).
 
-The history match (section 9 of the notebook) describes ln K with pilot points on a regular
-grid. The pilot-point values are kriged to every cell with simple kriging around ln(mean K)
-and a Gaussian correlation exp(-(r / L)^2). That is the correlation of the realisations of
-herebedragons.random_k_field: white noise smoothed with a Gaussian filter of width s has the
-correlation exp(-(r / 2s)^2), so L = 2s. PEST++ IES adjusts the pilot-point K values of every
-realisation to fit head observations; the posterior realisations are then rerun one folder
-each, so that gwsource can trace them.
+The synthetic "true" aquifer of section 9 is not built from pilot points. It is a field of
+herebedragons.random_k_field: white noise smoothed with a Gaussian filter of width s, which has
+the correlation exp(-(r / 2s)^2). With L = 2s the truth and the prior share their statistics.
 """
 
 import inspect
@@ -267,6 +269,27 @@ def write_pest_io_files(template_ws: Path, n_pp: int, n_obs: int) -> None:
     (Path(template_ws) / "heads.csv.ins").write_text("\n".join(ins) + "\n")
 
 
+def build_kriged_model(
+    model_ws: Path, mf6: Path, spec, weights: np.ndarray, mean_k: float
+) -> Path:
+    """Build the quickstart model with K read from k.txt, kriged from pilot points; run it once.
+
+    The folder holds the kriging weights and a copy of MF6, so that run_parameter_ensemble and
+    the PEST++ forward run can rerun it with new pilot-point values. It starts at K = mean_k.
+    """
+    import herebedragons as hbd
+
+    run = hbd.build_quickstart(model_ws, mf6, spec)
+    run.gwf.npf.k.store_as_external_file("k.txt")
+    run.sim.write_simulation(silent=True)
+    shutil.copy2(mf6, model_ws / mf6.name)
+    np.save(model_ws / "kriging_weights.npy", weights)
+    write_pilot_points(model_ws, np.full(weights.shape[-1], mean_k))
+    write_k_array(str(model_ws), mean_k)
+    run_mf6(str(model_ws), f"./{mf6.name}")
+    return model_ws
+
+
 def build_pest_template(
     template_ws: Path,
     mf6: Path,
@@ -276,21 +299,12 @@ def build_pest_template(
     obs_cells: list,
     mean_k: float,
 ) -> Path:
-    """Build the quickstart model with K read from k.txt, add the PEST files, run it once."""
-    import herebedragons as hbd
-
-    run = hbd.build_quickstart(template_ws, mf6, spec)
-    run.gwf.npf.k.store_as_external_file("k.txt")
-    run.sim.write_simulation(silent=True)
-    shutil.copy2(mf6, template_ws / mf6.name)
-    np.save(template_ws / "kriging_weights.npy", weights)
+    """Build the kriged model and add the PEST files (template, instructions, forward run)."""
+    build_kriged_model(template_ws, mf6, spec, weights, mean_k)
     lines = ["name,node"] + [f"{obs_name(i)},{spec.node(rc)}" for i, rc in enumerate(obs_cells)]
     (template_ws / "obs_cells.csv").write_text("\n".join(lines) + "\n")
     write_pest_io_files(template_ws, len(pp_cells), len(obs_cells))
     write_forward_run(template_ws, mean_k)
-    write_pilot_points(template_ws, np.full(len(pp_cells), mean_k))
-    write_k_array(str(template_ws), mean_k)
-    run_mf6(str(template_ws), f"./{mf6.name}")
     write_head_observations(str(template_ws))
     return template_ws
 
@@ -331,11 +345,15 @@ def build_pst(
     return pst
 
 
+def prior_frame(values: np.ndarray) -> pd.DataFrame:
+    """Return a parameter ensemble as a table: one row per realisation, one column per pilot point."""
+    columns = [par_name(i) for i in range(values.shape[1])]
+    return pd.DataFrame(values, columns=columns, index=pd.Index(range(len(values)), name="real"))
+
+
 def write_prior(template_ws: Path, values: np.ndarray, file_name: str = "prior.csv") -> None:
     """Write the prior parameter ensemble (one row per realisation, one column per pilot point)."""
-    columns = [par_name(i) for i in range(values.shape[1])]
-    frame = pd.DataFrame(values, columns=columns, index=pd.Index(range(len(values)), name="real"))
-    frame.to_csv(Path(template_ws) / file_name)
+    prior_frame(values).to_csv(Path(template_ws) / file_name)
 
 
 def run_ies(
@@ -396,16 +414,20 @@ def read_phi(master_ws: Path, case: str = "case") -> pd.DataFrame:
 
 
 def run_parameter_ensemble(
-    template_ws: Path, root: Path, ensemble: pd.DataFrame, mf6: Path, mean_k: float
+    model_ws: Path, root: Path, ensemble: pd.DataFrame, mf6: Path, mean_k: float
 ) -> list[Path]:
-    """Rerun every realisation of a parameter ensemble in root/real_<name>; return the folders."""
+    """Run every realisation of a parameter ensemble in root/real_000, ...; return the folders.
+
+    model_ws is the kriged model (build_kriged_model) or the PEST template built on it.
+    """
     skip = shutil.ignore_patterns(
         "mf6", "mf6.exe", "pestpp-ies*", "*.pst", "*.csv.ins", "*.tpl", "prior.csv"
     )
     folders = []
     for real, values in ensemble.iterrows():
-        ws = Path(root) / f"real_{real}"
-        shutil.copytree(template_ws, ws, ignore=skip, dirs_exist_ok=True)
+        name = f"{real:03d}" if isinstance(real, (int, np.integer)) else str(real)
+        ws = Path(root) / f"real_{name}"
+        shutil.copytree(model_ws, ws, ignore=skip, dirs_exist_ok=True)
         write_pilot_points(ws, values.to_numpy())
         write_k_array(str(ws), mean_k)
         run_mf6(str(ws), str(mf6))

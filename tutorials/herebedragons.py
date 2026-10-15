@@ -836,7 +836,7 @@ def build_maw(
     return run_model(sim, gwf, name, ws, dis_filename, spec, info)
 
 
-# ---------------------------------------------------------------- (g) random K ensembles
+# ---------------------------------------------------------------- (g) random K fields
 
 
 def random_k_field(
@@ -866,25 +866,6 @@ def build_realisation(
     run = build_quickstart(ws, exe, replace(spec, k=k))
     run.info.update({"k": k, "seed": seed})
     return run
-
-
-def build_ensemble(
-    root: Path,
-    exe: Path,
-    n_real: int,
-    seed: int = 1,
-    spec: AquiferSpec | None = None,
-    sigma_lnk: float = 0.8,
-    correlation_cells: float = 4.0,
-) -> list[Path]:
-    """Build and run n_real realisations in root/real_000, ...; return their folders."""
-    seeds = np.random.default_rng(seed).integers(0, 2**31 - 1, size=n_real)
-    folders = []
-    for i, real_seed in enumerate(seeds):
-        ws = Path(root) / f"real_{i:03d}"
-        build_realisation(ws, exe, int(real_seed), spec, sigma_lnk, correlation_cells)
-        folders.append(ws)
-    return folders
 
 
 # ---------------------------------------------------------------- multi-model and GWT
