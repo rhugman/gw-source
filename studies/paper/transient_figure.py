@@ -90,10 +90,10 @@ LABELS = {
 QUOTED = {
     "n_steps": 121,
     "n_cells": 1600,
-    "recharge factor, winter": 1.8,
-    "recharge factor, summer": 0.1,
-    "pumping factor, summer": 1.4,
-    "pumping, summer (m3/d)": 1120,
+    "recharge factor, wet": 1.8,
+    "recharge factor, dry": 0.1,
+    "pumping factor, dry": 1.4,
+    "pumping, dry (m3/d)": 1120,
     "snapshot recharge, mean": 0.60,
     "snapshot west edge, mean": 0.12,
     "snapshot storage, mean": 0.15,
@@ -156,14 +156,14 @@ def mean_snapshot(snapshot: pd.DataFrame, summary: pd.DataFrame) -> pd.Series:
 
 
 def seasonal_factors(info: dict) -> dict[str, float]:
-    """Return the winter and summer recharge and summer pumping factors over their means."""
+    """Return the wet and dry recharge and the dry pumping factors over their means."""
     rch = np.asarray(info["recharge_factor"][1:])
     wel = np.asarray(info["pumping_factor"][1:])
     season = np.asarray(info["season"][1:])
     return {
-        "recharge factor, winter": rch[season == "winter"].mean() / rch.mean(),
-        "recharge factor, summer": rch[season == "summer"].mean() / rch.mean(),
-        "pumping factor, summer": wel[season == "summer"].mean() / wel.mean(),
+        "recharge factor, wet": rch[season == "wet"].mean() / rch.mean(),
+        "recharge factor, dry": rch[season == "dry"].mean() / rch.mean(),
+        "pumping factor, dry": wel[season == "dry"].mean() / wel.mean(),
     }
 
 
@@ -297,7 +297,7 @@ def computed_values(data: dict, years: tuple[int, ...] = CUMULATIVE_YEARS) -> di
         "n_steps": data["n_steps"],
         "n_cells": int(data["first"].active.sum()),
         **data["factors"],
-        "pumping, summer (m3/d)": data["pumping_max"],
+        "pumping, dry (m3/d)": data["pumping_max"],
         "snapshot recharge, mean": mean["recharge"],
         "snapshot west edge, mean": mean["west edge"],
         "snapshot storage, mean": mean["storage"],

@@ -70,7 +70,7 @@ All writers read outline §1, §3, §5–7, terms.md, this brief, and the captio
 
 **B: Methods (§2).**
 - Carries key messages 1 and 3 (method) and outline §5.2 except sub-steps and steady limit (to C). Equations, each followed by "In words:": (I − P) F = S D; (I − Q) G = R T; backward closure; forward–backward check; (I − P) m = τ ∘ F; the tracking step V^new c^n − V^old c^(n−1) = Δt [...]; transient forward–backward identity.
-- Numbers: Fig. 1b F = 6/11 = 0.55; Fig. 1c 5.0 vs 33.7 m³/d (6.7 times); snapshot storage release up to 50 % in summer (forward to §4.4); model 6 volume options ≤ 1.2e-4 forward, ≤ 6e-3 backward.
+- Numbers: Fig. 1b F = 6/11 = 0.55; Fig. 1c 5.0 vs 33.7 m³/d (6.7 times); snapshot storage release up to 50 % in the dry season (forward to §4.4); model 6 volume options ≤ 1.2e-4 forward, ≤ 6e-3 backward.
 - Novelty sentence from outline §5.2: forward tracking is not new; backward tracking in time is what is added (Table 1, footnote 3).
 - Check: `README_method.md` (Fig. 1); PLAN §2.1–2.7.
 - Defines: every [B] item of §6, plus P, Q, S D, R T, net attribution, flow loops and closed recirculation loops, flow order (one precise sentence with "strongly connected components", "M-matrix", "pivoting"), boundary-control check ("duality" once, at the forward–backward check), mean travel time, turnover time, "flow"/"gwt" volumes, flow-error correction, backward tracking in time (not MODPATH backward tracking; "adjoint" once), fractions to other sinks and still stored.

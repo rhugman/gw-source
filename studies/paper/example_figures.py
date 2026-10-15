@@ -137,11 +137,11 @@ QUOTED = {
         "net F change, edges deleted": 0.155, "cells above 0.01, edges deleted": 24,
     },
     "fig6": {
-        "pumping winter (m3/d)": 640.0, "pumping spring (m3/d)": 800.0,
-        "pumping summer (m3/d)": 1120.0, "pumping autumn (m3/d)": 640.0,
-        "area F > 0.5 winter (km2)": 0.59, "area F > 0.5 summer (km2)": 1.35,
-        "west end winter (m)": 375.0, "west end summer (m)": 25.0,
-        "summer storage share": 0.525, "winter recharge share": 0.911,
+        "pumping wet (m3/d)": 640.0, "pumping wet-to-dry (m3/d)": 800.0,
+        "pumping dry (m3/d)": 1120.0, "pumping dry-to-wet (m3/d)": 640.0,
+        "area F > 0.5 wet (km2)": 0.59, "area F > 0.5 dry (km2)": 1.35,
+        "west end wet (m)": 375.0, "west end dry (m)": 25.0,
+        "dry storage share": 0.525, "wet recharge share": 0.911,
         "inner (km2)": 0.52, "seasonal (km2)": 0.93, "ring (km2)": 0.41,
         "envelope (km2)": 1.86, "seasonal steps": 36,
     },
@@ -495,8 +495,8 @@ def seasons_values(data: dict, sources: dict = SNAPSHOT_SOURCES) -> dict:
     classes = nested_zones(stats)
     area = stats.template.area
     values.update({
-        "summer storage share": shares.loc["summer", "storage"],
-        "winter recharge share": shares.loc["winter", "recharge"],
+        "dry storage share": shares.loc["dry", "storage"],
+        "wet recharge share": shares.loc["wet", "recharge"],
         "inner (km2)": km2(area[classes == 3].sum()),
         "seasonal (km2)": km2(area[classes == 2].sum()),
         "ring (km2)": km2(area[classes == 1].sum()),
@@ -867,7 +867,7 @@ def make_fig6(out_dir: Path, hbd, data: dict, values: dict) -> list[Path]:
     run, stats = data["run"], data["stats"]
     fig = plt.figure(figsize=(mfig.FULL_WIDTH, 3.8))
     well_cells = np.array(list(run.info["well_nodes"].values()))
-    x0, y0, size, gap_x, gap_y = 0.075, 0.115, (0.203, 0.374), 0.032, 0.07
+    x0, y0, size, gap_x, gap_y = 0.075, 0.115, (0.203, 0.374), 0.02, 0.07
     for n, (season, (step, f)) in enumerate(data["snapshots"].items()):
         row, col = divmod(n, 2)
         box = (x0 + col * (size[0] + gap_x), y0 + (1 - row) * (size[1] + gap_y), *size)
