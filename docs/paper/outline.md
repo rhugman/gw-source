@@ -1,229 +1,389 @@
-# Paper outline: full-mixing flow-source fractions for MODFLOW 6
+# Paper outline: gwsource, a tool paper built on worked examples
 
-Draft outline, 2026-10-05; revised 2026-10-10 so that the paper is about the method, with the Neversink model as one demonstration and benchmark. For co-author review. All numbers are from `docs/neversink_study.md` (cited as NS §n / Table n), `docs/dispersion_study.md` (DS §n / Table n), `PLAN.md` (status notes per phase), the tutorials (`tutorials/0n_*`) and the tests. Untracked outputs are in `studies/neversink/output/` and `studies/dispersion/output/` of the main checkout. Items marked [check] need verifying before submission. Terms follow `docs/paper/terms.md`.
+Branch `paper-draft-alt`, 2026-10-15. This replaces the method-and-benchmark outline of 2026-10-10 (still on branch `paper-draft`). Items marked [check] need verifying. Items marked [tutorial] need a change to a tutorial notebook so that the paper and the notebooks stay in step. Terms follow `docs/paper/terms.md`.
 
-## 1. Title and contribution
+## 1. What changes
 
-Working titles:
+The paper demonstrates an open-source tool to practitioners. It is not a methods paper and not a benchmark study.
 
-1. *Full-mixing flow tracing for MODFLOW 6: contributing areas and source fractions, water-budget checks and transient tracking through storage* (recommended)
-2. *Backward and forward full-mixing flow tracing as a sparse linear system, with exact water-budget checks*
-3. *Contributing areas and source fractions from groundwater model budgets by full mixing, steady and transient*
+- **Results are worked examples.** Each example answers one practitioner question on a small model that a reader can rerun in seconds. Each example shows the output a practitioner would use and checks it against an independent approach where one exists.
+- **The order of the examples follows the tutorial notebooks.** The paper describes each example model in its own words. The notebooks are the runnable version of the same examples.
+- **All nine examples stay for now.** Cutting happens in review.
+- **Neversink becomes a short demonstration at the end.** It shows cost at scale and an ensemble on a real regional model. It explains in prose why our areas differ from the published MODPATH 7 areas. The detail moves to the Supporting Information (SI).
+- **Limitations and trade-offs get their own section.** These are the limits of full mixing and of the code, with numbers from the examples.
+- **Methods shrink to what a user needs to read the outputs.** Equations stay. Derivations and the solver detail move to the SI.
 
-**Contribution.** The reference method [FB13, BF13] computes, from cell-by-cell flows, the fraction of each cell's water that reaches a destination (backward) or came from a source (forward), assuming each cell is fully mixed. Used for source protection zones in England [EA19], it is described only in conference papers and has no open implementation. We write the method as one sparse linear system per direction, solved exactly with or without flow loops. Gross accounting credits a weak-sink well with its pumping only; the reference method's net accounting is an option. Two exact identities, closure and a forward–backward check, test every result against the water budget. The reference method, as published [FB13, BF13; EA19], treats each time step of a transient model as a steady state; we keep these snapshots and add transient tracking, which carries tagged water through storage between steps. Forward tracking is not new: hydraulic mixing cells step forward in time, explicitly, on a similar mixing-cell assumption, first in stream and overland cells only [PAR11; Partington et al. 2013] and later also in aquifer cells (Schilling et al. 2017 [not read]; Nogueira et al. 2022), and with GWT's water volumes it is unit-concentration transport [BED24] in MF6 GWT with upstream weighting and no dispersion [LAN22]. What is added is its exact backward-in-time counterpart, the discrete analogue of adjoint methods [NW99, CP06]: for the water in every cell at every time, the fractions that leave through the destination, through other sinks, or stay stored. The code reads MODFLOW 6 grids of every type, multi-model simulations and package networks. The USGS Neversink/Rondout model (1.68 million cells) is the demonstration and benchmark; we attribute the differences from its published particle areas to mixing versus advective paths and to how streams are treated, and some of these mechanisms are inferred rather than traced cell by cell.
+Model papers named by the author: Hugman and White (2026, *Groundwater*, pyEMU emulator), Bakker and Brakenhoff (2026, *Groundwater*, Timflow), White et al. (2016, *Environmental Modelling & Software*, pyEMU). [check] Read their structure and length before fixing the word budget.
 
-## 2. Target journals
+## 2. Title, impact statement and key messages
 
-| journal | fit | length [check] | |
+Working titles (the title says what the tool gives the user):
+
+1. *Where does my well's water come from? Open-source flow tracing for MODFLOW 6*
+2. *Contributing areas, water sources and travel times from MODFLOW 6 budgets in seconds: the gwsource tool*
+3. Keep the current title: *Contributing areas and sources of water for any MODFLOW 6 sink, in steady-state and transient flow*
+
+Key messages, one per paragraph of the conclusions:
+
+1. From the cell-by-cell flows a MODFLOW 6 model already saves, the tool maps contributing areas, the sources of a sink's water, travel times and the fate of water from a source.
+2. Every result is checked against the water budget. The tool agrees with a published worked example and with MODFLOW 6 GWT to round-off, and with MODFLOW 6 PRT in totals and means. Per cell, it differs from PRT at the edge of a zone.
+3. The answers come in seconds on small models. On a 1.68-million-cell model, one trace of nine destination groups takes 2–3 s. Ensembles of hundreds of realisations are therefore affordable.
+4. The tool works on every MODFLOW 6 grid type, with stream networks, movers, multi-aquifer wells and multi-model simulations, in steady-state and transient flow.
+5. Full mixing has costs. Its areas are wider and more diffuse than particle areas. Its thresholds need judgement. Snapshots of a transient model have no travel lag. Transient tracking and ensembles need memory. The paper states when to use particles or transport instead.
+
+## 3. Section plan with word budgets
+
+Word budgets are first guesses for a *Groundwater* research paper. [check] the journal's current limit.
+
+| § | Section | Words | Figures |
 |---|---|---|---|
-| *Groundwater* (NGWA) | Audience of [FIE21], [BAR18], [POT08]; wellhead protection practitioners; the MODFLOW tool papers this readership uses (FloPy: Bakker et al. 2016; Hughes et al. 2024) are published there; the Neversink benchmark is a *Groundwater* workflow paper. A Methods Note is shorter [check] and would not hold transient tracking and a demonstration | research papers about 7,000–8,000 words incl. references [check]; supporting information unlimited | **recommended** |
-| *Environmental Modelling & Software* | Method plus open software; [PAR11] (hydraulic mixing cells, a forward transient mixing-cell method) published there; requires code availability. The method-first framing makes this a stronger fallback than before | no strict word limit for research papers [check] | second choice, if the method sections do not fit the *Groundwater* length |
-| *Water Resources Research* (Technical Report: Methods) | Theory (linear system, forward–backward identities, backward tracking in time) | 25 publication units [check] | higher bar on novelty; the steady method itself is from 2013, and the transient part is the discrete analogue of known adjoint methods [NW99, CP06] |
+| 1 | Introduction | 900 | — |
+| 2 | Method in brief | 1,100 | Fig. 1 (schematic) |
+| 3 | The software | 600 | Table 1 (inputs and outputs) |
+| 4 | Worked examples (nine) | 3,600 (about 400 each) | Figs 2–10 |
+| 5 | A regional model: Neversink | 600 | Fig. 11 |
+| 6 | Trade-offs and limitations | 900 | Fig. 12 (dispersion) or SI |
+| 7 | Conclusions | 300 | — |
+| 8 | Code and data availability | 150 | — |
+| | Total | about 8,150 | 12 figures (too many; cut in review) |
 
-Recommendation: *Groundwater* research paper. The method-first framing keeps the readers the same (MODFLOW 6, MODPATH and PEST users), and the earlier alternative of a separate Neversink comparison paper is dropped, since Neversink is now a demonstration inside the method paper. Transient tracking adds length, so move the verification details, the PRT diagnosis, the per-convention detail and NS Table 7 to supporting information; if the method sections still do not fit, *EMS* is the fallback. [check] Figure and table allowance: 10 figures and 7 tables is heavy; Tables 5–7 and Figs 9–10 are the first candidates for supporting information.
+### 3.1 Introduction (about 900 words)
 
-## 3. Key messages
+- **The practitioner's questions.** Where does the water pumped by a well come from? Which land should be protected? How old is the water? How do the answers change through the seasons, and how sure are we? Protection zones and risk-based studies need these answers for many wells and many realisations [EA19, Fienen et al. 2022].
+- **Existing tools, framed politely as what we add.**
+  - Particle tracking (MODPATH, MODFLOW 6 PRT) is the standard. It needs a stop-or-pass rule at weak sinks.
+  - Transport with tagged water (GWT, unit concentration [BED24]) needs one run per source.
+  - Full-mixing flow tracing: the reference method [FB13, BF13], used for source protection zones in England [EA19], and MODALL [POT08]. Neither is open source for MODFLOW 6.
+- **What the tool adds.**
+  - Open source, for MODFLOW 6 output.
+  - Every grid type, package networks and multi-model simulations.
+  - Gross and net accounting at weak sinks.
+  - Water-budget checks on every result.
+  - Transient tracking through storage, backward and forward.
+  - Low cost, so ensembles are affordable.
+- **What the paper does.** It shows each capability on a small example with the output a practitioner uses and a check against another approach. It closes with one regional model and an honest list of trade-offs.
+- Reuse: the current §1 paragraphs on weak sinks, MODALL, unit concentration and adjoint methods, shortened. Table 1 of the current draft (method comparison) moves to the SI or becomes part of the new Table 1.
 
-1. **The reference method is a linear system.** Backward fractions solve (I − P) F = S D, where P holds each cell's outflow to each neighbour as a share of the cell's total outflow and S D is the share of each cell's outflow that leaves through the destination sink terms; forward fractions solve the analogous system built from inflow shares. The reference method's cell-by-cell sweep is the special case without flow loops. Its net accounting, which credits a destination cell with all the water passing through it, is kept as an option and reproduces the [FB13] worked example exactly. Gross accounting credits a weak-sink well with its pumping only; net accounting credits it with all the water passing through its cell. How much that matters depends on the well's share of its cell's outflow: 6.7 times the pumping for the weak-sink well of tutorial 02. On Neversink, net accounting credits the eight wells with 7 % more than their pumping and U___7, which takes 44 % of its cell's outflow, with 2.26 times. Gross accounting is how transport models treat sink terms: in transient runs, forward tracking matches GWT, and the steady forward fraction equals GWT run to equilibrium (≤ 2.8e-11 on models 1 and 2; Table 2) and is the limit of forward tracking under constant flows (model 10); [BFW21] already describe forward mode as an Eulerian transport tool in which the forward fraction is C/C0. For steady flow, mean travel times come from the same matrix (model 1: 9574 d full mixing vs 9590 d PRT, to the well cell). (`src/gwsource/assemble.py`, `solve.py`, `traveltime.py`; `tests/test_fb13_example.py`; `tests/test_mf6_integration.py::test_weak_sink_gross_vs_net`; `tests/test_prt.py`; `tutorials/02_accounting`, `06_travel_time`; `studies/neversink/net_and_envelope.py`, NS §2, Table 2a (SI); PLAN §2.6, Phase 3 notes; `references/SUMMARY.md` §1, §2.4.)
-2. **Every result carries its own check.** The backward and forward closure checks and the forward–backward check are exact identities once the cell budget errors are included; under net accounting the closure check tests the solve only in sum. They hold to round-off on the synthetic test models (1–9) and to 1e-12 m³/d on the 1.68-million-cell Neversink model; transient tracking with GWT's volumes matches MF6 GWT to ≤ 1e-14 on test models 6 and 7 and to 1e-13 on tutorial 08. (`src/gwsource/diagnostics.py`; `tests/test_closure_duality.py`, `tests/test_tracking_mf6.py`; NS §1 Checks; PLAN §2.4, Phase 4B notes; tutorial 08 §8.)
-3. **Transient tracking carries water through storage.** Snapshots trace each time step on its own flows, with storage release as a source term and storage gain as a sink term; they describe each step's flow paths, but have no travel lag and cannot say what the water released from storage is. Transient tracking treats each cell as a fully mixed volume of water and carries tagged water from step to step (implicit, upstream weighting, no dispersion; porosity sets the water volume). Backward tracking in time, solved from the end of the simulation, gives for the water in each cell at each time the fraction that leaves through the destination before the end, the fraction that leaves through other sinks and the fraction still stored. With GWT's volumes, forward tracking is the upstream, dispersion-free unit-concentration transport of MF6 GWT and agrees with it to ≤ 2.2e-15 (model 6) and ≤ 1e-14 (model 7, stream network with SFT and MVT); the default volumes, which keep every cell's water balance exact, differ from it by about 1e-4 (1.2e-4 on model 6, 1.9e-4 on tutorial 08). What it adds is the matching backward tracking, all tags solved with one factorisation per time step, and the forward–backward check (≤ 7.7e-16) and closure check. Under flows held constant, both tend to the steady results (model 10: G to 1e-13, F to 7e-10). On the 30-year seasonal model of tutorial 08, 81 % of the water pumped in the first 10 years was already in the aquifer at the start of the simulation; snapshots cannot give this number. (`src/gwsource/tracking.py`, `transient.py`; `tests/test_tracking.py`, `tests/test_tracking_mf6.py`; PLAN §2.7, Phase 2 and 4B notes; tutorials 05, 08 §§4, 7.)
-4. **One system for every grid, package network and model.** The same matrices and solve apply on DIS, DISV and DISU grids (DIS = DISU to machine precision), across GWF-GWF exchanges (split simulations equal the single model to ≤ 7e-10), and with SFR reaches, lakes, MAW wells and UZF cells added as extra cells linked by MVR transfers. (`network.py`; `tests/test_mf6_integration.py::test_dis_and_disu_identical`, `tests/test_multimodel.py`, `tests/test_package_network.py`; PLAN §2.8, Phase 4A notes; tutorials 04, 07.)
-5. **Steady traces are cheap enough for ensembles.** On a 1M-cell synthetic grid the solve takes 0.55 s for four groups without flow loops (solve only; assembly 0.24 s) and 0.42 s with 7,000 flow loops. On Neversink a trace takes 2 to 3 s for nine destination groups, against 44 s for the MODFLOW 6 run; 358 realisations with two traces each took 76 min on six processes. Transient tracking is timed only on tutorial 08 (§5.3). (PLAN Phase 2 notes; `benchmarks/`; NS Summary, §6.)
-6. **Neversink demonstration: full mixing lies within the spread of particle conventions and follows the published areas across an ensemble and pumping scenarios.** On the same flow field, flow-weighted particles agree with the published MODPATH 7 contributing cells at an overlap (cells in both areas as a share of cells in either) of 0.29 to 0.62, depending on release depth and on how particles lose weight at weak sinks; full mixing (0.30 to 0.41) lies inside that range. PRT reproduces the published cells (overlap 0.998) only with the published conventions: recharge and stream flows on the top face where it is open, particles stopped at every weak sink, and particles in dry start cells draped to the first active cell below. The face assignment alone raises the overlap from 0.65 to 0.998. Full mixing traces exactly the wells' inflow; particles that lose weight at every sink in proportion to the flow that sink takes from the cell's outflow (weight-losing particles) deliver it within 2 %. Over the ensemble, mean F correlates with the published probability of contribution at 0.80 and gives 90 % of its expected area (the sum of the cell values, in cells). The median area is within 10 % of the published median from base to maximum pumping (911 vs 998 cells; 3,725 vs 3,592). The full-mixing area grows faster than pumping (4.09 vs 3.68 times) mainly because the stream share of the wells' water falls (42 % to 28 %). The published area grows more slowly (3.60), mainly because particles stop in buried stream cells (SFR reach cells with an active cell above, where a gaining reach is a weak sink inside the cell), which PRT with the published conventions reproduces (3.62). (Tables 3–7; NS §2–3, §6–7, Tables 1, 3–6; `mp7_reproduction.csv`.)
-7. **Neversink demonstration: how streams are represented changes the answer.** With streams as cells, stream leakage is a source term of the aquifer cell: 43 % of the wells' water is stream leakage and the contributing area stops at the streams. With the 12,316 SFR reaches added as a stream network, leakage is traced up the stream to where its water entered. All of it then traces to recharge, and the median area is 1.7 times larger at base pumping and 1.4 times at maximum pumping (1,534 vs 911 and 5,247 vs 3,725 cells); the ensemble mean F gives 1.51 times the published expected area. (Tables 5–6; NS §4, Tables 4–5.)
+### 3.2 Method in brief (about 1,100 words)
 
-## 4. Draft abstract (at most 250 words)
+Only what a reader needs to read the outputs. Each concept is explained in plain words where it first appears.
 
-Full-mixing flow tracing computes, from a groundwater model's cell-by-cell flows, the fraction of each cell's water that reaches a destination (backward) or came from a source (forward). The reference method, used for source protection zones, lacks a peer-reviewed description and open code. We write it as one sparse linear system per direction, solved exactly with or without flow loops; under gross accounting one solve covers every destination. Gross accounting credits a weak-sink well with its pumping; the reference method's net accounting credits it with all the water passing through its cell. Two exact identities check every result against the water budget: the traced volumes add up to each destination's and source's inflow, and backward and forward tracing agree. For transient models, tagged water is carried through storage. Forward, with GWT's water volumes, it matches dispersion-free unit-concentration transport in MODFLOW 6 (GWT) to round-off; backward in time it gives, for the water in each cell, the fractions that reach the destination, leave through other sinks or stay stored. On a seasonal test model, 81 % of the water pumped in the first ten years was already in the aquifer at the start of the simulation. The code reads MODFLOW 6 grids of every type, multi-model simulations and package networks. On the USGS Neversink/Rondout model (1.68 million cells) a trace takes 2–3 s, and agreement with the published MODPATH 7 contributing areas of eight supply wells lies within the spread of particle tracking under different conventions on the same flow field.
+- **Full mixing.** Each cell is a fully mixed volume. Its water leaves through its outflows in proportion to the flows.
+- **Backward fraction F and forward fraction G.** One equation each, (I − P) F = S D and its forward analogue, with a plain reading. A contributing area is a threshold on F.
+- **Volumes.** Volume through, volume from, and the split of a sink's water by source.
+- **Gross and net accounting.** Gross credits a weak-sink well with its pumping. Net credits it with all the water passing through its cell, as the reference method does.
+- **Budget checks.** Closure and the forward–backward check, in one sentence each, with what they test and what they do not.
+- **Mean travel time.** The equation, porosity as an explicit input.
+- **Transient flow.** Snapshots (each step as a steady state), and transient tracking (tagged water carried through storage, forward and backward in time). One equation for the tracking step.
+- To the SI: solution in flow order and flow loops, net-accounting details, the backward-in-time derivation, the current §2.4 and §2.8 in full.
+- Fig. 1: the current method schematic (`fig1_method_schematic`). Its panel c already uses the three-layer example model.
 
-(249 words: about five sixths method, one sixth demonstration. The ensemble, scenario and stream results and the per-convention overlaps are in §5.5, not here.)
+### 3.3 The software (about 600 words)
 
-## 5. Section outline
+- **Workflow.** Run MODFLOW 6 with the flows saved, read a step, select destinations or sources (by package, boundname, cells or zone), trace, read the outputs, export. A short code block of about ten lines, the quickstart example.
+- **Inputs.** Grid file, budget file, and (for package networks) the package budget files. Which save options are needed.
+- **Outputs.** F and G maps, volumes, source splits, travel time, transient statistics, ensemble statistics. Export to npz, netCDF and GeoPackage.
+- **Cost.**
+  - On a 1-million-cell synthetic grid, the solve takes 0.55 s for four groups, about 1.1 s in all with assembly, loop detection and outputs, on 16 cores (PLAN Phase 2 benchmarks).
+  - This number is only in an HTML comment in the current §3.3. [check] Rerun the benchmark before quoting it.
+  - Memory: Neversink peaked at 2.5 GB, plus about 0.19 GB per extra group.
+  - Use under the PEST++ run manager is untested.
+  - Neversink timings stay in §5.
+- **Testing.** The test suite runs ten test models and the published worked example. The full verification table (current Fig. 2 and Table S1) moves to the SI.
+- Table 1: inputs, selections and outputs in one table, each with the example that shows it.
 
-### 5.1 Introduction
+### 3.4 Worked examples (about 3,600 words)
 
-- Contributing areas and capture zones: particle tracking [POL88, POL16] is standard; weak sinks, transient flow and many destinations are hard to handle with it [EA19, BF13]. Evidence: `references/SUMMARY.md` §4.
-- Terminology: capture fraction in the budget sense [LEA10, BAR18], the share of a well's pumping supplied by increased recharge or reduced discharge (for example streamflow depletion), is a different quantity from F; state this early. Evidence: `references/bibliography.md` §D.
-- Flux-based alternatives: MODALL [POT08] and its critique [MC09], the reference method [FB13, BF13], hydraulic mixing cells [PAR11], unit-concentration transport [BED24], particle source apportionment [PRY22], backward-in-time (adjoint) and groundwater-age methods [NW99, GOO96, CP06]. Evidence: `references/SUMMARY.md` §5.
-- Gaps: no peer-reviewed description of the reference method, no open code, flow loops handled by deleting cell-to-cell connections, net accounting that credits a weak-sink well with all the water passing its cell, transient models treated, by design, as time-instant steady states with no water carried between steps (published descriptions; the 2020 version's changes [BFW21, DAL22] are not documented), no published comparison with particle-tracked contributing areas on a large real model. Evidence: `references/bibliography.md` §F; `references/SUMMARY.md` §2.7; PLAN §1 table.
-- Aims, as three questions: (i) an exact formulation, steady and transient, whose results can be checked against the water budget; (ii) cost on a regional model and ensemble; (iii) on a published benchmark, what the differences from a particle delineation consist of.
+**Shared example model (opening paragraph).** A 2 km × 2 km unconfined aquifer of 40 × 40 cells of 50 m:
+- top at 20 m and bottom at −30 m, with K 5 m/d;
+- recharge of 5 × 10⁻⁴ m/d;
+- a constant head of 10 m on the west edge;
+- a north–south river (stage 6 m) 1.5 km from the west edge;
+- a supply well pumping 800 m³/d 100 m west of the river. Each example changes this model where its question needs it. Say once that each example ships as a runnable notebook (Section 8).
 
-### 5.2 Method
+**Decision for the author.** The rule so far is "never write 'tutorial' in the main text". I suggest one sentence in this opening paragraph naming the notebooks, because for a tool paper they are part of the contribution.
 
-- **Cells, flows and accounting.** Each active cell is a fully mixed volume. The cell-to-cell flows (FLOW-JA-FACE) connect the cells, and every other budget term is kept as its own source or sink term. Each cell's total outflow O, total inflow I and cell budget error r = I − O are reported; r is never forced to zero. Gross accounting: each sink term in a cell takes its share of the cell's total outflow, and the rest passes to the neighbours, so a weak-sink well is credited with its pumping only. Evidence: PLAN §2.1; `assemble.py` docstring.
-- **Backward and forward systems.** Backward: (I − P) F = S D, with P_ij = q_ij / O_i the share of cell i's outflow that goes to neighbour j, and S D the share of each cell's outflow that leaves through the destination sink terms. Forward: (I − Q) G = R T, built in the same way from inflow shares, with R T the share of each cell's inflow that enters through the selected source terms. Derived volumes: the water passing through each cell that reaches the destination, the water entering the model in each cell that reaches it, and (forward) the water leaving through each sink that came from the source, each split by package. Boundary-control maps give, in every cell, the fractions going to each sink; they add up to 1. Evidence: PLAN §2.2–2.3; `metrics.py` docstring; `tests/test_closure_duality.py::test_steady_boundary_control`.
-- **Net accounting and the reference method.** Destination cells are fixed at F = 1 (all their water is credited to the destination), and each cell's net source (cell-to-cell outflow minus inflow) is used; this reproduces [FB13] Figs 5–8 and over-attributes water to weak-sink wells. Evidence: PLAN §2.4; `tests/test_fb13_example.py`; tutorial 02.
-- **Solution.** Without flow loops, the system is solved cell by cell in flow order, which is the reference method's sweep in matrix form. With loops, each loop is solved as one small block, the blocks in flow order (block-triangular sparse LU over the strongly connected components). Closed recirculation loops (groups of cells with no outflow to any sink or to a cell outside the group) are found before the solve, given F = 0 and reported. The matrix is an M-matrix (each cell's outflow shares sum to at most 1), so the factorisation needs no reordering for stability (no pivoting). Evidence: `solve.py` docstring; PLAN Phase 2 notes; `tests/test_mf6_integration.py::test_xt3d_cycles_detected_and_solved_by_block_lu`.
-- **Diagnostics.** Backward closure Σ F Src − Σ F r = destination inflow: the source volumes traced to the destination, corrected by the cell budget errors, add up to its inflow. Forward closure: the same for a source's inflow. Forward–backward check Σ_S F q − Σ_D G |q| = Σ F G r: the volume from source to destination is the same traced either way (a duality identity of the two systems). Evidence: `diagnostics.py` docstring.
-- **Travel time.** Mean travel time under full mixing: (I − P) m = τ ∘ F, with τ_i = V_i / O_i the mean residence time of cell i (water volume over outflow) and m the travel time weighted by the fraction reaching the destination; the mean travel time is m / F. The system is solved with the factorisation already computed for F (gross accounting only); for a transient model it is computed per snapshot. Identity ΣVF/Q: the flow-weighted mean travel time of all water reaching the destination equals the volume of water that ends there divided by its inflow (a turnover time), once the cell budget errors are included. Evidence: PLAN §2.6 and Phase 3 notes; `traveltime.py`, `transient.py`.
-- **Transient snapshots.** Each selected time step is traced as a steady state on its own flows, with storage release as a source term and storage gain as a sink term, as in the published descriptions of the reference method [FB13, BF13; EA19]. Destinations and sources are re-selected on every step. Statistics are accumulated step by step, so memory does not grow with the number of steps: min, max, mean weighted by step length, always/sometimes/never above a threshold, probability within a range and exceedance count. Snapshots have no travel lag, and the water released from storage has no origin: on the seasonal model of tutorial 08, storage release supplies up to 50 % of the well's water in summer (Fig. 4a). Evidence: `transient.py` docstring; PLAN §2.7, Phase 2 notes; `tests/test_transient.py::test_backward_stats_match_brute_force`; tutorials 05, 08 §2; `studies/paper/transient_figure.py`.
-- **Transient tracking through storage (forward).** Each cell, and each reach, lake, well or UZF cell added as an extra cell, is a fully mixed volume of water V. The storage terms leave the list of source and sink terms and act through the change of volume. Over step n of length Δt: V^new c^n − V^old c^(n−1) = Δt [Σ_j q_ji c_j^n + Σ s_k (tagged source terms) − (O + r) c^n], with c the tagged fraction. Implicit in time, upstream weighting, no dispersion, on the flow model's own time steps (every step saved, OC BUDGET ALL); the water volume needs porosity. The cell budget error leaves at the cell's own fraction, as in the GWT flow-imbalance correction [LAN22]. Each step's matrix is an M-matrix, so the solvers above apply step by step, all tags with one factorisation per step. Tagged initial water gives the share of water that was in the model at the start. With the "gwt" volumes this is unit-concentration transport [BED24] in GWT with upstream advection and no dispersion [LAN22]; hydraulic mixing cells [PAR11] step forward in time on a similar mixing-cell assumption, but explicitly, from the previous step's fractions on the flow model's own steps, stable only while a step's inflow or outflow volume does not exceed the cell's storage ([PAR11] §3.1, Eq. 9; Table 1). Partington et al. (2013, §3.3) added sub-time-steps, used where a step's outflow exceeds a cell's storage, and cell resets, still in stream and overland cells only; aquifer cells came later (Schilling et al. 2017 [not read]; Nogueira et al. 2022, Sect. 2.2). All of these step forward in time only (Table 1, footnote 3). Forward tracking is therefore not new; the backward tracking below is what is added. Evidence: `tracking.py` docstring; PLAN §2.7, Phase 4B notes.
-- **Water volumes.** Default ("flow"): the volume starts at porosity × saturated volume and is then carried by the storage flows, so the water and tagged-water balances of every cell are exact. Option ("gwt"): the volumes MF6 GWT uses, needed to reproduce GWT; where porosity differs from specific yield, tagged water appears or disappears at step boundaries and is reported. On model 6 (porosity 0.3, Sy 0.2) the two differ by ≤ 1.2e-4 in the forward fraction and ≤ 6e-3 in the backward fraction. Evidence: PLAN Phase 4B notes; tutorial 08 §7.
-- **Backward tracking in time.** Not MODPATH backward tracking (particles run in reverse from the well); say so at first use. Solved from the end of the simulation backward, with the transpose of each step's matrix: the discrete analogue of adjoint methods for continuous transport [NW99, CP06]. The backward fraction in time w is the fraction of the water in a cell at the start of step n (or entering it during the step) that leaves through the destination before the end. The same run gives the fraction that leaves through any other sink and the fraction still stored at the end; the three add up to 1, less the water removed by the flow-error correction (and, with "gwt" volumes, by the step-boundary adjustments). With every source tagged, it splits the destination's outflow by source term, time step and initial water (closure). Forward–backward check: the tagged outflow from forward tracking equals Σ_n Δt s^n · w^n + V^old,1 c^0 · w^1, exact for any volumes. Evidence: `tracking.py` docstring; PLAN Phase 4B notes; tutorial 08 §§5–6.
-- **Transport sub-steps.** Each flow step can be split into m equal transport sub-steps (flows constant, volumes interpolated), without changing the flow model. With 2000 d flow steps, one transport step per flow step roughly doubles the share of new water reaching the well in the first step (0.18 vs 0.09 for particles); 16 sub-steps (125 d) remove this. Closure and the forward–backward check stay exact. Evidence: DS §3 and its sub-step table; `tests/test_tracking.py::test_substeps_duality_closure_and_balance`.
-- **Steady limit.** With flows held constant long enough, the storage terms vanish, the forward fraction tends to the steady G and the backward fraction to the steady F. Model 10 (model 1's flows held for 4e5 d in 120 equal steps): G to 1e-13, F to 7e-10. Both are limited by the flow solver tolerance, not by round-off: with the flow model solved 100 times tighter they fall to 1e-14 and 1e-11. Evidence: `tests/test_tracking_mf6.py::test_constant_flows_converge_to_steady_snapshot`; PLAN Phase 4B notes.
-- In words, for the paper: a snapshot says where the water of a time step comes from under that step's flows; transient tracking says when it arrives, and how much of the water pumped was already in the aquifer.
+Each subsection follows the same pattern:
+1. the question;
+2. the model change;
+3. the output a practitioner uses;
+4. the check against another approach;
+5. one sentence on the limit it shows.
 
-### 5.3 Implementation
+#### 4.1 Where does the well's water come from? (tutorial 01)
 
-- MF6 reader: binary grid IA/JA in user numbering for DIS/DISV/DISU, list and array budget records, and both budget records of a package that hands water to the mover (e.g. DRN and DRN-TO-MVR), each kept as a sink term. Evidence: `mf6io.py` docstring; PLAN Phase 1–2 notes.
-- Package networks: SFR reaches, lakes, MAW wells and UZF cells added as extra cells from the package budget files, MVR transfers as connections between them, and a check that the GWF and package budgets agree on each aquifer exchange (tolerance `aquifer_rtol`). Multi-model GWF-GWF exchanges. Evidence: `network.py`, `packages.py`; PLAN Phase 4A notes.
-- Selection of destinations and sources (by package, boundname, cells or zone), exports (npz, netCDF, GeoPackage), and an ensemble routine that traces each realisation in turn and keeps running statistics per cell. Evidence: `selectors.py`, `export.py`, `ensemble.py`.
-- PRT post-processing routine: flow-weighted release from each source term; reads IFLOWFACE (the cell face a boundary flow is assigned to); gross accounting along each path, so that particles lose weight at every sink in proportion to the flow that sink takes from the cell's outflow (weight-losing particles). Evidence: `prt.py`; PLAN Phase 3 PRT revision and IFLOWFACE notes.
-- Performance: 1M-cell synthetic grid; solve without flow loops 0.55 s for four groups (solve only; assembly 0.24 s), block solve with 7,000 flow loops 0.42 s; memory about 90 MB per group per million cells. Evidence: PLAN Phase 2 notes; `benchmarks/`.
-- Transient tracking: one factorisation per time step for all tags; tutorial 08 (1,600 cells, 121 steps) takes 0.75 s forward and 0.80 s backward; memory is one array of (time steps × cells) per group and output; exports per step (netCDF with a time dimension, npz). No timing on a large transient model [check]. Evidence: `tracking.py`, `export.py`; PLAN Phase 4B notes; tutorial 08 §§3, 5.
+- Output:
+  - F map with the F > 0.1 and F > 0.5 contours, 1.575 and 1.143 km² (630 and 457 cells; the same with ≥ or >);
+  - [tutorial] tutorial 01 prints 1.142, while 06 and 09 print 1.143. Use one rounding.
+  - expected area ΣF·A of 1.173 km²;
+  - the well's water by source: recharge 71 %, west edge 15 %, river 14 %.
+- Check:
+  - closure (the traced sources add up to the 800 m³/d pumped);
+  - **needs an independent check**: the PRT captured fraction against F on the same model.
+    - Tutorial 06 already runs PRT on this model. Mean |PRT captured fraction − F| is 0.058 over all release cells and 0.164 over the 372 edge cells.
+    - Cite that here, or move a short version into tutorial 01 [tutorial].
+- Limit: the threshold is a judgement.
+  - In the dispersion study, F ≥ 0.5 is within 5 % of the advective area at cells of 50 m or less.
+  - F ≥ 0.1 contains the advective area. It is 8–16 % larger on a recharge-fed problem like this aquifer, and 30–90 % larger with regional flow.
+  - The narrow tail east of the river shows a weak-sink river in one layer.
+- Figure: F map with both contours, plus a source bar or pie.
 
-### 5.4 Verification and transient demonstration on synthetic models
+#### 4.2 What is being computed, and what changes at a small well? (tutorial 02)
 
-- [FB13] worked example, net accounting: exact. Evidence: `tests/test_fb13_example.py`.
-- Closure, forward–backward and boundary-control checks to 1e-10 relative (observed: round-off): models 1–5 and snapshot steps of model 6 (`tests/test_closure_duality.py`), package-network models 7–9 (`tests/test_package_network.py`, `tests/test_mover.py`). Evidence also PLAN Phase 1 "Done when", Phase 4A notes.
-- Same results on every grid type: DIS = DISU to machine precision; split simulations equal the single model to ≤ 7e-10. Evidence: `tests/test_mf6_integration.py::test_dis_and_disu_identical`; `tests/test_multimodel.py`; PLAN Phase 4A.
-- Transient tracking vs MF6 GWT ("gwt" volumes, unit concentrations, upstream advection, no dispersion): ≤ 2.2e-15 at every step on model 6 (recharge, CHD + river, initial water, recharge + initial water, recharge without flow-error correction), ≤ 1e-14 for cells and reaches on model 7 (SFR + MVR against GWT with SFT + MVT) (test tolerance 1e-8). Evidence: `tests/test_tracking_mf6.py::test_forward_matches_gwt`, `::test_package_network_matches_gwt_sft_mvt`; PLAN Phase 4B.
-- Steady forward fraction vs MF6 GWT run to equilibrium (10⁷ d, upstream advection, no dispersion): max |C − G| ≤ 2.8e-11 on models 1 and 2 (recharge, river leakage, CHD inflow; partly capturing river cells, weak well) (test tolerance 1e-10); 1.0e-8 on model 7 (SFR + MVR vs SFT + MVT), limited by the flow solve, 2.5e-11 with the flow model solved about 100 times tighter. Evidence: `tests/test_gwt_equilibrium.py`; Table 2.
-- Transient forward–backward check ≤ 7.7e-16 relative (test tolerance 1e-10) on model 6 (also with 5 sub-steps), model 6 split into 4 models, model 9 (lakes and UZF cells as extra cells, transient period) and model 7 (SFR + MVR), both volume options. With "flow" volumes, each cell's water balance holds by construction (V^new = V^old − Δt S); its error, ≤ 9.5e-17 of the water volume, tests the volume carry, the clipping at zero and round-off, not the flow solution. Each tagged group's model-wide balance, which tests the tracking solve, closes to ≤ 1.0e-15 (test tolerance 1e-10). Evidence: `tests/test_tracking_mf6.py` (`test_duality_*`, `test_flow_mode_exact_balances_*`); Table 2.
-- Steady limit: model 10 (model 1's flows held 4e5 d in 120 equal steps), forward fraction at the end and backward fraction at the start equal the steady G and F to 9.7e-14 and 6.8e-10 (test tolerances 1e-11 and 1e-8). Both errors are limited by the flow solver tolerance, not by round-off: with the flow model solved 100 times tighter they fall to 1.2e-14 and 1.4e-11. With 30 steps growing by 1.2 the errors were 1.4e-8 and 5.9e-7: initial water not yet flushed out by the last, long steps (implicit time stepping). Evidence: `tests/test_tracking_mf6.py::test_constant_flows_converge_to_steady_snapshot`; Table 2.
-- Sub-steps: m sub-steps equal a flow model with m times more steps of the same flows to 1.6e-16 (hand-built 15-cell network, test tolerance 1e-12 elementwise); snapshot statistics equal a brute-force calculation that stores every step. Evidence: `tests/test_tracking.py::test_substeps_equal_refined_flow_steps`; `tests/test_transient.py::test_backward_stats_match_brute_force`; DS §3.
-- Particles: mean travel time to the well cell, full mixing vs PRT, 9574 vs 9590 d (model 1; 9607 d with the residence in the well cell); flow delivered by particles 800.4 of 800 m³/d; 3-layer model 402.6 of 405 m³/d. Evidence: `tests/test_prt.py`; PLAN Phase 3.
-- Numerical dispersion against Javandel–Tsang and PRT references: the transition band (0.1 < F < 0.9) narrows as about h^0.5; F = 0.5 area within 5 % for h ≤ 50 m; F ≥ 0.1 always contains the reference zone (analytical, or PRT on the finest grid) but is 8–90 % too large; source shares identical to three digits. Evidence: DS Summary, Tables 1–2, §5.
+- Check: the Foley and Black (2013) 3 × 3 worked example, reproduced exactly (to 10⁻¹⁴), and a direct dense solve.
+- Output: the three-layer model with a 5 m³/d well in a cell carrying 33.7 m³/d. Gross credits it with 5 m³/d, net with 33.7 m³/d (6.7 times). Boundary-control and dominant-sink maps.
+- Limit: net accounting over-credits weak sinks. Use it to compare with the reference method only.
+- Figure: net against gross F maps around the weak well (layer 3), or reuse the current Fig. 1c.
+- [tutorial] Rerun: the net-accounting code changed on 2026-10-10, after the stored outputs were made. Print the claims that are now only read off maps (the "about 93 %" strip, gross = net × 5/33.7).
 
-**Transient demonstration (tutorial 08; Fig. 4).** The author's choice of transient demonstration (§7, item 7). It shows what transient tracking adds to snapshots on a model small enough to check every number. The shares below are those of Fig. 4: four transport sub-steps per 91-day flow step and the default water volumes. Tutorial 08 uses one transport step per flow step, so some of its shares differ slightly (year-1 river leakage 3.6 % against 3.1 %; initial water's cumulative share after year 1, 96.9 % against 97.6 %). Evidence: `studies/paper/transient_figure.py`; `docs/paper/figures/README_method.md`.
-- Model: the tutorial aquifer (2 km × 2 km, one layer, 50 m cells, 1,600 cells; river 100 m from the supply well; constant-head west edge 1.4 km away) with storage (Sy 0.2, Ss 1e-5 /m) and porosity 0.3; a 1-day steady first period, then four seasons a year for 30 years (121 time steps). The well pumps from the start, so the initial state is a pumped steady state. Recharge is high in winter and almost zero in summer; pumping is highest in summer (1,120 m³/d). Evidence: tutorial 08 §1; `tutorials/herebedragons.py::build_transient`.
-- Snapshots against tracking. Snapshots give, on average, 60 % recharge, 12 % west-edge inflow and 15 % storage in the well's water; storage peaks at 50 % in summer. Tracked forward, the well's water in the last season of year 1 is 95 % initial water (in the aquifer at the start), 3 % river leakage and under 2 % recharge; by year 30 it is 52 % initial water, 33 % recharge, 16 % river leakage and none from the west edge. Snapshots have no travel lag: they credit the well with west-edge inflow from the first step, while tracked west-edge water, 1.4 km away, does not reach the well within 30 years. River water arrives within months; recharge mixes into about 12 m of water per aquifer column (65 years of recharge at 0.18 m/yr) before it reaches the well. Evidence: tutorial 08 §§2–3; Fig. 4a–b.
-- Tagged initial water: of all water pumped so far, 98 % after year 1, 81 % after 10 years and 68 % after 30 years was in the aquifer at the start. Tagged-water balances close to 8.0e-16. Evidence: tutorial 08 §4.
-- Backward tracking: for the water in each cell at the start, the fraction that reaches the well within 30 years, leaves through other sinks or is still stored; within 30 years only water near the well and along the main flow paths reaches it. The three fractions add up to 1.0000 in every active cell. With every source tagged, the well's 30-year outflow (8,766,800 m³) splits into 13.8 % river, 18.5 % recharge and 67.7 % initial water, with relative closure error 0. Evidence: tutorial 08 §5; Fig. 4d–f.
-- Checks: forward and backward agree to ≤ 4.3e-16 per tag; with GWT's volumes and one transport step per flow step (GWT's own stepping), GWT on the same flows agrees to 9.8e-14 over 1,600 cells and 121 steps; "flow" and "gwt" volumes differ by 1.9e-4 in the forward and 3.7e-3 in the backward fraction, and the share of initial water in year 30 by 1e-4 (0.5166 vs 0.5167, at one transport step per flow step). Evidence: tutorial 08 §§6–8; Fig. 4 caption.
-- Time stepping: with one transport step per 91-day flow step, the share of new recharge in the first steps is overestimated by almost a factor of two (0.0078 vs 0.0042 with 16 sub-steps); later the curves merge. Fig. 4 uses four sub-steps (about 23 days); going to 16 moves the year-1 shares by at most 0.2 percentage points. Evidence: tutorial 08 §9; DS §3; `studies/paper/transient_figure.py`.
-- Caveat to state: the model has one layer, so each cell mixes over its whole saturated thickness and recharge cannot form a young layer on top of old water; this vertical mixing is a form of numerical dispersion. Evidence: tutorial 08 §3.
+#### 4.3 Where does each source's water go? (tutorial 03)
 
-### 5.5 Demonstration and benchmark: the Neversink model
+- Output:
+  - G maps of river, west-edge and recharge water;
+  - the well's water by source, matching the backward split of §4.1;
+  - fate of each source: 29 % of recharge reaches the well, 71 % the river;
+  - a 300 m × 300 m field: 39 % of its recharge reaches the well, nitrate diluted from 50 to 1.11 mg/L at the well (invented concentrations, stated);
+  - mixed chloride at the well, 18.6 mg/L.
+- Check:
+  - forward–backward agreement for each source (to the cell budget residual);
+  - **needs an independent check**, G against MODFLOW 6 GWT at equilibrium on this model [tutorial].
+    - The notebook says tutorial 08 makes this comparison. It does not: 08 compares transient tracking.
+    - The paper already has GWT agreement to 2.8 × 10⁻¹¹ on test models 1 and 2 (Table S1), which could be cited instead.
+- Limit: G is the long-run value, with no arrival time and no reactions.
+- Figure: field plume G map with its fate split, beside the river G map near the well.
 
-What it demonstrates about the method, steady state only (the model is steady, NS §1): (i) cost on a 1.68-million-cell model and a 358-realisation ensemble (2–3 s per trace; 76 min for the ensemble on six processes); (ii) the closure check on a regional model (≤ 1e-12 m³/d for every group); (iii) gross and net accounting on real weak-sink wells; (iv) the stream network with 12,316 SFR reaches; (v) how full mixing compares with a published particle delineation, and which particle conventions account for the differences. The published areas are a benchmark, not a reference: they are one particle convention.
+#### 4.4 Does it work on my grid? (tutorial 04)
 
-**Model and benchmark.**
-- USGS Neversink/Rondout MF6 model [FIE21, COR22]: 4 × 680 × 619 cells of 50 m, NEWTON, RCHA/CHD/WEL/SFR (12,316 reaches); rerun with MF6 6.9, heads within 8.6 mm. Evidence: NS §1.
-- Benchmark: published MODPATH 7 forward runs, one particle per uppermost active cell (122,021), weak sinks stop particles; 980 cells contributing to eight priority wells (3,671 m³/d). Evidence: NS §1.
+- Output:
+  - the same trace on DIS, Voronoi DISV and DISU (with and without vertices);
+  - land-use zones (farmland, village, woodland) with the recharge each sends to the well;
+  - GeoPackage export.
+- Checks:
+  - DIS = DISU exactly;
+  - XT3D with 5 flow loops, where the block solver equals a plain sparse LU (3.3 × 10⁻¹⁶);
+  - the reference method's edge deletion changes F by up to 0.155;
+  - On DISV, the expected area ΣF·A is 8 % smaller (1.082 against 1.173 km²) and the river share is 21 % instead of 14 %. The notebook attributes this to the river cell lying 70 m from the well cell instead of 100 m. That is a reading, not a test.
+- Limit:
+  - DISU without vertices gives fractions but no maps;
+  - PRT runs on DIS and DISV only;
+  - Voronoi cells do not reduce numerical dispersion.
+- Figure: DIS against DISV F maps with a grid inset; optionally XT3D F with the loop cells.
+- [tutorial]:
+  - the tables are stored as HTML only;
+  - "flow cycles" should become "flow loops";
+  - name the area metric (ΣF·A vs F > 0.5 area);
+  - remove the PLAN.md references.
 
-**Calibrated model vs published contributing cells.**
-- Overlap, defined as the cells in both areas as a share of the cells in either (the Jaccard index): 0.30 (F > 0.1), 0.41 (F > 0.5, and area-matched, i.e. the 980 cells with the largest F); sum of F 910 vs 980 cells; 96 % of the well water enters in published start cells. The Neversink thresholds are strict (F > 0.1, F > 0.5), as in NS; the dispersion tests use F ≥ 0.1 and F ≥ 0.5. Evidence: Table 3; NS §2, Table 1; `output/agreement_with_mp7.csv`, `mp7_coverage.csv`.
-- The F > 0.5 area is a core (94 % inside the published area, covering 43 % of it); the F > 0.1 area is twice as large and misses 27 %. Evidence: NS §2, §5.
-- Per-well agreement is low because the U-cluster wells share contributing areas and a particle counts for one well only. Evidence: SI (NS Table 2).
-- Net accounting on the same flow field (SI; NS §2, Tables 2a–2b; Fig. S1a): the eight wells are credited with 3,944 m³/d against 3,671 m³/d pumped. The difference is large only at U___7 (2.26 times its pumping) and SV_487 (1.43 times), the wells that take the smallest shares of their cells' outflow. The flow field has no flow loops, so removing loops, as the reference method does, makes no difference here. Against the published cells, net accounting gives a sum of F of 978 vs 980 (gross 910) and an overlap of 0.44 at F > 0.5 (gross 0.41) and 0.28 at F > 0.1 (gross 0.30). Per well it moves away from the published counts at U___7 (214 vs 58 cells) and U___8 (249 vs 163) (single-well traces, which both count the water passing from U___7's cell into U___8's). Evidence: `studies/neversink/net_and_envelope.py`; `output/net_vs_gross_wells.csv`, `net_vs_gross_mp7.csv`, `net_vs_gross_cell_classes.csv`.
-- End states of the published particles: in buried stream cells (an active cell above) the stream exchange stays distributed in the cell, and where the reach gains from the aquifer it is a weak sink that stops particles; open-top stream cells let them leave through the top face. SI. Evidence: NS §2; `output/mp7_status.csv`.
+#### 4.5 How does the contributing area change through the seasons? (tutorial 05)
 
-**Particle tracking on the same flow field.**
-- Weight-losing PRT particles deliver 3,736 m³/d against a well inflow of 3,671 m³/d (+1.8 %; between 0.0 and +1.8 % over five release layouts, with no trend in the number of particles); plain particles, which lose weight only to the wells, over-count 2.6 times. Evidence: Table 4; NS §3, Table 3; `output/prt_comparison.csv`.
-- Why the first PRT runs delivered too little (53 % and 82 %): particle weight dropped in well cells that take only part of the cell's outflow (+720 m³/d), and particles trapped at the water table (−1,300 m³/d at the water table vs mid-cell). Both were defects of an earlier version of the PRT post-processing routine, not of either method. Evidence: NS §3 table "first well cell only vs weight followed on"; `output/prt_diagnosis.csv`; `tests/test_prt.py::test_capture_along_paths_follows_weight_past_partial_sinks`.
-- The source split differs by method (stream 43 % vs 51 %), from reaches 0.4–1.3 km from the wells. Evidence: NS §3; `output/prt_sources_by_well.csv`.
-- F zones against the weight-losing PRT zone P > 0.5 (691 start cells), the particle reference zone as the dispersion study defines it (SI; NS §5, Table 3a; Fig. S1b–d). F > 0.1 covers 87 % of the PRT zone and misses 89 cells, 86 of them in the U cluster, most in a narrow strip about 1.5 km long west of the U wells (Fig. S1b). 87 of the 89 receive only recharge; their median F is 0.066, their source terms total 350 m³/d (276 m³/d recharge), and PRT delivers 227 m³/d of it to the wells (6 % of 3,736 m³/d). The F > 0.5 area lies 92 % inside the PRT zone. Two caveats: PRT was seeded only where F > 1e-6, so the PRT zone can lie only inside F's own support (all 2,139 start cells with F > 0.1 were seeded), and the 87 % coverage is an upper bound: an unseeded cell that would have P > 0.5 would be one more missed cell; and weight-losing particles share full mixing at weak sinks, so the reference is not an independent advective zone and the test covers only the spreading between sinks. Evidence: `studies/neversink/net_and_envelope.py`; `output/envelope_prt.csv`, `envelope_prt_notes.csv`.
-- Reproducing the published cells: recharge and stream flows on the top face where it is open (IFLOWFACE), dry starts draped, particles stopped at weak sinks: 99.0 % end in the same cell, overlap 0.998; MF6 default conventions 0.62–0.65. Evidence: Table 4; NS §3 reproduction table; `output/mp7_reproduction.csv`.
+- Model: storage, seasonal recharge (×1.8, 1.0, 0.1, 1.1) and pumping (640–1,120 m³/d), 3 years of 3 steps per season.
+- Output:
+  - seasonal F maps;
+  - the well's water by source per season (in summer 52.5 % comes from storage);
+  - min, mean and max F;
+  - always, sometimes and never;
+  - nested protection zones:
+    - inner (always F > 0.5): 0.52 km²;
+    - seasonal (sometimes F > 0.5): 0.93 km²;
+    - outer envelope (max F ≥ 0.1): 1.86 km², of which 0.41 km² lies outside the other two;
+    - [tutorial] use one threshold form.
+- Check: the step-by-step statistics equal a brute-force calculation over the stored steps (10⁻¹⁴). Every snapshot closes.
+- Limit:
+  - snapshots have no travel lag;
+  - storage hides the true source;
+  - equal weighting of steps of different length distorts the mean.
+- Figure: four seasonal F maps over the protection-zone composite.
+- [tutorial]:
+  - use strict thresholds as the paper does;
+  - print the per-season areas quoted in the text;
+  - one HTML-only table.
 
-**Streams.**
-- Streams as cells: 57 % recharge, 43 % stream leakage. Stream network (SFR reaches as extra cells linked by stream routing): 100 % recharge; the area extends upstream along streams; 8 small flow loops solved exactly; trace 2.6 s. Evidence: NS §4; `output/sources_cells.csv`, `sources_sfr_network.csv`, `checks_sfr_network.csv`.
+#### 4.6 How old is the water reaching the well? (tutorial 06)
 
-**Ensemble at base pumping.**
-- Rebuilt PEST interface; 358 realisations; closure ≤ 3e-12 m³/d in each; stream share 30–45 %. Evidence: NS §6.
-- The published Monte Carlo contributing areas lie one row south of their cells and are ordered by run numbers sorted alphabetically (100 before 10); with both corrected, PRT with the published conventions matches the published area of each of the 60 realisations tested (median overlap 0.996). Evidence: NS §6; `studies/neversink/mc_masks.py`; `output/scenarios/mechanisms60/mask_matches.csv`.
-- Mean F vs published probability of contribution: r = 0.80, ratio of expected areas 0.90, overlap 0.48 for the zones > 0.5; stream network 1.51 times the area. Evidence: Table 5; NS Table 4; `output/ensemble/probability_comparison.csv`.
-- In the S region the published area varies between realisations with a coefficient of variation of 32 %, follows PRT (r = 0.997) but not the sum of F (r = 0.00). Evidence: NS §6.
+- Output:
+  - mean travel-time map;
+  - 5-year and 25-year time-of-travel zones (0.098 and 0.455 km²);
+  - age by source (river 2 years, recharge 42 years, west edge 108 years);
+  - porosity scaling without a rerun.
+- Check against MODFLOW 6 PRT. The particles are weight-losing: they lose weight at weak sinks as full mixing does.
+  - All water: 45.7 against 45.9 years (−0.5 %). This overall agreement follows largely from the volume identity, so it is not an independent test of travel times.
+  - By source: recharge −2.1 %, west edge +2.1 %, river −20 %.
+  - 799.9 of 800 m³/d captured.
+  - Per cell, the informative comparison: the PRT/full-mixing time ratio is near 1 in the core (median 0.96) and large at the zone edge (median 5.7).
+- Internal identity: ΣVF/Q equals the flow-weighted mean time, up to the budget residual.
+- Limit:
+  - mean time, not first arrival;
+  - 50 m cells cannot resolve 50-day zones;
+  - zone edges disagree with particles.
+- Figure: travel-time map with zone contours, beside the PRT scatter.
+- [tutorial]:
+  - the zone comparison uses the time to the well instead of the time to the well cell, and should use the latter;
+  - "a little larger" should be +24 %;
+  - "flux-weighted" should become "flow-weighted".
 
-**Pumping scenarios and growth mechanisms.**
-- Scenario pumping rule inferred from the published Monte Carlo areas (root-mean-square misfit of the log area ratios 0.05), each realisation's well multipliers kept. Evidence: NS §7; `scenarios.py`.
-- Median areas within 10 % of published across five rates. Evidence: Table 6; NS Table 5; `output/scenarios/area_table.csv`.
-- Area growth 4.09 vs pumping growth 3.68: the stream share falls 42 % → 28 %; the recharge reaching the wells grows 4.57 times, and the area per unit of that recharge falls 11 %; r = 0.94 across realisations. Evidence: NS §7; `output/scenarios/source_table.csv`.
-- Where the stream water changes: 72 % of the increase is a larger share of the leakage from reaches already losing that reaches the wells; 18 % comes from reaches switching to losing; most of the extra pumping is recharge that discharged to streams at base pumping. Evidence: NS §7; `output/scenarios/mechanisms60/growth_decomposition.csv`, `stream_by_state.csv`, `stream_by_distance.csv`.
-- Why the published area grows more slowly: one convention at a time (Table 7; NS Table 6); stopping particles in buried stream cells where the reach is a weak sink takes growth from 4.76 to 3.83. Evidence: Table 7; NS Table 6; `mechanisms60/stream_stops.csv`.
-- Why weight-losing particles grow faster than full mixing: a 10 % shortfall at base pumping from reaches near the U wells whose leakage only partly reaches the wells, gone at higher pumping. Supporting information. Evidence: SI; NS §7, Table 7; `output/scenarios/advective_growth/`.
+#### 4.7 What if the water passes through streams, drains, wells or other models? (tutorial 07)
 
-### 5.6 Discussion
+- Output:
+  - with streams as cells, 32 % of the well's water is "stream water";
+  - with SFR reaches and the mover as a network, that water resolves into upstream inflow and recharge, and the drained areas join the contributing area;
+  - 188 of 800 m³/d passes through the mover;
+  - a weakly pumped multi-aquifer well (10 m³/d, screened in all three layers) carries 14.3 m³/d of shallow water down to the deep supply well.
+- Check: a model split into three models matches the single model (F to 2 × 10⁻¹³). Closure holds on both graphs.
+- Limit:
+  - movers between models are not read;
+  - flux outputs are not defined on package nodes;
+  - the PRT helper is single-model only;
+  - the save options are required.
+- Figure: F with streams as cells | F with the network | F per reach.
+- [tutorial]:
+  - the 10⁻¹³ agreement is called "the solver tolerance" (the paper uses 7.4 × 10⁻¹⁰ for the test models); reconcile;
+  - print the closure value;
+  - remove the PLAN.md references.
 
-- **Full mixing or particles.** Same water totals, different paths. Full mixing gives exact budgets, weak-sink shares and many destinations in seconds; particles give advective paths and first arrival. Use F = 0.5 for an advective core and particles where zones are small [EA19]. Evidence: DS §5; NS §3, §5.
-- **Particle conventions matter as much as the method.** On overlap with the published cells, weight loss at sinks (0.29 vs 0.62, flow-weighted particles) and face assignment (0.65 vs 0.998, particles from the published starts) each move the result by about a third, as much as or more than the switch from weight-losing particles to full mixing (0.62 vs 0.30–0.41). Release depth changes the flow particles deliver by a third (2,413 vs 3,736 m³/d), while full mixing and weight-losing particles agree on it within 2 %. A delineation should state release position, stopping rule and face convention. Evidence: Table 4 (NS Table 3 and §3 reproduction table); NS §5.
-- **Thresholds.** In the synthetic tests the F ≥ 0.1 zone contained the reference zone (analytical, or fine-grid PRT) in every run, missing at most 0.1 % of it (DS) (an area share, taken where no method mixes at weak sinks). On Neversink the F > 0.1 area is not a full envelope. It misses 27 % of the published cells, whose particles stop at every weak sink, and 13 % of the weight-losing PRT zone P > 0.5, whose particles do not (89 cells, 6 % of the water PRT delivers to the wells). The F > 0.5 area stays a core (92 % inside the PRT zone). Because the PRT reference shares full mixing at weak sinks and was seeded only where F > 1e-6 (§5.5), this tests only the spreading between sinks. Present F ≥ 0.1 as a wide zone that contained the reference in the synthetic tests but not fully on Neversink. Evidence: DS §5; NS §5, Table 3a.
-- **Net accounting and the published counts.** Net accounting brings the sum of F close to the published count (978 vs 980; gross 910) and raises the overlap at F > 0.5 from 0.41 to 0.44; at F > 0.1 it is about the same (0.28 vs 0.30). The match does not hold per well: at the three strong-sink wells both modes fall short of the published count (about 410 vs 514 cells), and at the five weak-sink wells net accounting exceeds it (U___7 214 vs 58, U___8 249 vs 163) while gross accounting is closer (502 vs 466 in all). The group-level match is therefore partly differences of both signs cancelling. One possible reading, not tested: stopping a particle at the first weak sink credits all the water reaching the well cell to the well, as net accounting does; the per-well counts do not support it. Evidence: NS §2, Table 2b; `net_vs_gross_mp7.csv`.
-- **Snapshots or tracking.** Snapshots say where a step's water enters under that step's flows, in seconds and without porosity. Tracking says when it arrives and how much of the pumped water was already stored. On tutorial 08, snapshots credit the well with 12 % west-edge inflow on average, but tracked, none arrives within 30 years, and 68 % of the water pumped over the 30 years was already in the aquifer at the start. It needs porosity, every time step saved, and one (steps × cells) array per group. Where porosity and specific yield differ, the two volume options differ (tutorial 08: 2e-4 forward, 4e-3 backward); check this when a result is close to a decision threshold. Evidence: tutorial 08 §§2, 7; PLAN 4B.
-- **Full mixing or a GWT run.** With GWT's volumes and time steps, forward tracking equals a GWT unit-concentration run (tutorial 08: 9.8e-14 at one transport step per flow step). The post-processor adds the backward run, all tags in one solve per step, and the checks. GWT adds dispersion and reactions. Evidence: §5.4; `tracking.py` docstring; [BED24, LAN22].
-- **Streams.** Streams as cells answers "which package delivers the water"; the stream network answers "where did the water enter". With streams as cells, the fall in stream share explains most of the faster area growth (r = 0.94 across realisations). Evidence: NS §4–5, §7.
-- **Ensembles.** Realisation-to-realisation variation of a published particle-tracked area can come from the particle conventions rather than from differences in the water reaching the wells (S region). Evidence: NS §6.
-- **Reproducibility of published benchmarks.** Two bookkeeping offsets in the published Monte Carlo contributing areas had to be inferred; archive the steps that write the contributing-area files. Brief, neutral. Evidence: NS §6, §8.
+#### 4.8 How much of the pumped water arrived since the start? (tutorial 08)
 
-### 5.7 Limitations
+- Model: the seasonal model run for 30 years, 1 step per season (121 steps), porosity 0.3.
+- Output:
+  - the well's water by origin through time (initial water 52 % at year 30);
+  - backward fate maps (share reaching the well within 30 years, the river, or still stored);
+  - snapshot shares against tracked shares, so the snapshot error is visible.
+- Check against MODFLOW 6 GWT: 9.8 × 10⁻¹⁴ over 1,600 cells and 121 steps, with GWT's water volumes and the recharge tag.
+  - The default volumes keep every cell's water balance exact. They differ from GWT's by up to 1.9 × 10⁻⁴ in the forward fraction and 3.7 × 10⁻³ in the backward fraction.
+- Internal identities: forward–backward agreement (2.9 × 10⁻¹⁶); every tagged balance closes.
+- Limit:
+  - every step must be saved;
+  - porosity is needed;
+  - long steps make early arrival too early, so sub-steps are needed;
+  - memory grows with the number of steps.
+- Figure: the current Fig. 4.
+- [tutorial]: the notebook uses 1 sub-step; the paper's Fig. 4 uses 4. Pick one and align the numbers (river share at year 1, cumulative initial water). Print the snapshot means (60/12/15/13 %).
 
-- Full mixing is grid-dependent (transition band ~h^0.5); face-to-face routing removes 35–70 % of the excess but is 2D and experimental. Evidence: DS §4, §6.
-- Steady and snapshot results have no travel lag; transient tracking is advection only, with upstream weighting and implicit time steps, and is verified and demonstrated on synthetic models only (§5.4); the paper has no real-model transient application. Every time step must be saved (OC BUDGET ALL), and memory is one (steps × cells) array per group and output, about 1.6 GB per array at 1.68 million cells and 121 steps (float64, as `tracking.py` stores the series). Evidence: PLAN §2.7, Phase 4B notes; DS §3; NS §1.
-- The Neversink comparison is on the uppermost active layer only; the scenario rule and the pairing of published areas with realisations are inferred; the maxrange scenario (each priority well's rate drawn at random between its base and maximum rate, independently per well and realisation) is reproduced in distribution only. Evidence: NS §8.
-- Some mechanism statements are inferred, not traced cell by cell (leakage staying on flow lines; narrow paths in Fig. 8). Evidence: NS §6, §7, §8.
-- MF6 PRT aborts in cells wet only by a thin film (one start left out); a reproducer is prepared, not yet reported upstream. Evidence: NS §8; `studies/neversink/prt_film_repro/`.
-- PRT supports DIS and DISV only; for DISU there are full-mixing travel times only. Evidence: PLAN §2.8.
+#### 4.9 How sure are we? (tutorial 09)
 
-### 5.8 Conclusions
+- Model: 20 random-K realisations (prior, K = 5·exp(0.8 z)).
+- Output:
+  - P(F > 0.5) and P(F > 0.1) maps;
+  - a zone at a stated risk level;
+  - spread of the river share (0.7–27 %) and travel time (36–54 years, 5–95 %);
+  - traced in 0.84 s for all 20.
+- Main finding: parameter uncertainty dominates the integral answers (area, shares, travel time). But the uncertain edge band from the ensemble (0.77 km²) is about the same size as the band from mixing in one model (0.80 km²).
+- Checks:
+  - exact against histogram quantiles, within one bin width for values inside the histogram range (45 cells fell above it, unbounded);
+  - ΣP·A = mean area;
+  - serial and parallel runs bit-identical.
+- Limit:
+  - memory for exact quantiles: 4 GB per series for 1,000 realisations of 1 million cells, 24 GB for the six series of this example;
+  - the same grid is needed in every realisation;
+  - prior only.
+- Figure: probability maps beside the source-share box plot.
+- [tutorial]:
+  - the PEST++ section is "described, not run": either run it or drop it from the paper;
+  - the grid-and-mixing column is hard-coded text;
+  - the travel-time range is quoted two ways.
 
-- Four or five sentences mirroring the key messages.
+### 3.5 A regional model: Neversink (about 600 words, one figure)
 
-### 5.9 Code and data availability
+- **Model.** USGS Neversink/Rondout model (Fienen et al. 2022; Corson-Dosch et al. 2022):
+  - 4 layers of 680 × 619 cells of 50 m (1.68 million cells), 12,316 SFR reaches;
+  - 8 priority wells pumping 3,671 m³/d;
+  - the calibrated model and its 358-realisation ensemble.
+- **Cost.**
+  - One trace of nine destination groups (each well alone and all eight together) takes 2–3 s, about 1 s of it reading the budget file.
+  - The MODFLOW 6 run takes 44 s. PRT takes about 30 s when it writes end points only, and 5–13 min with full tracks.
+  - Closure to 10⁻¹² m³/d.
+  - The 358 realisations took 76 min on six processes. Per realisation, that is about 50 s of MODFLOW 6 and about 9 s for two traces.
+- **Practitioner output.**
+  - ensemble mean F, correlated with the published probability of contribution at r = 0.80;
+  - expected area 90 % of the published one;
+  - the stream share of the wells' water (43 %), which traces to recharge with the stream network.
+- **Why our areas differ from the published ones (prose, about 250 words).**
+  1. The published area is where each start cell's single particle stops. Three particle settings decide it: recharge and stream flows enter at the top face, particles stop at every weak sink, and particles in dry cells are draped. PRT reproduces it (overlap 0.998) only with all three.
+  2. On the same flow field, particle settings alone move the overlap from 0.62 to 0.998.
+  3. Full mixing splits each cell's water among all its outflows, so its areas are wider and more diffuse. The published cells send on average 42 % of their water to the wells. F > 0.1 is the counterpart of a particle area, not F > 0.5. F > 0.1 holds 87 % of the area of particles that lose water at sinks as full mixing does.
+  4. At weak-sink wells and buried stream cells, particles stop and credit all their water to the sink. Full mixing passes the rest on.
+  5. Gross or net accounting changes the overlap little (0.41 to 0.44).
+  6. With the stream network, stream water traces to recharge upstream, and the area grows.
 
-- `gwsource` (MIT) on GitHub, with tests, tutorials and the study scripts (`studies/neversink/`, `studies/dispersion/`); archive a release on Zenodo with a DOI [check].
-- Neversink model and MODPATH outputs: USGS, `github.com/usgs/neversink_workflow` (CC0) and data release doi 10.5066/P9HWSOHP.
-- Software versions: MF6 6.9 development build and FloPy `develop` [check: pin to released versions before submission, PLAN D3].
-- Generated tables in `studies/neversink/output/` are not tracked; deposit the CSVs behind every table and figure with the release.
+  Do not write that full mixing lies "within the range" of particle results. With water-conserving runs only, it lies below it (0.30–0.41 against 0.62–0.998). Mark points 3 and 6 as interpretation where they are inferred.
+- **Figure.** One row in the U-cluster window:
+  - (a) F with the published outline;
+  - (b) F > 0.1 against the published cells;
+  - (c) F > 0.1 against the particle P > 0.5 area;
+  - (d) ensemble mean F;
+  - a locator inset replaces the current Fig. 5.
+- **To the SI.** The current §5 in full, with Figs 5–9 and Figures S2–S3: the reproduction table, end states, net attribution, ensemble statistics and pumping scenarios.
+  - Decision: drop or keep the pumping scenarios (Fig. 9, Tables S5–S6, Text S11, Figure S3).
+  - Text S10 stays in either case, because it holds the Monte Carlo offsets that the ensemble comparison needs.
 
-## 6. Figures and tables
+### 3.6 Trade-offs and limitations (about 900 words)
 
-Figures are numbered in the order of §5: method and verification (Figs 1–3), transient demonstration (Fig. 4), Neversink (Figs 5–9, previously 4–8; the former Fig. 10 is now Fig. S3).
+One paragraph each, with the numbers from the examples:
 
-| # | content | status | source |
-|---|---|---|---|
-| Fig. 1 | Schematic: a cell with cell-to-cell flows and source/sink terms; backward and forward systems; gross vs net accounting on a weak-sink cell; (d) a transient cell: snapshot (storage release as a source with no origin) against transient tracking (stored water and inflows mixed, carried to the next step) | made | `docs/paper/figures/fig1_method_schematic.png` / `.pdf`; code `studies/paper/method_figures.py` |
-| Fig. 2 | Verification summary in two blocks. Steady and snapshot checks: closure, forward–backward and boundary control over test models; steady G vs GWT at equilibrium (models 1, 2, 7); DIS/DISU/split agreement; PRT; [FB13]. Transient tracking checks: tracking vs GWT, forward–backward in time (models 6, 6 split, 7, 9), "flow" water and tagged-water balances, the model 10 steady limit, sub-steps vs refined steps | made | `docs/paper/figures/fig2_verification.png` / `.pdf`; code `studies/paper/method_figures.py` |
-| Fig. 3 | Numerical dispersion: transition-band width and area error against cell size | made | `docs/paper/figures/fig3_numerical_dispersion.png` / `.pdf`; code `studies/paper/method_figures.py` |
-| Fig. 4 | Transient demonstration (tutorial 08): the well's water by origin over 30 years, snapshot shares against tracked shares (initial water, recharge, river, west edge); the steady F of the first step; and maps of the backward fractions in time at the start (to the well within 30 years, to the river, still stored) | made | `docs/paper/figures/fig4_transient_tracking.png` / `.pdf`; code `studies/paper/transient_figure.py` (model `tutorials/herebedragons.py::build_transient`, tutorial 08 helpers) |
-| Fig. 5 | Neversink model, wells, regions and published contributing cells (location map) | made | `docs/paper/figures/fig5_location_map.png` / `.pdf`; code `studies/paper/neversink_figures.py` |
-| Fig. 6 | F with published cells; streams as cells and as a stream network | made | `docs/paper/figures/fig6_capture_maps.png` / `.pdf`; code `studies/paper/neversink_figures.py` |
-| Fig. 7 | Overlap with the published contributing cells by method and convention (full-mixing thresholds; PRT plain and weight-losing, release depth; PRT from MF6 default to published conventions) | made | `docs/paper/figures/fig7_agreement.png` / `.pdf`; code `studies/paper/neversink_figures.py` |
-| Fig. 8 | Published probability of contribution vs ensemble mean F (streams as cells, stream network) | made | `docs/paper/figures/fig8_probability_maps.png` / `.pdf`; code `studies/paper/neversink_figures.py` |
-| Fig. 9 | Area growth against pumping: published, full mixing, stream network, PRT with published conventions | made; SI candidate | `docs/paper/figures/fig9_area_growth.png` / `.pdf`; code `studies/paper/neversink_figures.py` |
-| Fig. S3 (formerly Fig. 10) | Growth mechanism: stream share vs pumping, and area-growth excess vs stream-share drop across realisations (r = 0.94) | made; in SI | `docs/paper/figures/figS3_growth_mechanism.png` / `.pdf`; code `studies/paper/neversink_figures.py` |
-| Table 1 | Comparison of the reference method, this formulation, GWT unit concentration [BED24, LAN22] and hydraulic mixing cells [PAR11]. Rows: what is solved and how, mixing in a cell, accounting at weak sinks, flow loops, outputs; transient: carried through storage?; backward in time?; destinations or sources per solve; built-in water-budget checks; grids and packages; open implementation. MODALL [POT08] in a footnote only. The [PAR11] column rests on its full text and describes [PAR11] itself, with later versions in a footnote; cells resting on an abstract are marked [check] | made | `docs/paper/figures/table1_methods.md` (caption, table, footnotes, sources per cell); PLAN §1 table; `references/SUMMARY.md` §2, §5; §7 item 10 |
-| Table 2 | Verification checks with tolerance and observed error, in two parts (steady and snapshot checks; transient tracking checks, as in Fig. 2) | made | `docs/paper/figures/verification_table.md` / `.csv`; code `studies/paper/verification.py` |
-| Table 3 | Calibrated model vs published cells (counts, overlap) | exists | NS Table 1 |
-| Table 4 | Particle tracking variants: overlap, expected cells, flow reaching the wells | exists | NS Table 3 plus reproduction table |
-| Table 5 | Ensemble comparison | exists; SI candidate | NS Table 4 |
-| Table 6 | Median areas by scenario | exists; SI candidate | NS Table 5 |
-| Table 7 | One convention at a time: areas at base and maximum pumping | exists; SI candidate | NS Table 6 |
-| Fig. S1 | Numerical dispersion maps (problems A and B, 50 m cells) and transport sub-steps (DS Figs 1, 3, 5 redrawn) | made | `docs/paper/figures/figS1_numerical_dispersion.png` / `.pdf`; code `studies/paper/si_dispersion_figure.py` |
-| Fig. S2 | Gross vs net attribution per well (a); maps of the PRT-zone cells missed by F > 0.1 (b–d) | made | `docs/paper/figures/figS2_net_and_envelope.png` / `.pdf`; code `studies/paper/si_figures.py` |
-| SI | Per-well table (NS Table 2); end states; PRT diagnosis; NS Table 7; gross vs net and envelope tables (NS Tables 2a–2b, 3a); dispersion maps and transient sub-steps (DS Figs 1, 3, 5) | exist | NS, DS |
+1. **Full mixing against particles.**
+   - Areas are wider and more diffuse. The band width narrows with cell size h, roughly as h^0.5.
+   - On the dispersion-study problems, F ≥ 0.5 is within 5 % of the advective area at cells of 50 m or less. F ≥ 0.1 contains it but is larger.
+   - On Neversink, F > 0.1 misses 27 % of the published cells and 13 % of the particle P > 0.5 cells. So "contains" does not hold in general.
+   - Use particles where a sharp edge matters. Use full mixing for coverage, any grid, networks and ensembles.
+   - (Dispersion study; §4.1, §4.6, §4.9, §5.)
+2. **Choosing a threshold.** A judgement that depends on the purpose; state it.
+3. **Weak sinks.** Gross against net, and what each answers (§4.2).
+4. **Snapshots, transient tracking or GWT.** Snapshots are cheap but have no travel lag. Tracking needs every step saved and porosity. GWT is the reference transport (§4.5, §4.8).
+5. **Memory and cost.**
+   - Transient series and exact ensemble quantiles grow with steps and realisations.
+   - Histogram quantiles bound the memory (§4.8, §4.9).
+   - On Neversink, the peak was 2.5 GB, plus about 0.19 GB per extra group.
+6. **What the code does not read.** Movers between models, PRT on DISU, flux outputs on package nodes (§4.4, §4.7).
 
-## 7. Claims–evidence gaps (priority order)
+Reuse: current §6.1–6.4 and §7, cut to the trade-offs (they currently lean on Neversink). Fig. 12: the current Fig. 3 (numerical dispersion), or move it to the SI.
 
-1. **Scripts for the five-layout analysis are missing.** NS §3 says the five-layout analysis of the +1.8 % excess "was a one-off analysis; its scripts are not in the repository". Add them (or drop the claim) before the paper cites it.
-2. **Threshold guidance on Neversink against a non-stopping reference.** Done: F > 0.1 covers 87 % of the weight-losing PRT zone P > 0.5, and the F > 0.5 area is 92 % inside it, within the two caveats of §5.5 (NS §5, Table 3a; Fig. S1b–d). Evidence: `studies/neversink/net_and_envelope.py`; `output/envelope_prt.csv`, `envelope_prt_notes.csv`.
-3. **Gross vs net on Neversink.** Done: net accounting credits the eight wells with 1.07 times their pumping, U___7 with 2.26 times and SV_487 with 1.43 times (NS §2, Tables 2a–2b; Fig. S1a). Evidence: `studies/neversink/net_and_envelope.py`; `output/net_vs_gross_wells.csv`, `net_vs_gross_mp7.csv`, `net_vs_gross_cell_classes.csv`.
-4. **Verification table and figure.** Done. `studies/paper/verification.py` collects the steady checks, the snapshot steps, steady G vs GWT at equilibrium (models 1, 2: ≤ 2.8e-11; model 7: 1.0e-8, flow-solve limited) and the transient tracking checks: tracking vs GWT, forward–backward in time (models 6, 6 split into 4, 7, 9; ≤ 7.7e-16), "flow" water balance per cell (≤ 9.5e-17) and tagged-water balance per group (≤ 1.0e-15), the model 10 steady limit (c to G 9.7e-14, w to F 6.8e-10) and sub-steps vs refined steps (1.6e-16) (Table 2, Fig. 2).
-5. **Travel time on Neversink.** The published MODPATH runs have travel times and PRT agrees with them within 1 % (NS §3), but full-mixing mean travel times were not compared. Needed only if the paper keeps travel time in scope.
-6. **Inferred mechanisms.** Leakage staying on flow lines to the wells (NS §7) and the narrow-path reading of Fig. 8 (NS §6) are inferred. Either trace one reach cell by cell or word them as interpretation.
-7. **Transient demonstration figure from tutorial 08.** Done: Fig. 4 (§5.4, §6), made by `studies/paper/transient_figure.py` with four transport sub-steps per flow step and the default water volumes; every caption number is asserted before plotting. Neversink is steady state (NS §1), so the paper has no real-model transient application; §5.7 says so.
-8. **References missing from `references/bibliography.md`:** MF6 PRT documentation, FloPy, PEST++/iES, Javandel & Tsang (1986) (cited only inline in DS), Mf6Splitter, Nogueira et al. (2022, doi 10.5194/hess-26-1883-2022), Partington et al. (2013, *Water Resources Research* 49, 5501–5519, doi 10.1002/wrcr.20405; read), Schilling et al. (2017, *Water Resources Research*, doi 10.1002/2017WR020754; not read, known from Aquanty's research summary), Partington et al. (2012, *J. Hydrol.* 458–459, 28–39; read), Campana & Simpson (1984, *J. Hydrol.* 72, 171–185), Tosco et al. (2010, *Ground Water Monitoring & Remediation* 30(2), 46–52; read) and the Bedekar et al. (2023) CWEMF slides on the unit-concentration method (read), all cited in Table 1; Nogueira et al. (2022), Partington et al. (2013) and Schilling et al. (2017) also in §1 and §5.2. Add before drafting. Okkonen (2016, *Water Resources Research*, doi 10.1002/2016WR018715) is not cited; see item 10.
-9. **Report the PRT abort in thin-film cells upstream** (NS §8) so the paper can cite the issue.
-10. **[PAR11], its later versions, [BED24] and [POT08]: hydraulic mixing cells answered from the full texts (2026-10-10); [BED24] answered in part from the authors' 2023 slides; the [BED24] paper and [POT08] still open (paywalled).** Sources per cell are in `docs/paper/figures/table1_methods.md`.
-    - [PAR11], read in full (authors' manuscript, local text): forward in time only, an explicit update from the previous step's fractions on the flow model's own steps (§3.1, Eqs 8–9), stable only while a step's inflow or outflow volume does not exceed the cell's storage. No direct or steady solve, no sub-steps, no backward mode. Mixing cells are stream cells of the surface domain only, with a modified mixing cell (Campana & Simpson 1984) that tends to full mixing as the step goes to 0 (Eqs 9–10). Checks: relative error from the sum of fractions (Eq. 13) and a global volume error against total exfiltration on gaining reaches (Eq. 14).
-    - Partington et al. (2012), read in full (authors' manuscript): applies the [PAR11] method unchanged, built into a version of HydroGeoSphere (§2.2), as the control for testing baseflow separation methods. Nothing new on the mixing cell.
-    - Partington et al. (2013), read in full: still forward and explicit, with no backward or steady solve. It adds overland-flow fractions and, for stability, sub-time-steps: where outflow over a step exceeds a cell's storage at the start of the step (HMC ratio > 1, Eq. 2), the step is split into s = [max. HMC ratio] + 1 sub-steps (Eqs 3–9; as printed, Eq. 4 gives the last sub-step a zero share, which looks like a typo). Cells that meet any of five criteria are reset to a tracked "reset" fraction (§3.3.3). Checks: the error |1 − Σf| per cell, and the reset fraction, initial fraction and cumulative mass-balance error as shares of the streamflow volume at the catchment outlet and six observation points (at most 0.41 %, 0.05 % and 0.9 %, para. 59). The mixing cells are stream and overland cells of the surface domain only; subsurface tracking is recommended as future work (§6, para. 73).
-    - Aquifer cells: Schilling et al. (2017), as Aquanty's research summary describes it (not read), and Nogueira et al. (2022, Sect. 2.2, Eq. 1), which describes forward updates only. Read Schilling et al. (2017) before submission if §1 keeps citing it.
-    - [BED24]: the paper is paywalled; abstract only. It assigns concentration 1 to the source water assessed and 0 to all other water, reads the concentration as each source's contribution to sinks, and lists source allocation, well capture analysis and mixing/dilution as uses. The authors' 2023 CWEMF slides on the same method, read in full, show well source analysis as four forward transient runs, one per source (lateral inflow, recharge, storage, stream), over 25 years. They name no code and say nothing of dispersion, weak sinks, budget checks or backward use. So the GWT backward-in-time cell of Table 1 keeps its [check] until the paper is read.
-    - MODALL linear system: still open; [POT08] is paywalled. Its abstract, [CHO16] (§2.3.3, p. 103) and [FB13, BF13] say it is steady-state only, assumes full mixing, gives fractions from sources or to sinks and does not use the reference method's flow-order sort; none says how it solves. Tosco et al. (2010, read in full) cite it only as one of several tools for choosing wells and pumping rates. So it has no column in Table 1, only a footnote.
-    - GWT steady state: the MST package is required (MF6 6.9.0.dev0 stops without it), so Table 1 keeps the [LAN22] wording (no steady-state option). With MST porosity 0, one transport step on model 1 gave C = G to 9.7 × 10⁻¹³ (Table 1, footnote 2); this use is not documented in [LAN22].
-    - The backward-in-time claim in §1 and §5.2 holds against everything read: [PAR11], Partington et al. (2012, 2013), Nogueira et al. (2022) and the 2023 slides all step forward only, and MODALL is steady only by the secondary accounts. Okkonen (2016), seen only in a search summary, appears to be a continuous adjoint method for capture zones; check whether it belongs with [NW99, CP06].
-    - To close the item: read [BED24] and [POT08] in full (library access), and Schilling et al. (2017).
-11. **Transient tracking cost on a large model.** The only timings are tutorial 08 (1,600 cells, 121 steps: 0.75 s forward, 0.80 s backward). Time one large transient run, or state the memory and time scaling only.
-12. **Steady forward fractions against GWT.** Done: `tests/test_gwt_equilibrium.py` runs GWT to equilibrium on the steady flows of models 1, 2 and 7; max |C − G| ≤ 2.8e-11 on models 1 and 2, 1.0e-8 on model 7 (flow-solve limited; 2.5e-11 solved tightly). Table 2 and Fig. 2 show it, so key message 1 can state the agreement directly.
+### 3.7 Conclusions (about 300 words)
 
-## 8. Reference skeleton
+The five key messages of section 2, one short paragraph each.
 
-Keys as in `references/bibliography.md`, which holds the full entries. The titles of [FB13], [BF13], [BFW21] and [DAL22] contain the product name, which this repository's naming test forbids, so they are not repeated here.
+### 3.8 Code and data availability (about 150 words)
 
-- **Reference method:** [FB13] Foley & Black 2013 and [BF13] Black & Foley 2013 (MODFLOW and More 2013 proceedings; page ranges from secondary citations [check]); [BFW21] Black, Foley & Witterick 2021 (slides; cite for the later fraction-from definition and for forward mode as an Eulerian transport tool, forward fraction = C/C0); [DAL22] Daley et al. 2022 (poster; the 2020 version); [EA19] Environment Agency 2019 (SPZ manual); [MAU21] Maurice et al. 2021; [CHO16] Chowdhury 2016 (thesis; face-to-face routing).
-- **Related flux-based and transport methods:** [POT08] Potter et al. 2008 (MODALL); [MC09] McLane & Cecan 2009; [PAR11] Partington et al. 2011; [BED24] Bedekar et al. 2024; [PRY22] Pryet et al. 2022; [NW99] Neupauer & Wilson 1999; [GOO96] Goode 1996; [CP06] Cornaton & Perrochet 2006; [FRI02] Frind et al. 2002.
-- **Capture terminology:** [BAR18] Barlow, Leake & Fienen 2018; [LEA10] Leake, Reeves & Dickinson 2010.
-- **Particle tracking and MODFLOW 6:** [POL88] Pollock 1988; [POL16] Pollock 2016 (MODPATH 7); [LAN17] Langevin et al. 2017 (GWF); [LAN22] Langevin et al. 2022 (GWT); [MF6IO] input/output guide. Not yet in the bibliography [check]: MF6 PRT documentation; FloPy (Bakker et al. 2016; Hughes et al. 2024).
-- **Case study:** [COR22] Corson-Dosch et al. 2022; [FIE21] Fienen et al. 2021; USGS data release doi 10.5066/P9HWSOHP. Not yet in the bibliography [check]: PEST++ iES (White et al. 2020).
-- **Synthetic reference:** Javandel & Tsang 1986, Ground Water 24(5) (cited inline in DS only; add to the bibliography).
+The repository, the version used, the nine example notebooks with their run times, the Neversink scripts and the published model archive.
+
+## 4. Supporting Information
+
+- **Text S1:** sources by column (current Text S1).
+- **Text S2:** the method in full.
+  - Current §2.4 and §2.8, net accounting and flow loops.
+  - Current Texts S4–S6: solution of the linear systems, the travel-time identity, and the water-volume options.
+- **Text S3:**
+  - the example models in full: every builder, with the parameters needed to rebuild them without the code;
+  - the ten test models and the hand-built 15-cell network (current Text S3, si/C.md).
+- **Table S1 and Figure S1:** the verification on the test models (current Fig. 2 and Table S1).
+- **Text S4:** transient checks on the seasonal model (current Text S7), aligned with §4.8.
+- **Figure S2:** numerical dispersion (current Fig. 3 and Fig. S1), if it leaves the main text.
+- **Texts S5 onwards:** Neversink in full (current §5, Figs 5–9, Figures S2–S3, Tables S2–S6, Texts S8–S11).
+
+## 5. Work on the tutorials before drafting
+
+The paper and the notebooks must give the same numbers.
+
+1. **Rerun all nine notebooks** on the current code. Tutorial 02's outputs predate the net-accounting change of 2026-10-10.
+2. **Independent checks for tutorials 01 and 03.**
+   - 01: cite PRT from 06, or add a short PRT comparison.
+   - 03: add a GWT-at-equilibrium comparison.
+3. **Consistency fixes**, listed in each subsection above:
+   - the 06 travel-time end point;
+   - the 08 sub-steps;
+   - the 07 tolerance wording;
+   - the 09 PEST++ section and hard-coded text;
+   - strict thresholds in 05;
+   - HTML-only tables in 04 and 05.
+4. **Print every number the text quotes.** Several claims are currently read off plots.
+5. **Terms.** Use "flow loops", "flow-weighted", "weight-losing particles" and "net accounting" (not "net mode"). Rows and columns should be 1-based in prose.
+6. **Remove references to `PLAN.md`** and other internal notes. They appear in tutorials 01, 02, 03, 04, 06, 07, 08 and 09.
+7. **Runtimes.** The README and the notebook headers disagree; print the measured times.
+
+## 6. Decisions for the author
+
+1. Name the notebooks once in the §4 opening, or only in §8?
+2. Verification:
+   - test-model table to the SI, with the main text using the example checks (suggested), or
+   - keep the current Fig. 2 in the main text.
+3. Neversink pumping scenarios: keep in the SI or drop.
+4. Tutorial 09's PEST++ section: run it, or leave it out of the paper. Use under the PEST++ run manager is untested so far.
+5. Title.
