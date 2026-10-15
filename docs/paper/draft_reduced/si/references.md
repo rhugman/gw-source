@@ -1,6 +1,6 @@
 ## References cited only in the Supporting Information
 
-<!-- Reduced draft: works cited in si/ but not in the main text, copied from the full draft list with their source comments. Works cited in both are in the main reference list. -->
+<!-- Reduced draft: works cited in si/ but not in the main text, copied from the full draft list with their source comments. Works cited in both are in the main reference list. SI round 1 removed Rushton (2003) and Tosco et al. (2010), which only the dropped literature notes cited. -->
 
 Black, A., and C. Foley. 2013. FlowSource: A program to efficiently delineate volumetric capture areas, pathways and source areas in groundwater models. In *Proceedings of MODFLOW and More 2013: Translating Science into Practice*, Golden, Colorado, June 2–5, 2013, 652–663. Golden, Colorado: IGWMC, Colorado School of Mines. https://groundwater-science.co.uk/wp-content/uploads/2013_FSv6_ApplicationPaper.pdf <!-- pages from a secondary citation: the reference list of Maurice et al. (2021), checked in references/docs/text/2021_Maurice_etal_Chalk_karst_groundwater_protection.txt; the proceedings were not seen -->
 
@@ -30,8 +30,4 @@ Partington, D., P. Brunner, S. Frei, C.T. Simmons, A.D. Werner, R. Therrien, H.R
 
 Provost, A.M., C.D. Langevin, and J.D. Hughes. 2017. Documentation for the "XT3D" option in the Node Property Flow (NPF) Package of MODFLOW 6. U.S. Geological Survey Techniques and Methods, book 6, chap. A56. Reston, Virginia: USGS. https://doi.org/10.3133/tm6A56 <!-- not in bibliography.md; suggested citation on the USGS Publications Warehouse page pubs.usgs.gov/publication/tm6A56 -->
 
-Rushton, K.R. 2003. *Groundwater Hydrology: Conceptual and Computational Models*. Chichester, UK: John Wiley and Sons. <!-- initials and place from library catalogue records (ISBN 978-0-470-85004-6); not in bibliography.md; from the reference lists of both 2013 conference papers (Foley and Black; Black and Foley), text copies in references/docs/text/; cited only in si/A.md:43 -->
-
 Schilling, O.S., C. Gerber, D.J. Partington, R. Purtschert, M.S. Brennwald, R. Kipfer, D. Hunkeler, and P. Brunner. 2017. Advancing physically-based flow simulations of alluvial systems through atmospheric noble gases and the novel ³⁷Ar tracer method. *Water Resources Research* 53, no. 12: 10465–10490. https://doi.org/10.1002/2017WR020754 <!-- not in bibliography.md; journal and DOI from docs/paper/outline.md §7 item 8; authors, title, volume, issue and pages from Crossref, checked against the article's HTML page (read in full) -->
-
-Tosco, T., A. Di Molfetta, and R. Sethi. 2010. Automatic delineation of capture zones for pump and treat systems: A case study in Piedmont, Italy. *Ground Water Monitoring & Remediation* 30, no. 2: 46–52. https://doi.org/10.1111/j.1745-6592.2010.01276.x <!-- not in bibliography.md; from the article, references/docs/text/2010_Tosco_etal_GWMR.txt (the DOI there is garbled by text extraction); DOI from Crossref -->

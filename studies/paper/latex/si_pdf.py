@@ -15,7 +15,9 @@ SI_HEADING = re.compile(r"^# Supporting Information.*$", re.M)
 HEADER_TEX = r"""\usepackage{newunicodechar}
 \newunicodechar{≤}{\ensuremath{\leq}}
 \newunicodechar{≥}{\ensuremath{\geq}}
-"""
+\usepackage{etoolbox}
+\AtBeginEnvironment{longtable}{\small}
+"""  # tables in a smaller font, as is usual for SI tables
 PANDOC_OPTS = ["--pdf-engine=xelatex", "-V", "mainfont=STIX Two Text", "-V", "mathfont=STIX Two Math",
                "-V", "monofont=Menlo", "-V", "geometry:margin=2.2cm", "-V", "fontsize=11pt",
                "-V", "colorlinks=true", "-V", "linestretch=1.15", "-f", "markdown-implicit_figures"]
