@@ -699,8 +699,9 @@ def weak_map(ax, hbd, data: dict, f: np.ndarray, layer: int, norm):
 def make_fig3(out_dir: Path, hbd, helpers, data: dict) -> list[Path]:
     """Fig. 3: the worked example and net against gross F of a weak sink (Section 4.2)."""
     fig = plt.figure(figsize=(mfig.FULL_WIDTH, 3.55))
-    ax_a = fig.add_axes((0.01, 0.03, 0.36, 0.86))
+    ax_a = fig.add_axes((0.01, 0.065, 0.36, 0.86))  # top at 0.925, level with panel (b)
     draw_worked_example(ax_a, helpers, data["fb13"]["f"])
+    ax_a.set_anchor("N")  # the equal-aspect drawing sits at the top of its box
     panel_title(ax_a, "(a) worked example, net F to cell A")
     norm = LogNorm(1e-3, 1.0)
     layer = data["weak_cellid"][0]
