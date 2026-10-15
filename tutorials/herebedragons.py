@@ -794,11 +794,13 @@ def run_gwt_tracer(
     porosity: float,
     tagged: tuple[str, ...] = ("rch",),
     strt: float | np.ndarray = 0.0,
+    ims_kwargs: dict | None = None,
 ) -> Path:
     """Run an MF6 GWT unit-tracer model on a DIS model's saved flows; return the UCN file.
 
     Upstream advection, no dispersion, FLOW_IMBALANCE_CORRECTION; every bound of the tagged
     packages (pnames) has concentration 1, all other inflow 0; strt tags the initial water.
+    ims_kwargs override GWT_IMS.
     """
     ws = Path(ws)
     ws.mkdir(parents=True, exist_ok=True)
@@ -810,7 +812,7 @@ def run_gwt_tracer(
         perioddata=[tuple(r) for r in tdis.perioddata.get_data()],
     )
     gwt = flopy.mf6.ModflowGwt(sim, modelname=name)
-    flopy.mf6.ModflowIms(sim, **GWT_IMS, filename=f"{name}.ims")
+    flopy.mf6.ModflowIms(sim, **{**GWT_IMS, **(ims_kwargs or {})}, filename=f"{name}.ims")
     dis = run.gwf.dis
     flopy.mf6.ModflowGwtdis(
         gwt, nlay=dis.nlay.get_data(), nrow=dis.nrow.get_data(), ncol=dis.ncol.get_data(),
