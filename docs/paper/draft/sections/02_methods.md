@@ -1,101 +1,87 @@
-# 2. Methods
+# 2. Method in brief
 
-## 2.1 Cells, flows, source and sink terms
+This section gives what a reader needs to read the outputs of the code. The derivations and the solution of the equations are given in the Supporting Information ({SI: method in full}).
 
-Each active cell is treated as fully mixed (Section 1). Cells exchange water through the cell-to-cell flows of the MODFLOW 6 budget file (FLOW-JA-FACE; Langevin et al. 2017). The flow from cell $i$ to its neighbour $j$ is $q_{ij} \ge 0$. All other budget terms, such as recharge, wells, rivers and storage, are kept separate by package and boundary. A term that brings water into a cell is a source term. A term that takes water out is a sink term. If $\mathrm{Src}_i$ and $\mathrm{Snk}_i$ are the totals of a cell's source and sink terms, its total inflow, total outflow and cell budget error are (Fig. 1a)
+## 2.1 Full mixing and the cell budget
+
+The method treats each active model cell as a fully mixed volume of water. The water in a cell leaves through each of its outflows in proportion to the size of that outflow. We refer to this as full mixing. <!-- evidence: docs/paper/terms.md (full mixing); src/gwsource/assemble.py (outflow shares q_ij / O_i) -->
+
+Cells exchange water through the cell-to-cell flows of the MODFLOW 6 budget file (FLOW-JA-FACE; Langevin et al. 2017). The flow from cell $i$ to its neighbour $j$ is $q_{ij} \ge 0$. All other budget terms, such as recharge, wells, rivers and storage, are kept separate by package and boundary. A term that brings water into a cell is a source term. A term that takes water out is a sink term. If $\mathrm{Src}_i$ and $\mathrm{Snk}_i$ are the totals of a cell's source and sink terms, its total inflow, total outflow and cell budget error are (Fig. 1a)
 
 $$I_i = \sum_j q_{ji} + \mathrm{Src}_i, \qquad O_i = \sum_j q_{ij} + \mathrm{Snk}_i, \qquad r_i = I_i - O_i. \tag{1}$$
 
-The cell budget error is reported and never forced to zero.
+The cell budget of a MODFLOW model never balances exactly, so $r_i$ is small but not zero. <!-- evidence: src/gwsource/diagnostics.py (cell_residual, budget_error) -->
 
-A trace is one solve of the method for chosen destinations or sources. The destination is the sink terms traced to, such as one well's pumping. Sink terms traced as one unit, such as all the wells of a wellfield, form a destination group. The outflow of cell $i$ through a destination is $d_i$. The source is the source terms traced from, and $s_i$ is the inflow of cell $i$ through them.
+A trace is one solve for a chosen set of destinations or sources. A destination is the sink terms traced to, such as one well's pumping. Sink terms traced as one unit, such as all the wells of a wellfield, form a destination group. A source is the source terms traced from, such as recharge. The outflow of cell $i$ through the destination is $d_i$. The inflow of cell $i$ through the source is $s_i$.
 
 [[Figure 1]]
 
 ## 2.2 Backward and forward fractions
 
-A contributing area is drawn from the backward fraction $F_i$. $F_i$ is the share of the water leaving cell $i$ that later leaves the model through the destination. Because the cell is fully mixed, all its outflows carry the same water. So
+The backward fraction $F_i$ tells where a destination's water comes from. It is the share of the water leaving cell $i$ that later leaves the model through the destination. Because the cell is fully mixed, all its outflows carry the same water. So
 
 $$F_i = \sum_j \frac{q_{ij}}{O_i}\, F_j + \frac{d_i}{O_i}. \tag{2}$$
 
-In words: the share of a cell's water that reaches the destination is the share leaving directly through it plus the outflow-weighted mean of its downstream neighbours' shares. In the eight-cell example of Fig. 1b, the well takes 6 of the 11 m³/d passing through its cell. So $F = 6/11 = 0.55$ in the well cell and in the cells whose water all flows through it. <!-- README_method.md Fig. 1b; studies/paper/method_figures.py GRAPH_EDGES, GRAPH_TERMS (cell 6: 9 + 1 in from neighbours, 1 recharge; 6 to the well, 5 on) -->
+In words: the share of a cell's water that reaches the destination is the share that leaves directly through it plus the outflow-weighted mean of the shares of its downstream neighbours. In the eight-cell example of Fig. 1b, the well takes 6 of the 11 m³/d passing through its cell. So $F = 6/11 = 0.55$ in the well cell and in the cells whose water all flows through it. <!-- evidence: docs/paper/figures/README_method.md Fig. 1b; studies/paper/method_figures.py GRAPH_EDGES, GRAPH_TERMS (cell 6: 9 + 1 in from neighbours, 1 recharge; 6 to the well, 5 on) -->
 
-Let $P_{ij} = q_{ij}/O_i$ be the share of cell $i$'s outflow that goes to cell $j$. For every cell at once, Eq. (2) then becomes
+A contributing area is the set of cells where $F$ exceeds a threshold, such as 0.1 or 0.5. The threshold is a judgement that depends on the purpose of the area (Sections 4.1 and 6).
 
-$$(\mathbf{I} - \mathbf{P})\,\mathbf{F} = \mathbf{S}\,\mathbf{D}, \tag{3}$$
+Let $P_{ij} = q_{ij}/O_i$ be the share of cell $i$'s outflow that goes to cell $j$. Written for every cell at once, Eq. (2) becomes
 
-where $\mathbf{I}$ is the identity matrix, $\mathbf{S}$ holds the share of each cell's outflow that leaves through each of its sink terms, and $\mathbf{D}$ marks which sink terms belong to which destination group. Each column of $\mathbf{F}$ holds the fractions to one destination group, so one solve gives every group.
+$$(\mathbf{I} - \mathbf{P})\,\mathbf{F} = \mathbf{S}\,\mathbf{D}. \tag{3}$$
 
-The forward fraction $G_i$ answers the reverse question. It is the share of the water entering cell $i$ that came from the source. It follows in the same way from the inflow shares $Q_{ij} = q_{ji}/I_i$:
+Here $\mathbf{I}$ is the identity matrix. $\mathbf{S}$ holds the share of each cell's outflow that leaves through each of its sink terms. $\mathbf{D}$ marks which sink terms belong to which destination group. Each column of $\mathbf{F}$ holds the fractions to one destination group, so one solve gives every group.
 
-$$(\mathbf{I} - \mathbf{Q})\,\mathbf{G} = \mathbf{R}\,\mathbf{T}, \tag{4}$$
+The forward fraction $G_i$ tells where a source's water goes. It is the share of the water entering cell $i$ that came from the source. It follows in the same way from the inflow shares $Q_{ij} = q_{ji}/I_i$ as
 
-where $\mathbf{R}$ holds the share of each cell's inflow that enters through each source term and $\mathbf{T}$ marks which source terms belong to which source group. A fraction times a flow gives a volume of water. For example, $F_i O_i$ is the water passing through cell $i$ that reaches the destination.
+$$(\mathbf{I} - \mathbf{Q})\,\mathbf{G} = \mathbf{R}\,\mathbf{T}. \tag{4}$$
 
-## 2.3 Gross and net accounting
+$\mathbf{R}$ holds the share of each cell's inflow that enters through each source term. $\mathbf{T}$ marks which source terms belong to which source group.
 
-Equation (2) needs a rule for weak sinks (Section 1). Our default is gross accounting. Each sink term then takes its share of the cell's total outflow, and the rest passes on to the neighbours. A well is credited with what it pumps, as in MODALL (Potter et al. 2008) and in a transport model (Section 4.1). <!-- Potter p. 336, Fig. 1: the sink cell's capture fraction is the well's outflow over the cell's total inflow, drawn for a weak sink -->
+Most cells can be solved one at a time along the flow paths. Flow loops are the exception. A flow loop is a group of cells among which water circulates, for example with the XT3D option of MODFLOW 6 (Provost et al. 2017). The code solves each loop exactly as one small block of equations and deletes no flow ({SI: method in full}). <!-- evidence: src/gwsource/config.py (solver "auto": topological substitution if acyclic, block-triangular sparse LU otherwise); src/gwsource/solve.py -->
 
-Net accounting credits a sink with all the water that passes through its cell, as FlowSource does (Foley and Black 2013). The destination cells are fixed at $F = 1$, so all the water that passes through them counts as reaching the destination ({SI: net accounting, fixed cells}). In the example of Fig. 1b, gross accounting credits the well with the 6 m³/d it pumps. Net accounting also credits it with the 5 m³/d that flow on through its cell to the river.
+## 2.3 Volumes
 
-In a three-layer example model, a well pumping 5.0 m³/d sits in a cell that carries 33.7 m³/d (Fig. 1c; {SI: example and test models}). <!-- tutorials/herebedragons.py::build_layered, LAYERED_WELLS (weak_well in layer 3 of 3, 5 m³/d); README_method.md Fig. 1c (whose cell carries 33.7 m³/d) --> Net accounting credits this well with 33.7 m³/d, 6.7 times its pumping. <!-- README_method.md Fig. 1c; tutorials/02_accounting (weak_well 33.667, 6.733) --> Net accounting is kept to reproduce studies made with FlowSource (Section 4.1).
+A fraction says what share of a cell's water reaches the destination, but not how much water that is. A fraction multiplied by a flow gives a volume of water per unit time. The volume through cell $i$ is $F_i O_i$. It is the part of the water passing through the cell that reaches the destination. <!-- evidence: src/gwsource/metrics.py docstring (volume_through = F x O, gross) -->
 
-## 2.4 Solution in flow order
+The volume from cell $i$ is $F_i$ times the cell's inflow through its source terms. It is the water entering the model in that cell that reaches the destination. Summing the volume from over all cells, package by package, splits the destination's water by source. For example, 71 % of the water pumped by the well of Section 4.1 is recharge. <!-- evidence: src/gwsource/metrics.py docstring (volume_from, volume_from_by_term); tutorials/01_quickstart output (recharge 568.6 of 800 m³/d, share 0.711) --> A forward trace gives the matching volumes from $G$. They split a source's water by where it leaves the model (Section 4.3). <!-- evidence: src/gwsource/metrics.py docstring (forward volume_through = G x I, volume_to, volume_to_by_term) -->
 
-Equation (2) gives a cell's $F$ from the $F$ of the cells downstream of it. Where water never returns to a cell it has left, the cells can be solved one at a time along the flow paths, as in FlowSource.
+## 2.4 Gross and net accounting
 
-Flow loops break this order. A flow loop is a group of cells among which water circulates, so that water leaving a cell can return to it. No ordering of the cells in a loop is purely downstream, so a single pass cannot solve a loop exactly. Loops arise with the XT3D option of MODFLOW 6 (Provost et al. 2017) and where stream reaches and aquifer cells exchange water in both directions. Foley and Black (2013) report loops as rare, mostly in unstable multilayer models. FlowSource deletes the smallest flow in each, which they expect to change results negligibly. <!-- references/docs/text/2013_Foley_Black_FlowSource_DAG_algorithms.txt, cycle section: "Cycles do, albeit rarely, occur"; "multilayer models which have stability problems"; "the edge with the lowest volume is removed"; "negligible in all but the rarest cases" -->
+At a weak sink, Eq. (2) needs a rule for how much of the cell's water to credit to the sink (Section 1). Our default is gross accounting. Each sink term then takes its share of the cell's total outflow. The rest passes on to the neighbours. A well is credited with the water it pumps, as in MODALL (Potter et al. 2008) and in a transport model. <!-- evidence: Potter et al. 2008 p. 336, Fig. 1 (the sink cell's capture fraction is the well's outflow over the cell's total inflow, drawn for a weak sink); src/gwsource/config.py (accounting "gross" default) -->
 
-We keep every flow and solve each loop exactly as one block of equations. In linear-algebra terms, the solve is a block-triangular sparse LU factorisation, with each flow loop as one block ({SI: solution of the linear systems}).
+Net accounting credits a sink with all the water that passes through its cell, as FlowSource does (Foley and Black 2013). The destination cells are fixed at $F = 1$. In the example of Fig. 1b, gross accounting credits the well with the 6 m³/d it pumps. Net accounting also credits it with the 5 m³/d that flow on through its cell to the river. At a small well, the difference can be several times the pumping (Fig. 1c; Section 4.2). Net accounting is kept to reproduce studies made with FlowSource. <!-- evidence: src/gwsource/config.py (net: destination cells absorbing, the reference method, for regression and comparison only); tutorials/02_accounting (weak_well 5 m³/d, net 33.667 m³/d, 6.7 times) -->
 
 ## 2.5 Water-budget checks
 
-Four checks tell the user whether a trace agrees with the model's water budget. They test the solve, not the flow model itself. Each must hold exactly, because each follows from adding up the cell equations. The first is the backward closure check:
+Before drawing an area from a trace, a user needs to know that the trace agrees with the flows the model saved. Each trace therefore comes with four checks. Each must hold exactly, because it follows from adding up the cell equations. The first is the backward closure check
 
 $$\sum_i F_i\, \mathrm{Src}_i - \sum_i F_i\, r_i = \sum_i d_i. \tag{5}$$
 
-The check says that the water entering through every source term, weighted by its $F$ and corrected for the cell budget errors, equals the water that leaves through the destination. Its mirror image is the forward closure check:
+It says that the source water traced to the destination, corrected for the cell budget errors, adds up to the water the destination takes. The forward closure check is its mirror image for a source. The third is the forward–backward check
 
-$$\sum_i G_i\, \mathrm{Snk}_i + \sum_i G_i\, r_i = \sum_i s_i. \tag{6}$$
+$$\sum_i F_i\, s_i - \sum_i G_i\, d_i = \sum_i F_i\, G_i\, r_i. \tag{6}$$
 
-The third is the forward–backward check:
+So the volume from a source to a destination is the same whether it is traced backward or forward, once the cell budget errors are included. The fourth is the boundary-control check. In every cell with outflow, the backward fractions to all sink terms must add up to 1. <!-- evidence: src/gwsource/diagnostics.py (backward_closure, forward_closure, duality); docs/paper/terms.md (closure, forward–backward and boundary-control checks) -->
 
-$$\sum_i F_i\, s_i - \sum_i G_i\, d_i = \sum_i F_i\, G_i\, r_i. \tag{7}$$
-
-So the volume from a source to a destination is the same whether it is traced backward or forward, once the cell budget errors are included. The fourth is the boundary-control check. In every cell with outflow, the backward fractions to all sink terms must add up to 1. Maps of these fractions (boundary-control maps) show where each cell's water goes.
-
-Because the checks include the flow model's budget errors $r_i$, a failed check points to an error in the tracing, not in the flow model.
+The checks test that the fractions were solved correctly from the flows that were read. A large error in a check points to a fault in the tracing. The checks cannot show that the flow model is right. Nor can they show that full mixing describes how water moves in the aquifer.
 
 ## 2.6 Mean travel time
 
-Fractions say how much water arrives, not when. Let $V_i$ be the volume of water in cell $i$, which is porosity times saturated volume. Its mean residence time is $\tau_i = V_i/O_i$. The mean travel time from entering cell $i$ to leaving the model through the destination is then $m_i/F_i$, where
+Fractions say how much water arrives, not when. Let $V_i$ be the volume of water in cell $i$. It is porosity times the saturated volume of the cell. Fractions need no porosity, but travel times do. The mean residence time of cell $i$ is $\tau_i = V_i/O_i$. The mean travel time from entering cell $i$ to leaving the model through the destination is then $m_i/F_i$, where
 
-$$(\mathbf{I} - \mathbf{P})\,\mathbf{m} = \boldsymbol{\tau} \circ \mathbf{F} \tag{8}$$
+$$(\mathbf{I} - \mathbf{P})\,\mathbf{m} = \boldsymbol{\tau} \circ \mathbf{F}. \tag{7}$$
 
-and $\circ$ is the cell-by-cell product ({SI: travel-time identity}). Each cell adds its residence time, weighted by its $F$, and passes the sum upstream with the outflow shares. Travel times are defined under gross accounting. A mean travel time averages fast and slow water that have mixed in the cells. It should not be used alone to draw a time-of-travel zone (Section 6.4).
+Here $\circ$ is the cell-by-cell product. Each cell adds its own residence time, weighted by its $F$. The sum then passes upstream with the outflow shares. A mean travel time averages fast and slow water that have mixed in the cells, so it is not a first-arrival time (Section 4.6). <!-- evidence: src/gwsource/traveltime.py (travel_time: porosity required, no default; gross accounting only; residence_time = V / O) -->
 
-## 2.7 Transient models: snapshots and transient tracking
+## 2.7 Transient flow: snapshots and transient tracking
 
-Existing full-mixing methods treat a transient model as a series of snapshots (Foley and Black 2013; Environment Agency 2019). A snapshot traces one time step as a steady state. Storage release is a source term and storage gain a sink term. Nothing is carried from one step to the next (Fig. 1d, left). Snapshots therefore have no travel lag between steps. Nor can they say where the water released from storage came from. On the seasonal example model of Section 4.4, such water makes up as much as 50 % of the well's water in summer. <!-- README_method.md Fig. 4a caption; studies/paper/transient_figure.py (summer storage peak 49.7 %); tutorial 08 §2 -->
+In a transient model, the water reaching a well depends on what happened in earlier time steps. Existing full-mixing methods treat a transient model as a series of snapshots (Foley and Black 2013; Environment Agency 2019). A snapshot traces one time step as a steady state on that step's flows. Storage release is then a source term. Nothing is carried from one step to the next (Fig. 1d, left). Snapshots therefore have no travel lag between steps. They also cannot say where the water released from storage came from. Section 4.5 shows snapshots of a seasonal model.
 
-We extend full mixing through time. We refer to this as transient tracking. Water from the chosen sources is tagged, as a tracer would be, and carried through storage from step to step (Fig. 1d, right). Each cell, and each reach, lake or well added as an extra cell (Section 3.1), is a fully mixed volume of water. Storage terms change this volume from $V_i^{\mathrm{old}}$ at the start of a step to $V_i^{\mathrm{new}}$ at its end. Let $c_i$ be the tagged fraction of a cell's water. Step $n$ of length $\Delta t$ is then
+We extend full mixing through time. We refer to this as transient tracking. Water from the chosen sources is tagged, as a tracer would be, and carried through storage from step to step (Fig. 1d, right). Storage terms change a cell's water volume from $V_i^{\mathrm{old}}$ at the start of a step to $V_i^{\mathrm{new}}$ at its end. Let $c_i$ be the share of a cell's water that is tagged. Step $n$ of length $\Delta t$ is then
 
-$$V_i^{\mathrm{new}} c_i^n - V_i^{\mathrm{old}} c_i^{n-1} = \Delta t \Big[ \sum_j q_{ji}\, c_j^n + s_i^n - (O_i + r_i)\, c_i^n \Big], \tag{9}$$
+$$V_i^{\mathrm{new}} c_i^n - V_i^{\mathrm{old}} c_i^{n-1} = \Delta t \Big[ \sum_j q_{ji}\, c_j^n + s_i^n - (O_i + r_i)\, c_i^n \Big], \tag{8}$$
 
-where $O_i$ now leaves out storage. Each cell's tagged water at the end of a step is its tagged water at the start, plus arrivals from upstream cells and source terms, less what leaves at the cell's end-of-step mix.
+where $O_i$ now leaves out storage. A cell's tagged water at the end of a step is its tagged water at the start, plus arrivals from upstream cells and source terms, less what leaves at the cell's end-of-step mix. The step is solved as in the MODFLOW 6 Groundwater Transport (GWT) Model, without dispersion (Langevin et al. 2022). Transient tracking needs porosity and the budget of every time step. The water in the model at the start of the simulation can be tagged as its own group. We refer to it as initial water. <!-- evidence: src/gwsource/tracking.py module docstring and TrackingConfig (porosity required; flow_error_correction as GWT FLOW_IMBALANCE_CORRECTION; initial_water; volume_mode "gwt") -->
 
-As in GWT, the scheme is implicit, so outflows carry the cell's mix at the end of the step. It is upstream weighted, so inflows carry the mix of the cell they come from. It adds no dispersion. It runs on the flow model's own time steps, so the budget of every step must be saved (SAVE BUDGET ALL in the Output Control file).
-
-MODFLOW's cell budget never balances exactly, so each cell has a small error $r_i$. We let this error leave the cell carrying the cell's own mix of water. GWT treats the error in the same way, which Langevin et al. (2022) call the flow-error correction.
-
-The water in the model at the start of the simulation can be tagged as its own group, called initial water. By default, each cell's water volume starts at porosity times saturated volume and is then carried by the storage flows. With these "flow" volumes, every water balance closes exactly. A "gwt" option resets the volumes at the end of each step, as GWT does, which can create or remove tagged water at step boundaries. Forward transient tracking is then unit-concentration transport in GWT (Bedekar et al. 2024; Langevin et al. 2022). We recommend the default unless a result must match a GWT run ({SI: water volume options}).
-
-## 2.8 Backward tracking in time
-
-Forward transient tracking is not new (Section 1; Table 1). What we add is backward tracking in time. It answers the question behind a time-limited protection zone: which water in the aquifer will reach a sink, and by when? It is not MODPATH backward tracking, in which particles run in reverse from the sink. Its result is the backward fraction in time, $w_i^n$. Take the water in cell $i$ at the start of step $n$, together with the water that enters the cell during the step. $w_i^n$ is the share of that water that leaves through the destination before the simulation ends. A map of $w$ is a time-limited contributing area, such as the 30-year area of Fig. 4d. The solve runs step by step from the end of the simulation back to the start, with inflow and outflow swapping roles. It is the discrete counterpart of adjoint methods for continuous transport (Neupauer and Wilson 1999; Cornaton and Perrochet 2006).
-
-The same run gives the fractions of each cell's water that leave through other sinks or are still stored at the end. Together with $w$, they add up to 1, apart from the flow-error correction and the step-boundary changes of the "gwt" volumes. With every source and the initial water tagged, the run splits the destination's outflow by source term, time step and initial water. The transient forward–backward check is
-
-$$\sum_n \Delta t \sum_i d_i^n c_i^n = \sum_n \Delta t \sum_i s_i^n w_i^n + \sum_i V_i^0 c_i^0 w_i^1, \tag{10}$$
-
-where $V_i^0$ and $c_i^0$ are the water volume and tagged fraction of cell $i$ at the start. This check says that the tagged water the destination takes, found by forward tracking, equals the tagged inflow and initial water, each multiplied by its share that later reaches the destination. The check holds exactly for either volume option (Section 4.2).
+Forward tracking cannot tell which of the water now in the aquifer will reach the destination, and by when. Backward tracking in time answers that question. It is not MODPATH backward tracking, in which particles run in reverse from the sink. The code solves the step equations from the end of the simulation back to the start, with the roles of inflow and outflow swapped ({SI: method in full}). The result is the backward fraction in time $w_i^n$. Take the water in cell $i$ at the start of step $n$, together with the water that enters the cell during the step. $w_i^n$ is the share of that water that leaves through the destination before the simulation ends. A map of $w$ is a time-limited contributing area, such as the 30-year area of Section 4.8. The method is the discrete counterpart of adjoint methods for continuous transport (Neupauer and Wilson 1999; Cornaton and Perrochet 2006). <!-- evidence: src/gwsource/tracking.py (track_backward, tracking_duality); docs/paper/terms.md (backward fraction in time w) -->
