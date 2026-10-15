@@ -259,21 +259,21 @@ Each subsection follows the same pattern:
 
 #### 4.9 How sure are we? (tutorial 09)
 
-- Model: 20 random-K realisations (prior, K = 5·exp(0.8 z)).
+- Model: one ensemble of 50 random-K realisations (prior, K = 5·exp(0.8 z) at 100 pilot points, kriged), then its PEST++ IES posterior.
 - Output:
   - P(F > 0.5) and P(F > 0.1) maps;
   - a zone at a stated risk level;
-  - spread of the river share (0.7–27 %) and travel time (36–54 years, 5–95 %);
-  - traced in 0.84 s for all 20.
-- Main finding: parameter uncertainty dominates the integral answers (area, shares, travel time). But the uncertain edge band from the ensemble (0.77 km²) is about the same size as the band from mixing in one model (0.80 km²).
+  - spread of the river share (0–33 %) and travel time (36–52 years, 5–95 %);
+  - traced in 0.69 s for all 50.
+- Main finding: parameter uncertainty dominates the integral answers (area, shares, travel time). It also blurs the edge more than mixing: the uncertain edge band of the prior (1.10 km²) is wider than the band from mixing in one model (0.80 km²). History matching narrows it to 0.35 km².
 - Checks:
-  - exact against histogram quantiles, within one bin width for values inside the histogram range (45 cells fell above it, unbounded);
+  - exact against histogram quantiles, within one bin width for values inside the histogram range (112 cells fell above it, unbounded);
   - ΣP·A = mean area;
   - serial and parallel runs bit-identical.
 - Limit:
   - memory for exact quantiles: 4 GB per series for 1,000 realisations of 1 million cells, 24 GB for the six series of this example;
   - the same grid is needed in every realisation;
-  - prior only.
+  - one synthetic history match only.
 - Figure: probability maps beside the source-share box plot. Once the PEST++ run exists, show prior against posterior P(F > 0.5).
 - PEST++ (decided: run it). The notebook conditions the ensemble on heads with PEST++ IES and traces the posterior realisations. That shows the practitioner output that matters: how history matching narrows the capture probability.
 - [tutorial]:

@@ -84,9 +84,9 @@ LAYER_NAMES = ("layer 1", "layer 2 (aquitard)", "layer 3")
 LAYER_NAME_COLOURS = ("white", "black", "black")  # readable on the F colours of panel (d)
 FIG8_HEIGHT = 4.6  # in: the maps of (a) and (b) fill their columns, so (d) and (e) align below
 
-# Fig. 10: tutorial 09 settings (section 9)
+# Fig. 10: tutorial 09 settings (one pilot-point ensemble: the prior of section 1, the posterior of section 9)
 SIGMA_LNK = 0.8
-CORRELATION_CELLS = 4.0
+CORRELATION_LENGTH = 400.0  # m: ln K correlated as exp(-(r / CORRELATION_LENGTH)^2)
 TRUTH_SEED = 2024
 N_OBS = 40
 OBS_SEED = 11
@@ -94,7 +94,7 @@ NOISE_SD = 0.05
 NOISE_SEED = 12
 PP_SPACING = 4
 NUGGET = 1e-4
-N_REAL_IES = 50
+N_REAL = 50
 PRIOR_SEED = 3
 N_ITER = 3
 N_WORKERS = 0  # serial PEST++: the sandbox blocks the workers' local ports
@@ -177,7 +177,7 @@ QUOTED_FIG8 = {
     "F MAW cell layer 1, cells only": (0.06, 5e-3),
     "F MAW cell layer 1, borehole traced": (0.53, 5e-3),
 }
-QUOTED_FIG10 = {  # tutorial 09 section 9 (eight PEST++ workers)
+QUOTED_FIG10 = {  # tutorial 09 sections 9.1 to 9.4 (eight PEST++ workers)
     "truth area F > 0.5 (km2)": (1.025, 5e-4),
     "truth river share": (0.094, 5e-4),
     "prior area P >= 0.9 (km2)": (0.558, 5e-4),
@@ -641,35 +641,39 @@ def setup_history_match(ws: Path, mf6: Path, h09, hbd) -> dict:
     base = hbd.build_quickstart(clean_dir(ws / "base"), mf6)
     base_step = gs.read_step(base.ws, boundnames=True)
     group = {WELL: {"boundnames": [WELL]}}
+    smoothing_cells = CORRELATION_LENGTH / (2 * base.spec.delr)  # Gaussian width s: length 2 s
     truth = hbd.build_realisation(clean_dir(ws / "truth"), mf6, TRUTH_SEED, sigma_lnk=SIGMA_LNK,
-                                  correlation_cells=CORRELATION_CELLS)
+                                  correlation_cells=smoothing_cells)
     truth_step = gs.read_step(truth.ws, boundnames=True)
     truth_res = gs.backward(truth_step, {WELL: gs.select(truth_step, **group[WELL])})
     spec = base.spec
     obs_cells = h09.observation_cells(spec, N_OBS, OBS_SEED)
     observed = h09.observed_heads(truth.head_file, [spec.node(rc) for rc in obs_cells], NOISE_SD,
                                   NOISE_SEED)
-    corr_length = 2 * CORRELATION_CELLS * spec.delr
     pp_cells = h09.pilot_point_cells(spec, PP_SPACING)
-    pp_cov = h09.pilot_point_covariance(spec, pp_cells, corr_length, NUGGET)
-    weights = h09.kriging_weights(spec, pp_cells, corr_length, NUGGET)
+    pp_cov = h09.pilot_point_covariance(spec, pp_cells, CORRELATION_LENGTH, NUGGET)
+    weights = h09.kriging_weights(spec, pp_cells, CORRELATION_LENGTH, NUGGET)
     mean_k = float(spec.k)
-    prior_values = h09.draw_prior(pp_cov, mean_k, SIGMA_LNK, N_REAL_IES, PRIOR_SEED)
+    prior_values = h09.draw_prior(pp_cov, mean_k, SIGMA_LNK, N_REAL, PRIOR_SEED)
     template = h09.build_pest_template(clean_dir(ws / "template"), mf6, spec, pp_cells, weights,
                                        obs_cells, mean_k)
     h09.write_prior(template, prior_values)
     k_bounds = (mean_k * np.exp(-4 * SIGMA_LNK), mean_k * np.exp(4 * SIGMA_LNK))
-    options = {"ies_parameter_ensemble": "prior.csv", "ies_num_reals": N_REAL_IES,
+    options = {"ies_parameter_ensemble": "prior.csv", "ies_num_reals": N_REAL,
                "ies_include_base": False}
     h09.build_pst(template, observed, NOISE_SD, mean_k, k_bounds, options, noptmax=N_ITER)
     return {"base": base, "base_step": base_step, "group": group, "truth_step": truth_step,
             "truth_res": truth_res, "obs_cells": obs_cells, "template": template,
-            "mean_k": mean_k, "spec": spec}
+            "mean_k": mean_k, "spec": spec, "prior_values": prior_values}
 
 
 def compute_fig10(work: Path, mf6: Path, pestpp: Path, run_ies: bool = True,
                   n_workers: int = N_WORKERS) -> dict:
-    """Run tutorial 09's history match (or reuse its PEST++ output) and trace prior and posterior."""
+    """Run tutorial 09's history match (or reuse its PEST++ output) and trace prior and posterior.
+
+    The prior is the drawn pilot-point ensemble itself, as in section 1 of the notebook. PEST++ IES
+    starts from it (prior.csv); its iteration-0 file holds the same values to six digits.
+    """
     hbd, h09 = tutorial_modules("09_ensembles")
     ws = work / "fig10"
     data = setup_history_match(ws, mf6, h09, hbd)
@@ -681,9 +685,14 @@ def compute_fig10(work: Path, mf6: Path, pestpp: Path, run_ies: bool = True,
     config = gs.EnsembleConfig(outputs=("fraction_through",), thresholds=(0.5,), boundnames=True)
     area = data["base_step"].area
     f_truth = data["truth_res"].fraction_through[WELL]
+    np.testing.assert_allclose(h09.read_par_ensemble(master, 0).to_numpy(), data["prior_values"],
+                               rtol=1e-5)  # PEST++ writes six significant digits
+    parameters = {
+        "prior": h09.prior_frame(data["prior_values"]),
+        "posterior": h09.read_par_ensemble(master, h09.last_iteration(master)),
+    }
     ensembles = {}
-    for label, iteration in (("prior", 0), ("posterior", h09.last_iteration(master))):
-        pe = h09.read_par_ensemble(master, iteration)
+    for label, pe in parameters.items():
         folders = h09.run_parameter_ensemble(data["template"], clean_dir(ws / label), pe, mf6,
                                              data["mean_k"])
         ens = gs.run_ensemble(folders, data["group"], config)
