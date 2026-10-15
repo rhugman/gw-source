@@ -1,16 +1,16 @@
-## Figure 2
+## Figure S10
 
 **Figure 2.** Largest error of each verification check (Section 4.1). Each row is one check. Each marker is the largest error of that check on one case. The cases are the ten test models, the worked example of Foley and Black (2013) and a hand-built network of 15 cells. Markers in the "exact" column have an error of zero. The dashed line is machine precision, the size of rounding error. Light grey bars are the tolerances of the automated tests. A row with two bars has a looser tolerance for one model. Markers far above machine precision are limited by the flow solver's tolerance or, for PRT, by the number of release points. Upper block: steady-state and snapshot checks. Lower block: transient tracking checks (Section 4.2). Its last row tests transport sub-steps. Values, tolerances and error measures are in {SI: verification errors per check and model}.
 
 <!-- Source: README_method.md, Fig. 2 caption and largest-error table, and the note on the relabelled figure (x axis cites Table S1; "Foley and Black (2013) example"; "machine precision"; light grey tolerance bars); verification_table.md / .csv (notes on m7_mover and m10_constant); studies/paper/method_figures.py (MACHINE_EPS = np.finfo(float).eps = 2.2e-16; largest exact-check error 1.8e-15, about 8 times machine precision); studies/paper/verification.py docstring (tolerances: G vs GWT 1e-10 for models 1 and 2, 1e-7 for model 7; PRT 0.01 for models 1 and 3, 0.02 for model 2; sub-steps: three sub-steps against three times as many flow steps, 1.6e-16, hand-built 15-cell network); figures/fig2_verification.png (two bars in the rows "steady G vs GWT at equilibrium" and "PRT flow to the well") -->
 
-## Figure 3
+## Figure 13
 
 **Figure 3.** Numerical dispersion of full mixing against cell size h. Top row: problem A, uniform flow to a well, with the analytical capture zone (Javandel and Tsang 1986) as reference. Flow runs along the grid rows (solid) or at 30° to them (dotted). Bottom row: problem B, an aquifer like model 1. The reference is PRT on the finest grid, compared west of the river. (a, d) Width of the transition band (0.1 < F < 0.9). Dashed guide: $h^{0.5}$. Face routing: an experimental 2D option that passes water between cell faces instead of mixing it (Chowdhury 2016; Section 7). The exact zone averaged onto the grid (A) and PRT on the same grid (B) show the narrowest band the grid allows. (b, e) Relative error in the size of the F > 0.1 area. (c, f) The same for the F > 0.5 area. Grey band, ±5 %.
 
 <!-- Source: README_method.md, Fig. 3 caption; DS §2, §4, §5 (problem A includes the DISV grids, mean cell size slightly above nominal h; face routing removes 35–70 % of the excess spreading, DS Summary, §4); face routing removes 35–70 % of the excess spreading: stated in sections/07_limitations.md since round 5; panel titles relabelled from F ≥ to F > by the figure agent in round 5, which selects the same cells (si/C.md, dispersion item) -->
 
-## Figure 4
+## Figure 9
 
 **Figure 4.** Snapshots and transient tracking on the seasonal example model (Section 4.4). Triangle: supply well. Dashed line in (c–f): river. (a) Snapshots: the well's water by source, each step traced on its own flows. (b) Forward transient tracking: the well's water by tagged source, including initial water. The dashed line is the initial water's share of all water pumped so far. Its labels give the cumulative share after 1, 10 and 30 years. (c) Steady-state F for the first step's flows. F extends east of the river because the river cells take only part of the water flowing through them. (d–f) Backward tracking in time: for the water in each cell at the start, the fractions that leave through the well (w) or the river within 30 years, and the fraction still stored. Numbers are in {SI: transient checks on the seasonal example model}.
 
