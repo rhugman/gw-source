@@ -1,6 +1,6 @@
 ## 4.9 How sure can we be of the contributing area?
 
-Every example so far used one set of parameters. Many sets can fit the measured heads about equally well. Each set is one realisation of an ensemble (Section 1).
+Every example so far used one set of parameters. Many sets can fit the measured heads about equally well. Each set is one version of the model. We refer to it as a realisation. A set of realisations is an ensemble.
 
 The first ensemble holds 20 realisations of the shared model (Section 4). Each has its own random hydraulic conductivity (K) field. No measurements have shaped these fields. We refer to such an ensemble as a prior. <!-- evidence: tutorials/09_ensembles/09_ensembles.ipynb Settings, cell 2 (N_REAL 20, SIGMA_LNK 0.8) and §1, cell 3 (K = 5 exp(0.8 z), spatially correlated; recharge, river, west edge, well and grid unchanged; "These realisations are a prior: no data has shaped them") --> For each cell, the probability of contribution is the share of realisations in which F > 0.5. A protection zone can then be drawn at a stated risk. In the middle 90 % of realisations, the river supplies 0.7 to 27 % of the pumped water. The mean travel time lies between 36 and 54 years. <!-- evidence: tutorials/09_ensembles/09_ensembles.ipynb §8, cell 20 (5 to 95 %: river share 0.007 to 0.273; mean travel time 36 to 54 yr) --> The shared model gives 14 % and 46 years (Sections 4.1 and 4.6).
 
