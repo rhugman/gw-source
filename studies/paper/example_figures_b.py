@@ -10,7 +10,9 @@ plotting, so a figure stops if they drift.
   with the 5-year and 25-year time-of-travel zones. (b) Mean travel time per release cell, PRT
   weight-losing particles against full mixing, both to the well cell, coloured by F.
 - Fig. 8 (Section 4.7), a stream fed by drains through the water mover. (a) F on the aquifer cells
-  alone; (b) F with the stream reaches and the mover traced; (c) F of each reach.
+  alone; (b) F with the stream reaches and the mover traced; (c) F of each reach. A multi-aquifer
+  well (MAW) in a three-layer model, section through the MAW's row: (d) F on the aquifer cells
+  alone; (e) F with the MAW borehole traced as a node.
 - Fig. 10 (Section 4.9), history matching with PEST++ IES. Prior and posterior probability of
   contribution (the share of realisations with F > 0.5) with the true F > 0.5 outline, and the
   river share of each realisation. PEST++ runs serially here (N_WORKERS = 0 in the notebook):
@@ -45,6 +47,7 @@ import method_figures as mfig  # noqa: E402  (style, palette, save, find_mf6)
 
 import gwsource as gs  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
+from matplotlib import patheffects  # noqa: E402
 from matplotlib.colors import ListedColormap, LogNorm  # noqa: E402
 from matplotlib.lines import Line2D  # noqa: E402
 
@@ -73,6 +76,13 @@ ZONE_COLOUR = "tab:cyan"
 
 # Fig. 8: tutorial 07
 REACH_COLOURS = {"losing": "tab:blue", "gaining": "tab:orange"}
+MAW_GROUP = "MAW pumping"
+SECTION_X = (0.5, 1.7)  # km, columns of the MAW cross-section (MAW and supply well within)
+BORE_STYLE = {"color": "white", "lw": 1.8, "solid_capstyle": "butt", "zorder": 5,
+              "path_effects": [patheffects.withStroke(linewidth=3.2, foreground="black")]}
+LAYER_NAMES = ("layer 1", "layer 2 (aquitard)", "layer 3")
+LAYER_NAME_COLOURS = ("white", "black", "black")  # readable on the F colours of panel (d)
+FIG8_HEIGHT = 4.6  # in: the maps of (a) and (b) fill their columns, so (d) and (e) align below
 
 # Fig. 10: tutorial 09 settings (section 9)
 SIGMA_LNK = 0.8
@@ -159,6 +169,13 @@ QUOTED_FIG8 = {
     "last feeding reach": (21, 0),
     "F reach 21": (0.014, 5e-4),
     "flow loop nodes": (711, 0),
+    "MAW pumping (m3/d)": (10.0, 0.05),
+    "borehole inflow, layers 1-2 (m3/d)": (24.3, 0.05),
+    "borehole outflow, layer 3 (m3/d)": (14.3, 0.05),
+    "MAW water to the well, cells only (m3/d)": (14.3, 0.05),
+    "extra recharge with the borehole (m3/d)": (14.3, 0.05),
+    "F MAW cell layer 1, cells only": (0.06, 5e-3),
+    "F MAW cell layer 1, borehole traced": (0.53, 5e-3),
 }
 QUOTED_FIG10 = {  # tutorial 09 section 9 (eight PEST++ workers)
     "truth area F > 0.5 (km2)": (1.025, 5e-4),
@@ -405,7 +422,7 @@ def make_fig7(out_dir: Path, data: dict) -> list[Path]:
 
 
 def compute_fig8(work: Path, mf6: Path) -> dict:
-    """Build tutorial 07's stream and mover model; trace it on the cells and with the reaches."""
+    """Build tutorial 07's stream and MAW models; trace each on the cells and with its nodes."""
     hbd, h07 = tutorial_modules("07_networks_multimodel")
     stream = hbd.build_stream_mover(clean_dir(work / "fig8") / "stream", mf6)
     cells_only = gs.read_step(stream.ws, boundnames=True)
@@ -422,11 +439,30 @@ def compute_fig8(work: Path, mf6: Path) -> dict:
     return {"stream": stream, "cells_only": cells_only, "back_off": back_off, "network": network,
             "back_on": back_on, "reaches": reaches, "exchange": exchange,
             "drain_nodes": drain_nodes, "mover": mover, "hbd": hbd,
-            "n_cells": network.block(stream.name).n}
+            "n_cells": network.block(stream.name).n,
+            **compute_maw(work / "fig8" / "maw", mf6, hbd, h07)}
+
+
+def compute_maw(ws: Path, mf6: Path, hbd, h07) -> dict:
+    """Build tutorial 07's MAW model; trace it on the cells and with the borehole as a node."""
+    maw = hbd.build_maw(ws, mf6)
+    maw_cells = maw.info["maw_nodes"]  # the MAW's cell in layers 1, 2 and 3
+    maw_step = gs.read_step(maw.ws, boundnames=True)
+    maw_off = gs.backward(maw_step, {WELL: gs.select(maw_step, boundnames=[WELL])})
+    maw_net = gs.read_network(maw.ws, package_nodes=("MAW",), boundnames=True)
+    bore = int(maw_net.block("MAW").nodes[0])  # the one MAW well is one node
+    maw_on = gs.backward(maw_net, {MAW_GROUP: gs.select(maw_net, package="MAW", term="RATE"),
+                                   WELL: gs.select(maw_net, boundnames=[WELL])})
+    for name, result, step in (("MAW cells only", maw_off, maw_step), ("MAW node", maw_on, maw_net)):
+        check = gs.diagnostics.backward_closure(step, result, WELL)
+        assert check.relative_error < 1e-8, (name, check)
+    return {"maw": maw, "maw_off": maw_off, "maw_on": maw_on, "maw_cells": maw_cells,
+            "bore_in": h07.edges_between(maw_net, maw_cells, [bore]),
+            "bore_out": h07.edges_between(maw_net, [bore], maw_cells)}
 
 
 def fig8_values(data: dict) -> dict:
-    """Return the numbers Section 4.7 quotes, from the Fig. 8 data."""
+    """Return the numbers Section 4.7 quotes, from the Fig. 8 data (stream, then MAW)."""
     hbd = data["hbd"]
     f_on = data["back_on"].fraction_through[WELL]
     off = hbd.volume_from_table(data["back_off"], WELL)
@@ -438,7 +474,7 @@ def fig8_values(data: dict) -> dict:
     assert gaining == [2, *range(22, 41)], f"gaining reaches {gaining}"
     via_mover = float((data["mover"]["q"] * f_on[data["mover"]["dst"]]).sum())
     drains = data["drain_nodes"]
-    return {
+    stream_values = {
         "SFR share, cells only": float(off.loc["SFR", "share"]),
         "SFR, cells only (m3/d)": float(off.loc["SFR", "volume_from"]),
         "stream inflow to the well (m3/d)": float(on.loc["SFR:EXT-INFLOW", "volume_from"]),
@@ -451,6 +487,28 @@ def fig8_values(data: dict) -> dict:
         "F reach 21": float(f_reach.loc[21]),
         "flow loop nodes": max(c.cells.size for c in data["back_on"].cycles),
     }
+    return {**stream_values, **maw_values(data)}
+
+
+def maw_values(data: dict) -> dict:
+    """Return the numbers of the MAW example: borehole flows, sources and F of the MAW cells."""
+    hbd, maw_cells = data["hbd"], data["maw_cells"]
+    bore_in, bore_out = data["bore_in"], data["bore_out"]
+    assert sorted(maw_cells.index(n) for n in bore_in["src"]) == [0, 1], "inflow from layers 1, 2"
+    assert [maw_cells.index(n) for n in bore_out["dst"]] == [2], "outflow to layer 3"
+    off = hbd.volume_from_table(data["maw_off"], WELL)
+    on = hbd.volume_from_table(data["maw_on"], WELL)
+    return {
+        "MAW pumping (m3/d)": -float(data["maw"].info["maw_rate"]),
+        "borehole inflow, layers 1-2 (m3/d)": float(bore_in["q"].sum()),
+        "borehole outflow, layer 3 (m3/d)": float(bore_out["q"].sum()),
+        "MAW water to the well, cells only (m3/d)": float(off.loc["MAW", "volume_from"]),
+        "extra recharge with the borehole (m3/d)":
+            float(on.loc["RCH", "volume_from"] - off.loc["RCH", "volume_from"]),
+        "F MAW cell layer 1, cells only": float(data["maw_off"].fraction_through[WELL][maw_cells[0]]),
+        "F MAW cell layer 1, borehole traced":
+            float(data["maw_on"].fraction_through[WELL][maw_cells[0]]),
+    }
 
 
 def gaining_reaches(exchange: pd.DataFrame) -> np.ndarray:
@@ -459,14 +517,26 @@ def gaining_reaches(exchange: pd.DataFrame) -> np.ndarray:
 
 
 def make_fig8(out_dir: Path, data: dict) -> list[Path]:
-    """Fig. 8: F on the cells alone, F with the reaches and mover traced, F of each reach."""
+    """Fig. 8: the stream example (a-c) above the MAW cross-sections (d, e); one F colour bar."""
+    fig, axes = plt.subplot_mosaic(
+        [["a", "b", "c"], ["d", "e", "key"]], figsize=(mfig.FULL_WIDTH, FIG8_HEIGHT),
+        layout="constrained", width_ratios=[1.0, 1.0, 0.55], height_ratios=[1.0, 0.66],
+    )
+    image = draw_stream_panels(axes, data)
+    draw_maw_panels(axes, data)
+    colour_bar(fig, image, [axes[k] for k in "abde"], "F (-)", shrink=0.9, pad=0.02)
+    return mfig.save(fig, out_dir, "fig8_networks")
+
+
+def draw_stream_panels(axes: dict, data: dict):
+    """Draw panels (a) to (c): F maps of the stream model and F of each reach; return the image."""
     stream, step, n_cells = data["stream"], data["cells_only"], data["n_cells"]
     spec = stream.spec
-    f_maps = {"(a) Aquifer cells only": data["back_off"].fraction_through[WELL][:n_cells],
-              "(b) Stream reaches and mover traced": data["back_on"].fraction_through[WELL][:n_cells]}
-    fig, axes = plt.subplots(1, 3, figsize=(mfig.FULL_WIDTH, 2.75), layout="constrained",
-                             gridspec_kw={"width_ratios": [1.0, 1.0, 0.55]})
-    for i, (ax, (text, values)) in enumerate(zip(axes[:2], f_maps.items())):
+    f_maps = {"a": ("(a) Aquifer cells only", data["back_off"].fraction_through[WELL][:n_cells]),
+              "b": ("(b) Stream reaches and mover traced",
+                    data["back_on"].fraction_through[WELL][:n_cells])}
+    for key, (text, values) in f_maps.items():
+        ax = axes[key]
         grid = gs.export.to_grid(step, values)[0]
         image = draw_field(ax, grid, spec, cmap=F_CMAP, vmin=0.0, vmax=1.0)
         draw_contours(ax, grid, spec, (0.1, 0.5))
@@ -474,11 +544,10 @@ def make_fig8(out_dir: Path, data: dict) -> list[Path]:
         for node in data["drain_nodes"].values():
             mark_cell(ax, spec, node_rc(node, spec), DRAIN_STYLE)
         mark_cell(ax, spec, spec.wells[0][1], WELL_STYLE)
-        map_axes(ax, spec, (0, 1, 2), ylabel=i == 0)
+        map_axes(ax, spec, (0, 1, 2), ylabel=key == "a")
         title(ax, text)
-    colour_bar(fig, image, axes[:2], "F (-)", shrink=0.9, pad=0.02)
 
-    ax = axes[2]
+    ax = axes["c"]
     f_reach = data["back_on"].fraction_through[WELL][data["reaches"]]
     y_reach = cell_centres_km(spec)[1]  # one reach per row, north to south
     gaining = gaining_reaches(data["exchange"])
@@ -494,7 +563,72 @@ def make_fig8(out_dir: Path, data: dict) -> list[Path]:
     ax.set_ylabel("y of the reach (km)")
     ax.legend(loc="lower right", handletextpad=0.2, borderaxespad=0.2)
     title(ax, "(c) F of each reach")
-    return mfig.save(fig, out_dir, "fig8_networks")
+    return image
+
+
+def draw_maw_panels(axes: dict, data: dict) -> None:
+    """Draw panels (d) and (e): F along the MAW's row, cells only and with the borehole traced."""
+    maw = data["maw"]
+    spec, botm = maw.spec, data["hbd"].LAYER_BOTM
+    z_edges = np.array([spec.top, *botm])
+    shape = (len(botm), spec.nrow, spec.ncol)
+    row, col = maw.info["maw_cell"]
+    layer, well_row, well_col = maw_supply_cell(data)
+    assert well_row == row, "the supply well lies in the MAW's row"
+    sections = {"d": ("(d) Aquifer cells only", data["maw_off"].fraction_through[WELL]),
+                "e": ("(e) MAW borehole traced", data["maw_on"].fraction_through[WELL])}
+    for key, (text, values) in sections.items():
+        ax = axes[key]
+        draw_section(ax, values[: np.prod(shape)].reshape(shape)[:, row, :], spec, z_edges)
+        fill_section_cell(ax, spec, z_edges, 0, spec.riv_col, RIVER_COLOUR)
+        x_bore = (col + 0.5) * spec.delr / 1000.0
+        ax.plot([x_bore, x_bore], z_edges[[0, -1]], **BORE_STYLE)
+        ax.plot((well_col + 0.5) * spec.delr / 1000.0, z_edges[layer:layer + 2].mean(),
+                **WELL_STYLE)
+        ax.set_xlim(*SECTION_X)
+        ax.set_ylim(z_edges[-1], z_edges[0])
+        ax.set_yticks(z_edges)
+        ax.set_xlabel("x (km)")
+        if key == "d":
+            ax.set_ylabel("elevation (m)")
+            z_mids = (z_edges[:-1] + z_edges[1:]) / 2.0
+            for name, z_mid, colour in zip(LAYER_NAMES, z_mids, LAYER_NAME_COLOURS):
+                ax.text(SECTION_X[0] + 0.02, z_mid, name, color=colour, ha="left", va="center",
+                        fontsize=7, zorder=6)
+        else:
+            ax.set_yticklabels([])
+        title(ax, text)
+
+    ax = axes["key"]
+    ax.axis("off")
+    handles = [Line2D([], [], **BORE_STYLE, label="MAW borehole"),
+               Line2D([], [], **WELL_STYLE, label="supply well"),
+               Line2D([], [], color=RIVER_COLOUR, ls="none", marker="s", ms=5, label="river")]
+    ax.legend(handles=handles, loc="center left", borderaxespad=0.0)
+
+
+def maw_supply_cell(data: dict) -> tuple[int, int, int]:
+    """Return the (layer, row, col) of the supply well of the MAW model."""
+    maw = data["maw"]
+    shape = (len(data["hbd"].LAYER_BOTM), maw.spec.nrow, maw.spec.ncol)
+    return tuple(int(i) for i in np.unravel_index(maw.info["well_nodes"][WELL], shape))
+
+
+def draw_section(ax, values: np.ndarray, spec, z_edges: np.ndarray):
+    """Draw one row of per-cell values (nlay, ncol) as a cross-section in km and m."""
+    x = np.arange(spec.ncol + 1) * spec.delr / 1000.0
+    mesh = ax.pcolormesh(x, z_edges[::-1], values[::-1], shading="flat", cmap=F_CMAP, vmin=0.0,
+                         vmax=1.0)
+    for depth in z_edges[1:-1]:
+        ax.axhline(depth, color="white", lw=0.5)
+    return mesh
+
+
+def fill_section_cell(ax, spec, z_edges: np.ndarray, layer: int, col: int, colour: str) -> None:
+    """Fill one cell of a cross-section with one colour."""
+    x0 = col * spec.delr / 1000.0
+    ax.fill_between([x0, x0 + spec.delr / 1000.0], z_edges[layer + 1], z_edges[layer],
+                    color=colour, lw=0, zorder=3)
 
 
 # ---------------------------------------------------------------- Fig. 10: history matching
