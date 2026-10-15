@@ -12,7 +12,7 @@ $$I_i = \sum_j q_{ji} + \mathrm{Src}_i, \qquad O_i = \sum_j q_{ij} + \mathrm{Snk
 
 The cell budget of a MODFLOW model never balances exactly, so $r_i$ is small but not zero. <!-- evidence: src/gwsource/diagnostics.py (cell_residual, budget_error) -->
 
-A trace is one solve for a chosen set of destinations or sources. A destination is the sink terms traced to, such as one well's pumping. Sink terms traced as one unit, such as all the wells of a wellfield, form a destination group. A source is the source terms traced from, such as recharge. The outflow of cell $i$ through the destination is $d_i$. The inflow of cell $i$ through the source is $s_i$.
+A trace follows water to or from the boundaries the user selects. Water can be traced backward to a destination, such as the pumping of one well. Several wells, such as those of a wellfield, can be treated as one destination group. Water can also be traced forward from a source, such as recharge. The outflow of cell $i$ through the destination is $d_i$. The inflow of cell $i$ through the source is $s_i$.
 
 [[Figure 1]]
 
