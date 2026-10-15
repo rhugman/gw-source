@@ -178,7 +178,7 @@ Each subsection follows the same pattern:
 - Model: storage, seasonal recharge (×1.8, 1.0, 0.1, 1.1) and pumping (640–1,120 m³/d), 3 years of 3 steps per season.
 - Output:
   - seasonal F maps;
-  - the well's water by source per season (in summer 52.5 % comes from storage);
+  - the well's water by source per season (in the dry season 52.5 % comes from storage);
   - min, mean and max F;
   - always, sometimes and never;
   - nested protection zones:
