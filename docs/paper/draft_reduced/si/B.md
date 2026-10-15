@@ -32,11 +32,11 @@ $\mathbf{R}$ holds the share of each cell's inflow that enters through each sour
 
 ### Volumes
 
-A fraction says what share of a cell's water reaches the destination, but not how much water that is. A fraction times a flow gives a volume of water per unit time. The volume through cell $i$ is $F_i O_i$. It is the part of the water passing through the cell that reaches the destination. The volume from cell $i$ is $F_i$ times the cell's inflow through its source terms. It is the water entering the model in that cell that reaches the destination. Summing the volume from over all cells, package by package, splits the destination's water by source (Section 4.1). A forward trace gives the matching volumes from $G$. They split a source's water by where it leaves the model ({SI: where each source's water goes}). <!-- evidence: src/gwsource/metrics.py docstring (volume_through = F x O, gross; volume_from, volume_from_by_term; forward volume_through = G x I, volume_to, volume_to_by_term); full draft Section 2.3 -->
+A fraction says what share of a cell's water reaches the destination, but not how much water that is. A fraction times a flow gives a volume of water per unit time. The volume through cell $i$ is $F_i O_i$. It is the part of the water passing through the cell that reaches the destination. The volume from cell $i$ is $F_i$ times the cell's inflow through its source terms. It is the water entering the model in that cell that reaches the destination. Summing the volume from over all cells, package by package, splits the destination's water by source (Section 4, Fig. 2b). A forward trace gives the matching volumes from $G$. They split a source's water by where it leaves the model ({SI: where each source's water goes}). <!-- evidence: src/gwsource/metrics.py docstring (volume_through = F x O, gross; volume_from, volume_from_by_term; forward volume_through = G x I, volume_to, volume_to_by_term); full draft Section 2.3 -->
 
 ### Why the water-budget checks hold exactly
 
-The checks of Section 2.3 follow from adding up Eqs. (S2) and (S4) over all cells. Adding Eq. (S2) over all cells gives $\sum_i F_i O_i$ on the left. On the right, each flow $q_{ij}$ appears once, multiplied by the $F$ of the cell it enters. Summed over the cells it leaves, the flow into cell $j$ is $\sum_i q_{ij} = I_j - \mathrm{Src}_j$. So
+The checks of Section 2 follow from adding up Eqs. (S2) and (S4) over all cells. Adding Eq. (S2) over all cells gives $\sum_i F_i O_i$ on the left. On the right, each flow $q_{ij}$ appears once, multiplied by the $F$ of the cell it enters. Summed over the cells it leaves, the flow into cell $j$ is $\sum_i q_{ij} = I_j - \mathrm{Src}_j$. So
 
 $$\sum_i F_i\, O_i = \sum_j F_j \left(I_j - \mathrm{Src}_j\right) + \sum_i d_i .$$
 
@@ -100,7 +100,7 @@ The mean travel time $m_i/F_i$ includes the time spent in the cell where the wat
 
 ### Transient tracking
 
-Transient tracking carries tagged water from step to step (Section 2.4; {SI: method schematic}d). Each cell, and each reach, lake or well added as an extra cell (Section 3), is a fully mixed volume of water. The storage terms of the flow model are not traced as source or sink terms. They change the volume of water in the cell instead. In step $n$, of length $\Delta t$, the volume changes from $V_i^{\mathrm{old}}$ to $V_i^{\mathrm{new}}$. The change equals the storage release over the step. The tagged water in the cell at the end of the step is the tagged water at the start, plus what arrives, less what leaves. Let $c_i$ be the share of a cell's water that is tagged. Step $n$ of length $\Delta t$ is then
+Transient tracking carries tagged water from step to step (Section 2; {SI: method schematic}d). Each cell, and each reach, lake or well added as an extra cell (Section 3), is a fully mixed volume of water. The storage terms of the flow model are not traced as source or sink terms. They change the volume of water in the cell instead. In step $n$, of length $\Delta t$, the volume changes from $V_i^{\mathrm{old}}$ to $V_i^{\mathrm{new}}$. The change equals the storage release over the step. The tagged water in the cell at the end of the step is the tagged water at the start, plus what arrives, less what leaves. Let $c_i$ be the share of a cell's water that is tagged. Step $n$ of length $\Delta t$ is then
 
 $$V_i^{\mathrm{new}} c_i^n - V_i^{\mathrm{old}} c_i^{n-1} = \Delta t \Big[ \sum_j q_{ji}\, c_j^n + s_i^n - (O_i + r_i)\, c_i^n \Big], \tag{S12}$$
 

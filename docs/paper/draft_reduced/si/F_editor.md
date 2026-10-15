@@ -2,7 +2,7 @@
 
 ## {SI: per-well gross and net}
 
-**Table.** Contributing area of each priority well against its published contributing cells, under gross and net accounting (Section 2.2); calibrated Neversink model, streams as cells. Where two values are given, the first is gross accounting and the second net accounting.
+**Table.** Contributing area of each priority well against its published contributing cells, under gross and net accounting (Section 2); calibrated Neversink model, streams as cells. Where two values are given, the first is gross accounting and the second net accounting.
 
 | well | pumping (m³/d) | well's share of its cell's outflow | net attribution (m³/d) | published contributing cells | expected area (sum of F) | overlap, F > 0.1 | overlap, F > 0.5 | overlap, area-matched |
 |---|---|---|---|---|---|---|---|---|
