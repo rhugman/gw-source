@@ -1,6 +1,6 @@
-<!-- Title chosen by the author (2026-10-15, paper-draft-alt): a practitioner's question, then what the tool is. -->
+<!-- Title chosen by the author (2026-10-15, paper-draft-alt, option 5 of the artifact thread): a practitioner's question not tied to wells, then what the tool is. -->
 
-# Where does my well's water come from? Open-source flow tracing for MODFLOW 6
+# Where does it come from and where does it go? Fast, open-source flow tracing for MODFLOW 6 models
 
 **Article Impact Statement:** Open-source code turns saved MODFLOW 6 flows into contributing areas, water sources and travel times for any well or stream, in steady-state or transient flow, fast enough for ensembles.
 

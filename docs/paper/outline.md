@@ -19,7 +19,7 @@ Model papers named by the author: Hugman and White (2026, *Groundwater*, pyEMU e
 
 Title (author's choice, 2026-10-15): a practitioner's question, then what the tool is.
 
-- *Where does my well's water come from? Open-source flow tracing for MODFLOW 6* (chosen)
+- *Where does it come from and where does it go? Fast, open-source flow tracing for MODFLOW 6 models* (chosen 2026-10-15, replacing *Where does my well's water come from? Open-source flow tracing for MODFLOW 6*)
 - Variants in the same style:
   - *Which land feeds my well? Open-source flow tracing for MODFLOW 6*
   - *Where does a well's water come from, and how old is it? Open-source flow tracing for MODFLOW 6*
