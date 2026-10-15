@@ -1,6 +1,6 @@
-<!-- Title chosen by the author (2026-10-13): the method applies to any sink, and transient flow is the main extension. -->
+<!-- Title chosen by the author (2026-10-15, paper-draft-alt): a practitioner's question, then what the tool is. -->
 
-# Contributing areas and sources of water for any MODFLOW 6 sink, in steady-state and transient flow
+# Where does my well's water come from? Open-source flow tracing for MODFLOW 6
 
 **Article Impact Statement:** Open-source code maps the contributing areas of wells, streams and other MODFLOW 6 sinks in seconds and checks every result against the water budget.
 

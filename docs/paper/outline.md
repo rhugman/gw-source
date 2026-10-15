@@ -27,7 +27,7 @@ Title (author's choice, 2026-10-15): a practitioner's question, then what the to
 Key messages, one per paragraph of the conclusions:
 
 1. From the cell-by-cell flows a MODFLOW 6 model already saves, the tool maps contributing areas, the sources of a sink's water, travel times and the fate of water from a source.
-2. Every result is checked against the water budget. The tool agrees with a published worked example and with MODFLOW 6 GWT to round-off, and with MODFLOW 6 PRT in totals and means. Per cell, it differs from PRT at the edge of a zone.
+2. Every result is checked against the water budget. The tool reproduces a published unit-concentration study (Bedekar et al. 2024) and a published worked example, agrees with MODFLOW 6 GWT to round-off, and with MODFLOW 6 PRT in totals and means. Per cell, it differs from PRT at the edge of a zone.
 3. The answers come in seconds on small models. On a 1.68-million-cell model, one trace of nine destination groups takes 2–3 s. Ensembles of hundreds of realisations are therefore affordable.
 4. The tool works on every MODFLOW 6 grid type, with stream networks, movers, multi-aquifer wells and multi-model simulations, in steady-state and transient flow.
 5. Full mixing has costs. Its areas are wider and more diffuse than particle areas. Its thresholds need judgement. Snapshots of a transient model have no travel lag. Transient tracking and ensembles need memory. The paper states when to use particles or transport instead.
