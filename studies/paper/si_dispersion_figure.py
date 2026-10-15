@@ -18,6 +18,9 @@ Figs 1, 3 and 5). Nothing is rerun.
 
 The numbers the SI text quotes are in QUOTED and asserted before plotting. Sizes follow
 studies/paper/method_figures.py: double column 7 in, fonts 7 to 8 pt, PNG at 300 dpi and PDF.
+A second figure (main_combined, reduced draft) puts the problem A maps at 30 degrees and the
+problem B maps above the band width and area errors against cell size, without (m-n).
+
 Run from the repository root:
 
     PYTHONPATH=src python studies/paper/si_dispersion_figure.py
@@ -194,6 +197,71 @@ def make_figS1(fig_dir: Path, a_maps: dict, b_maps: dict, curves: pd.DataFrame) 
     return mfig.save(fig, fig_dir, FIG_NAME)
 
 
+COMBINED_NAME = "figS23_numerical_dispersion"
+METRIC_TITLES = ("width of the 0.1 < F < 0.9 band (m)", "relative area error, F > 0.1",
+                 "relative area error, F > 0.5")
+
+
+def draw_metrics(axes, a: pd.DataFrame, b: pd.DataFrame, letters: str) -> None:
+    """Band width and area errors against cell size for problems A and B (main-text Fig. 3 of
+    the full draft, drawn by method_figures.make_fig3)."""
+    dfig = mfig.import_dispersion_figures()
+    keys_a = [("DIS", "mixing"), ("DIS", "routing"), ("DISV", "mixing"), ("DIS", "cell_average")]
+    keys_b = [("DIS", "mixing"), ("DIS", "routing"), ("DISV", "mixing"), ("DIS", "particles")]
+    mfig.dispersion_row(axes[0], a, keys_a, ((0.0, "-"), (30.0, ":")), dfig._size_axis,
+                        (200, 100, 50, 25, 12.5))
+    mfig.dispersion_row(axes[1], b, keys_b, ((None, "-"),), dfig._size_axis, (100, 50, 25, 12.5))
+    mfig.slope_guide(axes[0, 0], np.array([200.0, 12.5]), (200.0, 900.0), 0.5, "$h^{0.5}$")
+    mfig.slope_guide(axes[1, 0], np.array([100.0, 12.5]), (100.0, 230.0), 0.5, "$h^{0.5}$")
+    mfig.plain_log_ticks(axes[0, 0], (10, 30, 100, 300, 1000))
+    mfig.plain_log_ticks(axes[1, 0], (10, 30, 100, 300))
+    mfig.plain_log_ticks(axes[0, 1], (0.03, 0.1, 0.3, 1, 3))
+    mfig.plain_log_ticks(axes[1, 1], (0.02, 0.05, 0.1, 0.2, 0.5))
+    for row, problem in enumerate(("A", "B")):
+        for col, title in enumerate(METRIC_TITLES):
+            axes[row, col].set_title(f"({letters[3 * row + col]}) {title}", loc="left")
+            if row == 0:
+                axes[row, col].set_xlabel("")
+        axes[row, 0].set_ylabel(f"problem {problem}")
+    axes[0, 2].set_ylim(-0.55, 0.5)
+    axes[1, 2].set_ylim(-0.06, 0.06)
+
+
+def make_combined(fig_dir: Path, a_maps: dict, b_maps: dict, a: pd.DataFrame,
+                  b: pd.DataFrame) -> list[Path]:
+    """SI figure of the reduced draft: the 50 m maps of problem A (flow at 30 degrees to the
+    rows) and problem B, then band width and area errors against cell size. The time-step panels
+    of Fig. S1 are left out."""
+    mfig.paper_style()
+    fig = plt.figure(figsize=(mfig.FULL_WIDTH, 7.6), layout="constrained")
+    top, bottom = fig.subfigures(2, 1, height_ratios=(1.85, 2.0), hspace=0.02)
+    axes = top.subplots(2, 4, gridspec_kw={"hspace": 0.02, "wspace": 0.02})
+    image = draw_problem_a(axes[0], a_maps, 30.0, "abcd", bottom=True)
+    draw_problem_b(axes[1], b_maps, "efgh")
+    for ax, label in zip(axes[:, 0], ("problem A: y (km)", "problem B: y (km)")):
+        ax.set_ylabel(label)
+    top.colorbar(image, ax=axes, shrink=0.6, aspect=20, pad=0.01,
+                 label="F, share of the cell's water\nthat reaches the well")
+    metric_axes = bottom.subplots(2, 3)
+    draw_metrics(metric_axes, a, b, "ijklmn")
+    handles = [plt.Line2D([], [], color=c, marker=m, ms=3.2, lw=1.4, label=lab)
+               for c, m, lab in mfig.DISPERSION_SERIES.values()]
+    handles += [plt.Line2D([], [], color=mfig.MUTED, ls=ls, lw=1.2, label=lab)
+                for ls, lab in (("-", "A: flow along the rows"), (":", "A: flow at 30°"))]
+    bottom.legend(handles=handles, loc="outside lower center", ncol=4)
+    return mfig.save(fig, fig_dir, COMBINED_NAME)
+
+
+def main_combined(fig_dir: Path = mfig.FIG_DIR,
+                  dispersion_out: Path = mfig.DISPERSION_DIR / "output") -> list[Path]:
+    """Make the reduced draft's combined SI figure from the dispersion study's outputs."""
+    a_maps = dict(np.load(dispersion_out / "a_maps.npz"))
+    b_maps = dict(np.load(dispersion_out / "b_maps.npz"))
+    a = pd.read_csv(dispersion_out / "a_metrics.csv")
+    b = pd.read_csv(dispersion_out / "b_metrics.csv")
+    return make_combined(fig_dir, a_maps, b_maps, a, b)
+
+
 def main(fig_dir: Path = mfig.FIG_DIR, dispersion_out: Path = mfig.DISPERSION_DIR / "output",
          h_steps: float = H_STEPS) -> list[Path]:
     """Make Fig. S1 in fig_dir from the dispersion study's outputs; return the paths."""
@@ -207,5 +275,9 @@ def main(fig_dir: Path = mfig.FIG_DIR, dispersion_out: Path = mfig.DISPERSION_DI
 
 if __name__ == "__main__":
     t0 = time.perf_counter()
-    print(main())
+    if len(sys.argv) > 1:  # python si_dispersion_figure.py <dispersion output dir> [combined]
+        out = Path(sys.argv[1])
+        print(main_combined(dispersion_out=out) if "combined" in sys.argv[2:] else main(dispersion_out=out))
+    else:
+        print(main())
     print(f"{time.perf_counter() - t0:.1f} s")

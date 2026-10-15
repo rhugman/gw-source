@@ -507,8 +507,11 @@ def fig2_legends(fig, handles: list) -> None:
 
 
 def make_fig2(out_dir: Path, table: pd.DataFrame, model_labels: dict,
-              check_labels: dict, check_order: tuple, check_groups: dict) -> list[Path]:
-    """Fig. 2: error per check and model on a log axis, with machine precision and tolerances."""
+              check_labels: dict, check_order: tuple, check_groups: dict,
+              xlabel: str = "error reached (measure per check in Table S1)",
+              file_name: str = "fig2_verification") -> list[Path]:
+    """Fig. 2: error per check and model on a log axis, with machine precision and tolerances.
+    The reduced draft's SI figure (figS21_verification) names the measures in its caption."""
     checks = [c for c in check_order if c in set(table.check)]
     rows, headings = check_rows(check_groups, checks)
     n_rows = len(rows) + len(headings)
@@ -532,10 +535,10 @@ def make_fig2(out_dir: Path, table: pd.DataFrame, model_labels: dict,
                 fontsize=7.5, fontweight="bold", zorder=4)
         if row > 0:
             ax.axhline(row - 0.5, color=MUTED, lw=0.8, zorder=3)
-    ax.set_xlabel("error reached (measure per check in Table S1)")
+    ax.set_xlabel(xlabel)
     ax.tick_params(axis="y", length=0)
     fig2_legends(fig, handles)
-    return save(fig, out_dir, "fig2_verification")
+    return save(fig, out_dir, file_name)
 
 
 # ---------------------------------------------------------------- Fig. 3: numerical dispersion
