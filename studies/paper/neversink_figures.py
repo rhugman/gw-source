@@ -11,6 +11,8 @@ of the main checkout when this checkout has no output folder.
   (as Fig. S7a), (c) against the P > 0.5 area of the weight-losing PRT particles (as Fig. S7d),
   (d) ensemble mean F with the published probability 0.5 outlined (as Fig. S8d), and a locator
   map of the whole model with the window (in place of Fig. S5).
+- Reduced draft Fig. 3 (gate fig_single), one column of 8.25 cm: panels (a) and (b) of Fig. 12
+  side by side in the same window, with the same checks.
 - Fig. S5, location map: active model area, SFR reaches as a network, the three MODPATH 7
   regions (start cells of the published runs), the published contributing cells of the
   calibrated model and the eight priority wells by cluster. Coordinates are km from the grid
@@ -925,6 +927,94 @@ def neversink_row(
     return save(fig, fig_dir, "fig12_neversink")
 
 
+# ---------------------------------------------------------------- reduced draft: one column
+
+SINGLE_REDUCED = 8.25 / 2.54  # width (in) of the one-column figures of the reduced draft
+SINGLE_TITLES = ("(a) F", "(b) F > 0.1, published cells")
+SINGLE_OVERLAP_LABELS = ("in both", "published only", "F > 0.1 only")  # codes 1 to 3
+
+
+def single_key(ax: plt.Axes, image: AxesImage, edges: tuple = F_EDGES) -> None:
+    """Draw the colour bar of F in panel (a) of the one-column figure in the upper part of ax."""
+    ax.axis("off")
+    cax = ax.inset_axes([0.06, 0.42, 0.88, 0.2])
+    bar = plt.colorbar(
+        image, cax=cax, orientation="horizontal", extend="min", ticks=edges, spacing="uniform"
+    )
+    bar.ax.set_xticklabels([f"{edge:g}" for edge in edges])
+    bar.outline.set_visible(False)
+    bar.ax.tick_params(labelsize=6, length=2, pad=1)
+    bar.ax.set_title("F (a), grey below 0.01", fontsize=6.5, loc="left", pad=2)
+
+
+def single_legend(
+    ax: plt.Axes, colors: tuple = OVERLAP_COLORS, labels: tuple = SINGLE_OVERLAP_LABELS
+) -> None:
+    """Draw the legend of the one-column figure in ax: the overlap classes of panel (b) in the
+    first column; the wells, the SFR reaches and the outline of panel (a) in the second."""
+    ax.axis("off")
+    handles = [Patch(facecolor=colors[k], edgecolor="none", label=labels[k - 1]) for k in (1, 2, 3)]
+    handles += [
+        plt.Line2D(
+            [], [], ls="", marker="o", ms=3.5, mfc=COLORS["prt"], mec=INK, mew=0.6, label="wells"
+        ),
+        plt.Line2D([], [], color=STREAM, lw=1, label="SFR reaches"),
+        plt.Line2D([], [], color=INK, lw=0.8, label="published (a)"),
+    ]
+    ax.legend(
+        handles=handles,
+        loc="center",
+        ncol=2,
+        handlelength=1.1,
+        handleheight=0.8,
+        handletextpad=0.4,
+        labelspacing=0.25,
+        columnspacing=0.6,
+        frameon=False,
+        fontsize=6.5,
+        borderpad=0.0,
+        borderaxespad=0.0,
+    )
+
+
+def neversink_single(
+    fig_dir: Path,
+    idomain: np.ndarray,
+    wells: dict,
+    maps: dict,
+    window: tuple,
+    segments: np.ndarray,
+    titles: tuple = SINGLE_TITLES,
+    bar_km: float = F6_BAR_KM,
+    width: float = SINGLE_REDUCED,
+) -> Path:
+    """One-column Neversink figure of the reduced draft, panels (a) and (b) of Fig. 12 side by
+    side in the same window: (a) F with the published cells outlined, (b) the F > 0.1 area
+    against the published cells."""
+    paper_style()
+    nrow, ncol = idomain.shape[1:]
+    wells_ij = list(well_ij(wells, (nrow, ncol)).values())
+    fig = plt.figure(figsize=(width, 1.72), layout="constrained")
+    fig.get_layout_engine().set(w_pad=0.01, h_pad=0.01, wspace=0.02, hspace=0.0)
+    top, bottom = fig.subfigures(2, 1, height_ratios=(1.0, 0.36))
+    axes = top.subplots(1, 2)
+    image = class_panel(
+        axes[0], maps["F"], maps["published"], wells_ij, window, segments, f_classes(), titles[0]
+    )
+    overlap_panel(axes[1], maps["codes published"], window, wells_ij, segments, titles[1])
+    for ax in axes:
+        ax.title.set_fontsize(7)
+        for line in ax.lines:
+            line.set_markersize(3.5)
+            line.set_markeredgewidth(0.6)
+    x0, _, y0, _ = window_extent(window, nrow)
+    scale_bar(axes[0], x0 + 0.4, y0 + 0.4, bar_km)
+    ax_key, ax_legend = bottom.subplots(1, 2)
+    single_key(ax_key, image)
+    single_legend(ax_legend)
+    return save(fig, fig_dir, "fig_neversink_single")
+
+
 # ---------------------------------------------------------------- Fig. S9: area growth
 
 
@@ -1152,6 +1242,7 @@ def published_mask(shape: tuple, out: Path = OUT) -> np.ndarray:
 
 def main(
     fig12: bool = True,
+    fig_single: bool = False,
     figS5: bool = False,
     figS6: bool = False,
     figS7: bool = False,
@@ -1175,7 +1266,7 @@ def main(
     idomain = wf.grid_idomain(model_dir)
     shape = idomain.shape[1:]
     wells = wf.PRIORITY_WELLS
-    maps_needed = fig12 or figS5 or figS6 or figS7 or figS8
+    maps_needed = fig12 or fig_single or figS5 or figS6 or figS7 or figS8
     if maps_needed:
         mask = published_mask(shape, out)
         windows = capture_windows(idomain, wells, mask, out)
@@ -1187,6 +1278,11 @@ def main(
         maps = row_maps(idomain, mask, out, ens_dir / "probability_maps.npz")
         check_window(maps, window)
         paths.append(neversink_row(fig_dir, idomain, wells, maps, window, segments, regions))
+    if fig_single:
+        window = equal_windows(windows, shape)[FIG12_WINDOW]
+        maps = row_maps(idomain, mask, out, ens_dir / "probability_maps.npz")
+        check_window(maps, window)
+        paths.append(neversink_single(fig_dir, idomain, wells, maps, window, segments))
     if figS5:
         x0, y0 = read_dis_origin(model_dir / "neversink.dis")
         north = true_north_angle(x0 + shape[1] * 25.0, y0 + shape[0] * 25.0)
