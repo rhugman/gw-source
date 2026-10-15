@@ -63,6 +63,28 @@ def test_quickstart_builder(tmp_path, mf6_exe):
     assert hbd.feature_cells(step, "RIV").size == run.spec.nrow
 
 
+def test_voronoi_builder(tmp_path, mf6_exe):
+    """The vorflow DISV model centres the well cell on the well and the river cells on the river.
+
+    Its river conductance adds up to the DIS total, and the well's water closes on the pumping.
+    """
+    pytest.importorskip("vorflow")
+    import herebedragons as hbd
+
+    run = hbd.build_voronoi(tmp_path, mf6_exe)
+    spec = run.spec
+    step = gs.read_step(run.ws, boundnames=True)
+    centres = gs.export.cell_centres(run.grb_file)
+    well_node = run.info["well_nodes"]["supply_well"]
+    assert np.allclose(centres[well_node], spec.xy(spec.wells[0][1]))
+    riv_x = (spec.riv_col + 0.5) * spec.delr
+    assert np.allclose(centres[run.info["riv_cells"], 0], riv_x)
+    riv = run.gwf.get_package("riv").stress_period_data.get_data(0)
+    assert riv["cond"].sum() == pytest.approx(spec.riv_cond * spec.nrow, rel=1e-12)
+    res = gs.backward(step, {"well": gs.select(step, boundnames=["supply_well"])})
+    assert res.volume_from["well"].sum() == pytest.approx(800.0, rel=1e-8)
+
+
 def load_tutorial_helpers(folder: str):
     """Import a tutorial's own helpers.py under a unique module name (each tutorial has one)."""
     import importlib.util
