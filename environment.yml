@@ -17,6 +17,7 @@ dependencies:
   - nbclient
   - nbformat
   - nbconvert
+  - pyemu
   - pip
   - pip:
       - flopy[codegen] @ git+https://github.com/modflowpy/flopy.git@develop
