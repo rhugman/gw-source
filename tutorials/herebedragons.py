@@ -795,22 +795,23 @@ def run_gwt_tracer(
     tagged: tuple[str, ...] = ("rch",),
     strt: float | np.ndarray = 0.0,
     ims_kwargs: dict | None = None,
+    perioddata: list[tuple[float, int, float]] | None = None,
 ) -> Path:
     """Run an MF6 GWT unit-tracer model on a DIS model's saved flows; return the UCN file.
 
     Upstream advection, no dispersion, FLOW_IMBALANCE_CORRECTION; every bound of the tagged
     packages (pnames) has concentration 1, all other inflow 0; strt tags the initial water.
-    ims_kwargs override GWT_IMS.
+    ims_kwargs override GWT_IMS. perioddata (perlen, nstp, tsmult) replaces the flow model's
+    TDIS; MF6 reuses the single budget step of a steady flow model for every GWT step, so a
+    long period runs a steady model to equilibrium.
     """
     ws = Path(ws)
     ws.mkdir(parents=True, exist_ok=True)
     name = "gwt"
     sim = flopy.mf6.MFSimulation(sim_name=name, sim_ws=str(ws), exe_name=str(exe))
-    tdis = run.sim.tdis
-    flopy.mf6.ModflowTdis(
-        sim, nper=tdis.nper.get_data(), time_units="days",
-        perioddata=[tuple(r) for r in tdis.perioddata.get_data()],
-    )
+    if perioddata is None:
+        perioddata = [tuple(r) for r in run.sim.tdis.perioddata.get_data()]
+    flopy.mf6.ModflowTdis(sim, nper=len(perioddata), time_units="days", perioddata=perioddata)
     gwt = flopy.mf6.ModflowGwt(sim, modelname=name)
     flopy.mf6.ModflowIms(sim, **{**GWT_IMS, **(ims_kwargs or {})}, filename=f"{name}.ims")
     dis = run.gwf.dis
