@@ -453,9 +453,17 @@ def build_voronoi(
     shared equally among the river cells so that its total matches the DIS model.
     """
     spec = AquiferSpec() if spec is None else spec
-    name = "voronoi"
-    ws = Path(ws)
     gridprops = disv_gridprops(vorflow_cells(spec, background, well_size, river_size))
+    return build_disv(ws, exe, gridprops, spec, name="voronoi")
+
+
+def build_disv(ws: Path, exe: Path, gridprops: dict, spec: AquiferSpec, name: str) -> ModelRun:
+    """Steady 1-layer DISV quickstart model on any polygon grid (stresses by voronoi_stress_cells).
+
+    gridprops holds DISV ncpl, nvert, vertices and cell2d (disv_gridprops). The river
+    conductance is shared equally among the river cells so that its total matches the DIS model.
+    """
+    ws = Path(ws)
     cells = voronoi_stress_cells(gridprops, spec)
     ncpl = gridprops["ncpl"]
     sim, gwf = make_sim(name, ws, exe, STEADY)
@@ -490,6 +498,106 @@ def build_voronoi(
         "chd_cells": cells["chd"],
     }
     return run_model(sim, gwf, name, ws, dis_filename, spec, info)
+
+
+def rotated_square_cells(
+    spec: AquiferSpec,
+    side: float,
+    anchor: tuple[float, float],
+    angle: float = 45.0,
+    decimals: int = 6,
+):
+    """Tile the tutorial domain with squares rotated by `angle` degrees; return a GeoDataFrame.
+
+    One square is centred on `anchor` [m]. Squares cut by the domain edge are clipped. Each
+    cell keeps its square centre in columns x and y when the clipped cell still covers it
+    (the connections to its neighbours then stay perpendicular to the shared faces), and the
+    centroid of the clipped cell otherwise. Corners and centres are rounded to `decimals`
+    decimal places [m], so neighbours share exact corners and a line through a row of centres
+    touches the neighbouring squares at their corners only.
+    """
+    import geopandas as gpd
+    from shapely.geometry import Point, Polygon, box
+
+    domain = box(0.0, 0.0, spec.lx, spec.ly)
+    theta = np.radians(angle)
+    u = side * np.array([np.cos(theta), np.sin(theta)])  # lattice vector along the first side
+    v = side * np.array([-np.sin(theta), np.cos(theta)])  # lattice vector along the second side
+
+    def point(a: float, b: float) -> tuple[float, float]:
+        """Return the rounded position anchor + a u + b v."""
+        x, y = np.asarray(anchor) + a * u + b * v
+        return round(float(x), decimals), round(float(y), decimals)
+
+    n = int(np.ceil(np.hypot(spec.lx, spec.ly) / side)) + 1
+    polygons, xs, ys = [], [], []
+    for i in range(-n, n + 1):
+        for j in range(-n, n + 1):
+            xc, yc = point(i, j)
+            if not (-side <= xc <= spec.lx + side and -side <= yc <= spec.ly + side):
+                continue
+            corners = [point(i + a, j + b) for a, b in ((-.5, -.5), (.5, -.5), (.5, .5), (-.5, .5))]
+            cell = Polygon(corners).intersection(domain)
+            if cell.geom_type != "Polygon" or cell.area < 1e-6 * side**2:
+                continue
+            centre = (xc, yc) if cell.covers(Point(xc, yc)) else cell.centroid.coords[0]
+            polygons.append(cell)
+            xs.append(float(centre[0]))
+            ys.append(float(centre[1]))
+    return gpd.GeoDataFrame({"x": xs, "y": ys}, geometry=polygons)
+
+
+def build_rotated_squares(
+    ws: Path, exe: Path, side: float, spec: AquiferSpec | None = None, angle: float = 45.0
+) -> ModelRun:
+    """Steady DISV quickstart model on squares rotated by `angle`, one centred on the first well.
+
+    The river, the west edge and the wells are placed on the cells by the rules of
+    build_voronoi (voronoi_stress_cells).
+    """
+    spec = AquiferSpec() if spec is None else spec
+    anchor = spec.xy(spec.wells[0][1])
+    gridprops = disv_gridprops(rotated_square_cells(spec, side, anchor, angle))
+    return build_disv(ws, exe, gridprops, spec, name="rotated")
+
+
+# ---------------------------------------------------------------- edge of a capture zone
+
+
+def edge_band_area(F: np.ndarray, area: np.ndarray, low: float = 0.1, high: float = 0.9) -> float:
+    """Return the summed area of the cells with low < F < high (the edge band) [area units]."""
+    F = np.asarray(F, dtype=float)
+    return float(np.asarray(area)[(F > low) & (F < high)].sum())
+
+
+def transect_profile(
+    centres: np.ndarray, values: np.ndarray, x: float, y: np.ndarray
+) -> np.ndarray:
+    """Return per-cell values interpolated linearly between cell centres along a line x = const."""
+    from scipy.interpolate import LinearNDInterpolator
+
+    interpolate = LinearNDInterpolator(np.asarray(centres)[:, :2], np.asarray(values, dtype=float))
+    return interpolate(np.full(len(y), x), np.asarray(y, dtype=float))
+
+
+def band_width_north(
+    y: np.ndarray, profile: np.ndarray, low: float = 0.1, high: float = 0.5
+) -> tuple[float, float, float]:
+    """Return (y at F = high, y at F = low, their distance) north of the peak of a profile.
+
+    profile is F sampled at the increasing positions y. Each crossing is the first one north of
+    the largest F, located by linear interpolation between samples.
+    """
+    y, profile = np.asarray(y, dtype=float), np.asarray(profile, dtype=float)
+    start = int(np.nanargmax(profile))
+    crossings = []
+    for level in (high, low):
+        below = np.flatnonzero(profile[start:] < level)
+        assert below.size, f"F does not fall below {level} north of the peak"
+        k = start + int(below[0])
+        f0, f1 = profile[k - 1], profile[k]
+        crossings.append(float(y[k - 1] + (f0 - level) / (f0 - f1) * (y[k] - y[k - 1])))
+    return crossings[0], crossings[1], crossings[1] - crossings[0]
 
 
 def build_disu(
