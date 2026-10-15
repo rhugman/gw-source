@@ -1,4 +1,4 @@
-"""Transient-tracking figure of the paper (Fig. 4, file fig4_transient_tracking): tutorial 08's
+"""Transient-tracking figure of the paper (Fig. 9, file fig9_transient_tracking): tutorial 08's
 seasonal model, snapshots against transient tracking through storage. Outline: docs/paper/outline.md §5.4 and §6; wording: docs/paper/terms.md.
 
 The model is tutorial 08's (tutorials/herebedragons.py::build_transient): the tutorial aquifer
@@ -21,16 +21,17 @@ Every panel uses the default "flow" volumes and four transport sub-steps per flo
 23 days; one step per 91-day flow step nearly doubles early arrivals, tutorial 08 §9). Forward
 and backward runs share these options, so the forward-backward check pairs them to round-off.
 Two extra runs at one transport step per flow step serve the checks: "gwt" volumes against an
-MF6 GWT unit-tracer run on the same flows (tutorial 08 §8; the verification on test models 6
-and 7 is Fig. 2's), and "flow" volumes for the difference between the two volume options. A
+MF6 GWT unit-tracer run on the same flows (tutorial 08 §8), and "flow" volumes for the difference between the two volume options. A
 16-sub-step run bounds the effect of the transport step on the year-1 shares.
 
 The caption numbers are in QUOTED and asserted against the computed values before plotting.
 Sizes follow studies/paper/method_figures.py: double column 7 in, fonts 7 to 8 pt, PNG at
-300 dpi and PDF, Okabe-Ito colours. Run from the repository root (model workspaces in
+300 dpi and PDF, Okabe-Ito colours. The maps follow studies/paper/example_figures.py:
+viridis from 0 to 1 with white contours (dashed 0.1, solid 0.5), river cells in sky blue and the
+well as a white star. Run from the repository root (model workspaces in
 studies/paper/output, git-ignored):
 
-    PYTHONPATH=src python studies/paper/transient_figure.py
+    PYTHONPATH=src:tutorials python studies/paper/transient_figure.py
 """
 
 import sys
@@ -47,10 +48,11 @@ import method_figures as mfig  # noqa: E402  (style, palette, save, find_mf6)
 
 import gwsource as gs  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
+from matplotlib.colors import ListedColormap  # noqa: E402
 
 TUTORIAL_DIR = mfig.TUTORIAL_DIR
 TUTORIAL08_DIR = TUTORIAL_DIR / "08_transient_tracking"
-FIG_NAME = "fig4_transient_tracking"
+FIG_NAME = "fig9_transient_tracking"
 WELL = "supply_well"
 N_YEARS = 30
 POROSITY = 0.3
@@ -71,6 +73,12 @@ COLOURS = {
     "storage": OKABE_ITO["orange"],
     "initial": "#c8c8c8",
 }
+F_CMAP = "viridis"  # maps, as studies/paper/example_figures.py
+F_CONTOUR = "white"
+THRESHOLDS = (0.1, 0.5)  # map contours: dashed, solid
+RIVER_COLOUR = OKABE_ITO["sky"]
+STAR_COLOUR = "white"  # the well on maps
+STAR_SIZE = 70.0
 LABELS = {
     "recharge": "recharge",
     "river": "river leakage",
@@ -255,6 +263,7 @@ def compute(
         "first": first,
         "spec": run.spec,
         "well_node": run.info["well_nodes"][well],
+        "river_cells": hbd.feature_cells(first, "RIV"),
         "n_steps": len(fwd.steps),
         "factors": seasonal_factors(run.info),
         "pumping_max": float(summary["well rate (m3/d)"].max()),
@@ -395,18 +404,45 @@ def map_extent(spec) -> tuple[float, float, float, float]:
     return (0.0, spec.lx / 1000.0, 0.0, spec.ly / 1000.0)
 
 
+def cell_centres_km(spec) -> tuple[np.ndarray, np.ndarray]:
+    """Return the x and y (km) of the cell centres of the tutorial grid."""
+    x = (np.arange(spec.ncol) + 0.5) * spec.delr / 1000.0
+    y = (spec.ly - (np.arange(spec.nrow) + 0.5) * spec.delc) / 1000.0
+    return x, y
+
+
+def draw_contours(ax, grid: np.ndarray, spec, levels: tuple = THRESHOLDS,
+                  colour: str = F_CONTOUR) -> None:
+    """Draw the 0.1 (dashed) and 0.5 (solid) contours of a per-cell fraction."""
+    x, y = cell_centres_km(spec)
+    ax.contour(x, y, np.ma.masked_invalid(grid), levels=list(levels), colors=colour,
+               linestyles=["--", "-"], linewidths=1.0)
+
+
+def draw_river(ax, first: gs.FlowStep, river_cells: np.ndarray, spec,
+               colour: str = RIVER_COLOUR) -> None:
+    """Fill the river cells with one colour."""
+    values = np.full(first.n_cells, np.nan)
+    values[river_cells] = 1.0
+    grid = np.ma.masked_invalid(gs.export.to_grid(first, values)[0])
+    ax.imshow(grid, cmap=ListedColormap([colour]), vmin=0.0, vmax=2.0, extent=map_extent(spec),
+              origin="upper", interpolation="nearest")
+
+
 def draw_map(ax, first: gs.FlowStep, values: np.ndarray, spec, well_node: int,
-             okabe_ito: dict = OKABE_ITO):
-    """Map one per-cell fraction (0 to 1) with the river column and the well marked."""
+             river_cells: np.ndarray, star_colour: str = STAR_COLOUR,
+             star_size: float = STAR_SIZE):
+    """Map one per-cell fraction (viridis, 0 to 1) with contours, the river and the well."""
     grid = gs.export.to_grid(first, values)[0]
-    image = ax.imshow(grid, cmap=mfig.F_CMAP, vmin=0.0, vmax=1.0, extent=map_extent(spec),
+    image = ax.imshow(grid, cmap=F_CMAP, vmin=0.0, vmax=1.0, extent=map_extent(spec),
                       origin="upper", interpolation="nearest")
-    x_river = (spec.riv_col + 0.5) * spec.delr / 1000.0
-    ax.plot([x_river, x_river], [0.0, spec.ly / 1000.0], color=mfig.MUTED, lw=0.8,
-            ls=(0, (3, 1.5)))
+    draw_contours(ax, grid, spec)
+    draw_river(ax, first, river_cells, spec)
     x_well, y_well = spec.xy(divmod(well_node, spec.ncol))
-    ax.plot(x_well / 1000.0, y_well / 1000.0, marker="v", color=okabe_ito["vermillion"],
-            ms=4.5, mec="white", mew=0.5)
+    ax.scatter(x_well / 1000.0, y_well / 1000.0, marker="*", s=star_size, color=star_colour,
+               edgecolor="black", linewidth=0.6, zorder=6)
+    ax.set_xlim(0.0, spec.lx / 1000.0)
+    ax.set_ylim(0.0, spec.ly / 1000.0)
     ax.set_xticks((0, 1, 2))
     ax.set_yticks((0, 1, 2))
     ax.set_aspect("equal")
@@ -423,7 +459,7 @@ def series_legend(fig, anchor: tuple[float, float], colours: dict = COLOURS,
 
 
 def make_figure(out_dir: Path, data: dict, fig_name: str = FIG_NAME) -> list[Path]:
-    """Fig. 4: snapshot and tracked shares of the well's water, and four backward maps."""
+    """Fig. 9: snapshot and tracked shares of the well's water, and four backward maps."""
     fig = plt.figure(figsize=(mfig.FULL_WIDTH, 5.0))
     top = fig.add_gridspec(2, 1, left=0.085, right=0.75, top=0.955, bottom=0.53, hspace=0.32)
     ax_snap = fig.add_subplot(top[0])
@@ -447,7 +483,8 @@ def make_figure(out_dir: Path, data: dict, fig_name: str = FIG_NAME) -> list[Pat
     }
     axes = [fig.add_subplot(bottom[0, i]) for i in range(4)]
     for ax, (key, title) in zip(axes, titles.items()):
-        image = draw_map(ax, data["first"], data["maps"][key], data["spec"], data["well_node"])
+        image = draw_map(ax, data["first"], data["maps"][key], data["spec"], data["well_node"],
+                         data["river_cells"])
         ax.set_title(title, loc="left", fontweight="bold")
         ax.set_xlabel("x (km)")
     axes[0].set_ylabel("y (km)")
@@ -464,7 +501,7 @@ def make_figure(out_dir: Path, data: dict, fig_name: str = FIG_NAME) -> list[Pat
 
 
 def main(out_dir: Path = mfig.FIG_DIR, work: Path = mfig.WORK_DIR) -> dict[str, float]:
-    """Build tutorial 08's model, check the caption numbers and write Fig. 4."""
+    """Build tutorial 08's model, check the caption numbers and write Fig. 9."""
     mfig.paper_style()
     start = time.perf_counter()
     data = compute(work, mfig.find_mf6())
