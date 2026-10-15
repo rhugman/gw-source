@@ -80,5 +80,5 @@ Order: first citation, reading `sections/` in file order, with each display capt
 ## Notes on labels
 
 - **Table S4** holds three tables under one heading: (a) largest error per check, (b) steady-state and snapshot checks per model, (c) transient tracking checks per model. Label them Table S4a–c, or Tables S4–S6 if the journal wants one number per table.
-- **Texts S6 and S8** and **Text S2** each hold short tables inside the text (end states of the particles; PRT delivery by crediting rule; the test models). **Text S4** holds the table of phi by iteration. They stay unnumbered parts of their Text.
+- **Texts S6 and S8** and **Text S2** each hold short tables inside the text (end states of the particles; PRT delivery by rule for counting weight; the test models). **Text S4** holds the table of phi by iteration. They stay unnumbered parts of their Text.
 - The labels above hold for the main text as of the cleanup pass after alt round 1. The builder renumbers on every build, so a new or moved citation changes them. Recheck with the build rather than editing labels by hand.

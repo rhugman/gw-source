@@ -72,7 +72,7 @@ Only what a reader needs to read the outputs. Each concept is explained in plain
 - **Full mixing.** Each cell is a fully mixed volume. Its water leaves through its outflows in proportion to the flows.
 - **Backward fraction F and forward fraction G.** One equation each, (I − P) F = S D and its forward analogue, with a plain reading. A contributing area is a threshold on F.
 - **Volumes.** Volume through, volume from, and the split of a sink's water by source.
-- **Gross and net accounting.** Gross credits a weak-sink well with its pumping. Net credits it with all the water passing through its cell, as the reference method does.
+- **Gross and net accounting.** Gross counts only a weak-sink well's pumping as its water. Net attributes all the water passing through the well's cell to the well, as the reference method does.
 - **Budget checks.** Closure and the forward–backward check, in one sentence each, with what they test and what they do not.
 - **Mean travel time.** The equation, porosity as an explicit input.
 - **Transient flow.** Snapshots (each step as a steady state), and transient tracking (tagged water carried through storage, forward and backward in time). One equation for the tracking step.
@@ -130,8 +130,8 @@ Each subsection follows the same pattern:
 #### 4.2 What is being computed, and what changes at a small well? (tutorial 02)
 
 - Check: the Foley and Black (2013) 3 × 3 worked example, reproduced exactly (to 10⁻¹⁴), and a direct dense solve.
-- Output: the three-layer model with a 5 m³/d well in a cell carrying 33.7 m³/d. Gross credits it with 5 m³/d, net with 33.7 m³/d (6.7 times). Boundary-control and dominant-sink maps.
-- Limit: net accounting over-credits weak sinks. Use it to compare with the reference method only.
+- Output: the three-layer model with a 5 m³/d well in a cell carrying 33.7 m³/d. Gross attributes 5 m³/d to it, net 33.7 m³/d (6.7 times). Boundary-control and dominant-sink maps.
+- Limit: net accounting attributes too much water to weak sinks. Use it to compare with the reference method only.
 - Figure: net against gross F maps around the weak well (layer 3), or reuse the current Fig. 1c.
 - [tutorial] Rerun: the net-accounting code changed on 2026-10-10, after the stored outputs were made. Print the claims that are now only read off maps (the "about 93 %" strip, gross = net × 5/33.7).
 
@@ -310,7 +310,7 @@ Each subsection follows the same pattern:
   1. The published area is where each start cell's single particle stops. Three particle settings decide it: recharge and stream flows enter at the top face, particles stop at every weak sink, and particles in dry cells are draped. PRT reproduces it (overlap 0.998) only with all three.
   2. On the same flow field, particle settings alone move the overlap from 0.62 to 0.998.
   3. Full mixing splits each cell's water among all its outflows, so its areas are wider and more diffuse. The published cells send on average 42 % of their water to the wells. F > 0.1 is the counterpart of a particle area, not F > 0.5. F > 0.1 holds 87 % of the area of particles that lose water at sinks as full mixing does.
-  4. At weak-sink wells and buried stream cells, particles stop and credit all their water to the sink. Full mixing passes the rest on.
+  4. At weak-sink wells and buried stream cells, particles stop. All their water counts as reaching the sink. Full mixing passes the rest on.
   5. Gross or net accounting changes the overlap little (0.41 to 0.44).
   6. With the stream network, stream water traces to recharge upstream, and the area grows.
 

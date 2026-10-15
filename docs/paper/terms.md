@@ -13,9 +13,9 @@ The single list of terms for the paper, its figures and its supporting informati
 | forward fraction G | "forward fraction G", "G" | Share of the water entering a cell that came from the selected source. |
 | cell-to-cell flows | "cell-to-cell flows (FLOW-JA-FACE)" | The intercell flows of the MF6 cell-by-cell budget. Not "edges" in the text. |
 | source and sink terms | "source and sink terms" | Every other budget term of a cell (recharge, wells, SFR leakage, CHD, storage), each kept separate. |
-| gross accounting | "gross accounting" | Each sink term in a cell takes its share of the cell's total outflow, and the rest passes on to the neighbours. A weak-sink well is credited with its pumping only. The default. |
-| net accounting | "net accounting" (not "net mode") | The reference method's bookkeeping: it uses the cell-to-cell flows and each cell's net source (cell-to-cell outflow minus inflow), and fixes a destination cell at F = 1. A weak-sink well is then credited with all the water passing through its cell. |
-| net attribution | "net attribution" | The source water that net accounting credits to a well. Under gross accounting it equals the pumping. |
+| gross accounting | "gross accounting" | Each sink term in a cell takes its share of the cell's total outflow, and the rest passes on to the neighbours. Only the water a weak-sink well pumps counts as the well's water. The default. |
+| net accounting | "net accounting" (not "net mode") | The reference method's bookkeeping: it uses the cell-to-cell flows and each cell's net source (cell-to-cell outflow minus inflow), and fixes a destination cell at F = 1. All the water passing through a weak-sink well's cell then counts as the well's water. |
+| net attribution | "net attribution" | The source water that net accounting attributes to a well. Under gross accounting it equals the pumping. |
 | weak sink | "weak sink", "weak-sink well" | A cell whose sink term takes only part of the cell's outflow (standard MODPATH usage). |
 | cell budget error | "cell budget error r" (r = I − O) | Difference between a cell's total inflow I and total outflow O in the MF6 budget. Reported, never forced to zero. Code and docstrings call it the residual (not in text). |
 | closure check | "closure check" (backward, forward) | Backward: the volumes traced from all sources add up to the destination inflow. Forward: the volume from a source traced to all sinks adds up to that source's inflow. Both hold exactly once the cell budget errors are included. Table 2 and Fig. 2 label them "backward closure" and "forward closure". |
@@ -55,7 +55,7 @@ The single list of terms for the paper, its figures and its supporting informati
 | published conventions | "the published particle conventions" | One particle at the centre of each uppermost active cell; recharge and stream flows on the top face where it is open; particles stopped at every weak sink; particles in dry start cells draped; dry cells treated as inactive, so particles that reach a side face next to a dry cell stop there (1,139 particles, NS §2). PRT copies all but the last, which accounts for nearly all of the 1 % of end cells that still differ. |
 | IFLOWFACE | "IFLOWFACE (the cell face a boundary flow is assigned to)" | MF6 auxiliary variable read by PRT; −1 puts recharge or stream flow on the top face instead of spreading it through the cell. |
 | draping | "draping (MODPATH DrapeOption)" | A particle that starts in a dry cell is moved down to the first active cell below, at the same local position. |
-| stopping at weak sinks | "stopped at every weak sink" | The MODPATH weak-sink option: a particle ends in the first weak-sink cell it enters, and its whole weight is credited to that cell's sink. |
+| stopping at weak sinks | "stopped at every weak sink" | The MODPATH weak-sink option: a particle ends in the first weak-sink cell it enters, and its whole weight is counted as reaching that cell's sink. |
 | buried stream cells | "buried stream cells" | SFR reach cells with an active cell above. The stream exchange stays distributed in the cell; where the reach gains from the aquifer it is a sink (usually weak) and stops particles under the published conventions. Open-top stream cells instead let particles leave through the top face. |
 
 ## Streams
@@ -72,6 +72,7 @@ The single list of terms for the paper, its figures and its supporting informati
 |---|---|---|
 | capture fraction | not used for F | Reserved for the budget sense [LEA10, BAR18]: the share of a well's pumping supplied by increased recharge or reduced discharge (for example streamflow depletion). |
 | captured | avoid; prefer "reaching the wells" | "Captured recharge" → "recharge reaching the wells"; "captured flow" → "flow reaching the wells"; "fully captured" → "F = 1". "Capture zone" for a well's zone of contribution is standard and may stay. |
+| credit, credited | avoid; say how the water is counted | "Credits the well with its pumping" → "counts only the water the well pumps"; "credited to the sink" → "counted as reaching the sink" or "attributed to the sink"; "crediting rule" → "rule for counting a particle's weight". Vary the verb (counts, attributes, assigns, gives). |
 
 ## Transient models
 
@@ -91,4 +92,4 @@ The single list of terms for the paper, its figures and its supporting informati
 
 ## Words not used in the paper prose
 
-Jaccard (except once at the definition of overlap), graph, node, edge, adjoint (only when naming the backward-in-time methods [NW99, CP06]: in §5.1, and once where backward tracking in time is introduced or its novelty stated), duality (except once, at the definition of the forward–backward check), topological, pivoting (except once in §5.2), out-normalised, mask, thinning/thinned, flux-weighted, net mode, circulation cells (for flow loops), captured (see above), ground truth, quadrature, residual (use cell budget error), pipeline, robust, leverage, plumbing, first-class, out of the box, under the hood, true transient.
+Jaccard (except once at the definition of overlap), graph, node, edge, adjoint (only when naming the backward-in-time methods [NW99, CP06]: in §5.1, and once where backward tracking in time is introduced or its novelty stated), duality (except once, at the definition of the forward–backward check), topological, pivoting (except once in §5.2), out-normalised, mask, thinning/thinned, flux-weighted, net mode, circulation cells (for flow loops), captured (see above), credit/credited (see above), ground truth, quadrature, residual (use cell budget error), pipeline, robust, leverage, plumbing, first-class, out of the box, under the hood, true transient.

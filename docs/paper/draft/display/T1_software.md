@@ -19,7 +19,7 @@
 | **Outputs** | Backward fraction F | Share of each cell's water that ends at the destination | §4.1 |
 | | Forward fraction G | Share of each cell's water that came from the source | §4.3 |
 | | Volumes | Volume through, volume from and volume to, and their split by package | §4.1, §4.3 |
-| | Gross and net accounting | Water credited to a weak-sink well under each rule. Boundary-control maps | §4.2 |
+| | Gross and net accounting | Water attributed to a weak-sink well under each rule. Boundary-control maps | §4.2 |
 | | Budget checks | Closure, forward–backward and boundary-control checks with every trace | §4.1–§4.3 |
 | | Mean travel time | Mean time to the destination under full mixing | §4.6 |
 | | Snapshot statistics | Minimum, mean and maximum F over time steps. Cells always, sometimes or never above a threshold | §4.5 |
