@@ -36,7 +36,7 @@ $$(\mathbf{I} - \mathbf{Q})\,\mathbf{G} = \mathbf{R}\,\mathbf{T}. \tag{4}$$
 
 $\mathbf{R}$ holds the share of each cell's inflow that enters through each source term. $\mathbf{T}$ marks which source terms belong to which source group.
 
-Most cells can be solved one at a time along the flow paths. Flow loops are the exception. They are groups of cells among which water circulates, for example with the XT3D option of MODFLOW 6 (Provost et al. 2017). The code solves each loop exactly as one small block of equations ({SI: method in full}). <!-- evidence: src/gwsource/config.py (solver "auto": topological substitution if acyclic, block-triangular sparse LU otherwise); src/gwsource/solve.py -->
+The F of a cell depends only on the F of the cells its water flows into. The code therefore starts at the destination and works upstream, one cell at a time. Each cell is solved once the cells it drains to are known. This fails only in a flow loop. A flow loop is a small group of cells in which water circulates and returns to where it started. Loops can occur, for example, with the XT3D option of MODFLOW 6 (Provost et al. 2017). The code solves the cells of each loop together, as one small set of equations, so the result stays exact ({SI: method in full}). <!-- evidence: src/gwsource/config.py (solver "auto": topological substitution if acyclic, block-triangular sparse LU otherwise); src/gwsource/solve.py -->
 
 ## 2.3 Volumes
 
