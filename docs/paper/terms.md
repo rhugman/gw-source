@@ -36,6 +36,7 @@ The single list of terms for the paper, its figures and its supporting informati
 | term | wording used in the paper | definition |
 |---|---|---|
 | PRT | "MODFLOW 6 particle tracking (PRT)" at first use, then "PRT" | The MF6 particle-tracking model. |
+| GWT | "the MODFLOW 6 Groundwater Transport (GWT) Model" at first use (Section 1), named in full once more in Section 2, then "GWT" | The MF6 solute-transport model (Langevin et al. 2022). Compared with full mixing only with upstream weighting and no dispersion (and, for transient tracking, the flow-imbalance correction and one transport step per flow step). |
 | published contributing cells | "published contributing cells", "published area" | The 980 cells whose published MODPATH 7 particle ends in a priority well (calibrated model). Replaces "mask" (not in text). |
 | published Monte Carlo areas | "published Monte Carlo contributing areas" | The contributing-cell arrays of the published ensemble runs: 357 per scenario (one per realisation; 6 × 357 in all). Replaces "Monte Carlo masks". |
 | published probability of contribution | "published probability of contribution" | Share of the 357 published Monte Carlo areas that contain a cell. |

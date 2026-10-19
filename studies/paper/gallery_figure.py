@@ -446,6 +446,11 @@ def make_method_single(out_dir: Path, height: float = 4.2,
     step = mfig.graph_step()
     f, inflow, _ = mfig.graph_fractions(step)
     assert inflow == 6.0 and abs(f[6] - 6 / 11) < 1e-12, (inflow, f[6])
+    # Section 2 quotes the net-accounting value: net accounting uses only the cell-to-cell flows,
+    # so the well cell's own 1 m3/d of recharge is left out and the well gets 10, not 11, m3/d.
+    net = gs.backward(step, {"well": gs.select(step, package="WEL")},
+                      gs.TraceConfig(accounting="net")).destination_inflow["well"]
+    assert abs(net - 10.0) < 1e-12, net
     fig = plt.figure(figsize=(SINGLE_WIDTH, height))
     title_h = 0.24 / height  # figure fraction of a panel title
     ax_a = fig.add_axes((0.0, 1.0 - split, 1.0, split - title_h))
