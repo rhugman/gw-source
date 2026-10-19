@@ -25,7 +25,7 @@ def build(repo: str, out_dir: str) -> str:
     commit = subprocess.run(["git", "-C", repo, "log", "-1", "--format=%h %cs"], capture_output=True, text=True)
     with open(bd.TEMPLATE) as f:
         page = f.read()
-    page = (page.replace("<title>Paper Draft (Examples)</title>", "<title>Paper Outline (Examples)</title>")
+    page = (page.replace("<title>Paper Draft (Examples)</title>", "<title>Paper Outline (Round 2)</title>")
             .replace("<span>Full draft</span>", "<span>Outline</span>")
             .replace("{{H1}}", title.lstrip("# ")).replace("{{TOC}}", toc).replace("{{BODY}}", body)
             .replace("{{COMMIT}}", commit.stdout.strip())
