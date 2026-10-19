@@ -94,6 +94,7 @@ WINDOW_ASPECT = 1.3  # width / height of every map panel
 WINDOW_NAMES = {"U": "U", "SV north": "SV_W", "SV south": "SV_S"}  # nf.cluster_windows keys
 F_EDGES = (0.01, 0.1, 0.25, 0.5, 0.75, 1.0)  # Fig. S6 colour classes of F; below 0.01: grey
 F_COLORMAP = "viridis_r"  # perceptual; light for low F, dark for high F
+SINGLE_COLORMAP = "viridis"  # reduced Fig. 4a: yellow for high F, as Figs 2 and 3
 F6_BAR_KM = 2.0  # length of the one scale bar of Fig. S6
 FIXED_QRATS = nf.QRAT_FRACTION  # baserat to maxrat and their pumping fraction f
 PRT_RUN = "prt_volume_thin1"  # weight-losing particles over the cell volume (net_and_envelope)
@@ -962,8 +963,8 @@ def single_legend(
         plt.Line2D(
             [], [], ls="", marker="o", ms=3.5, mfc=COLORS["prt"], mec=INK, mew=0.6, label="wells"
         ),
-        plt.Line2D([], [], color=STREAM, lw=1, label="SFR reaches"),
-        plt.Line2D([], [], color=INK, lw=0.8, label="published (a)"),
+        plt.Line2D([], [], color=STREAM, lw=1, label="stream reaches"),
+        plt.Line2D([], [], color=INK, lw=0.8, label="published cells"),
     ]
     ax.legend(
         handles=handles,
@@ -1003,7 +1004,14 @@ def neversink_single(
     top, bottom = fig.subfigures(2, 1, height_ratios=(1.0, 0.36))
     axes = top.subplots(1, 2)
     image = class_panel(
-        axes[0], maps["F"], maps["published"], wells_ij, window, segments, f_classes(), titles[0]
+        axes[0],
+        maps["F"],
+        maps["published"],
+        wells_ij,
+        window,
+        segments,
+        f_classes(colormap=SINGLE_COLORMAP),
+        titles[0],
     )
     overlap_panel(axes[1], maps["codes published"], window, wells_ij, segments, titles[1])
     for ax in axes:
