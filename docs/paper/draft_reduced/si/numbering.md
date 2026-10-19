@@ -28,20 +28,23 @@ Order: the rows of this table, alias rows left out. The order follows the first 
 | {SI: mean travel time to the well} | Text S3 | {SI: the worked examples in brief} | – |
 | {SI: streams, drains, wells and linked models} | Text S3 | {SI: the worked examples in brief} | – |
 | {SI: a new well's source mix} | Text S3 | {SI: the worked examples in brief} | – |
-| {SI: contributing area against particle tracking} | Figure S2 | – | 04_examples.md |
-| {SI: snapshots and transient tracking over 30 years} | Figure S3 | – | 04_examples.md |
-| {SI: probability of contribution before and after history matching} | Figure S4 | – | 04_examples.md |
-| {SI: the unit-concentration example rebuilt} | Figure S5 | – | 04_examples.md |
+| {SI: snapshots and transient tracking over 30 years} | Figure S2 | – | 04_examples.md |
+| {SI: probability of contribution before and after history matching} | Figure S3 | – | 04_examples.md |
+| {SI: time-limited contributing areas in the unit-concentration example} | Figure S4 | – | si/G_examples.md |
+| {SI: contributing area against particle tracking} | Text S3 | {SI: the worked examples in brief} | – |
+| {SI: the unit-concentration example rebuilt} | Text S3 | {SI: the worked examples in brief} | – |
 | {SI: the Neversink comparison} | Text S4 | – | 05_neversink.md |
 | {SI: delineations on one flow field} | Text S4 | {SI: the Neversink comparison} | – |
 | {SI: end states of the published particles} | Text S4 | {SI: the Neversink comparison} | – |
-| {SI: Neversink particle area and ensemble mean F} | Figure S6 | – | 05_neversink.md |
-| {SI: Neversink full-mixing maps} | Figure S6 | {SI: Neversink particle area and ensemble mean F} | – |
+| {SI: Neversink particle area and ensemble mean F} | Figure S5 | – | 05_neversink.md |
+| {SI: Neversink full-mixing maps} | Figure S5 | {SI: Neversink particle area and ensemble mean F} | – |
 | {SI: numerical dispersion test problems} | Text S5 | – | 06_tradeoffs.md |
 | {SI: numerical dispersion} | Text S5 | {SI: numerical dispersion test problems} | – |
-| {SI: numerical dispersion maps and cell size} | Figure S7 | – | 06_tradeoffs.md |
-| {SI: numerical dispersion against cell size} | Figure S7 | {SI: numerical dispersion maps and cell size} | – |
+| {SI: numerical dispersion maps and cell size} | Figure S6 | – | 06_tradeoffs.md |
+| {SI: numerical dispersion against cell size} | Figure S6 | {SI: numerical dispersion maps and cell size} | – |
 
 Alias rows keep older placeholder names working. They were merged in SI round 1. Dropped in that round: the literature notes of the comparison of methods (the full draft's SI keeps them), the Monte Carlo offsets, the diagnosis of the first PRT runs, the per-well and ensemble tables (all now in docs/neversink_study.md), the per-check verification table (docs/verification.md), the method schematic (its panel b is main-text Fig. 1), the Neversink figures not cited by the main text and the example figures that the notebooks draw.
+
+Round 2 moved the figures "contributing area against particle tracking" and panel (a) of "the unit-concentration example rebuilt" into main-text Fig. 3. The backward maps of the second stay as "time-limited contributing areas in the unit-concentration example". The two old names are alias rows of Text S3, so that older citations still resolve.
 
 Labels are reassigned on every build. Recheck them with the build rather than editing them by hand.

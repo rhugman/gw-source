@@ -104,7 +104,10 @@ SI_FIGS = {"numerical dispersion maps and time steps": "figS1_numerical_dispersi
            # SI figures of the reduced draft drawn in its SI round 1
            "verification checks on the test models": "figS21_verification.png",
            "Neversink particle area and ensemble mean F": "figS22_neversink_cd.png",
-           "numerical dispersion maps and cell size": "figS23_numerical_dispersion.png"}
+           "numerical dispersion maps and cell size": "figS23_numerical_dispersion.png",
+           # round 2: the backward maps left in the SI when Fig. 11a moved to main-text Fig. 3
+           "time-limited contributing areas in the unit-concentration example":
+               "figS24_unit_concentration_maps.png"}
 SI_FIG_WIDTH = {  # Markdown export only: width of an SI image in the reduced draft's SI PDF
     "figS21_verification.png": "90%",
     "fig9_transient_tracking.png": "80%",

@@ -300,22 +300,24 @@ def water_cell(ax, xy: tuple[float, float], size: float, level: float, shade: fl
     ax.text(xy[0], y0 + 0.6 * level * size, text, ha="center", va="center", fontsize=7)
 
 
-def cell_terms(ax, x: float, y: float, h: float, inflow_y: float) -> None:
+def cell_terms(ax, x: float, y: float, h: float, inflow_y: float,
+               flow_colour: str = INK) -> None:
     """Draw a cell's intercell in- and outflow, its recharge and its well, unlabelled."""
     blue, red = OKABE_ITO["blue"], OKABE_ITO["vermillion"]
-    arrow(ax, (x - h - 0.6, inflow_y), (x - h, inflow_y))
-    arrow(ax, (x + h, inflow_y), (x + h + 0.6, inflow_y))
+    arrow(ax, (x - h - 0.6, inflow_y), (x - h, inflow_y), flow_colour)
+    arrow(ax, (x + h, inflow_y), (x + h + 0.6, inflow_y), flow_colour)
     arrow(ax, (x - 0.25, y + h + 0.55), (x - 0.25, y + h), blue, width=1.4)
     arrow(ax, (x + 0.25, y + h), (x + 0.25, y + h + 0.55), red, width=1.4)
 
 
-def draw_snapshot_cell(ax, xy: tuple[float, float] = (2.4, 1.7), size: float = 1.0) -> None:
+def draw_snapshot_cell(ax, xy: tuple[float, float] = (2.4, 1.7), size: float = 1.0,
+                       flow_colour: str = INK) -> None:
     """Panel (d), left: one step traced on its own flows, storage release as a source term."""
     blue, red = OKABE_ITO["blue"], OKABE_ITO["vermillion"]
     x, y, h = xy[0], xy[1], size / 2
     cell_box(ax, xy, size)
     ax.text(x, y, "$i$", ha="center", va="center", fontsize=9)
-    cell_terms(ax, x, y, h, y)
+    cell_terms(ax, x, y, h, y, flow_colour)
     ax.text(x - 0.37, y + h + 0.3, "recharge", ha="right", va="center", fontsize=7, color=blue)
     ax.text(x + 0.37, y + h + 0.3, "well", ha="left", va="center", fontsize=7, color=red)
     arrow(ax, (x, y - h - 0.65), (x, y - h), MUTED, width=2.2)
@@ -324,7 +326,7 @@ def draw_snapshot_cell(ax, xy: tuple[float, float] = (2.4, 1.7), size: float = 1
 
 
 def draw_tracking_cells(ax, x0: float = 7.0, y: float = 1.7, size: float = 1.0,
-                        gap: float = 2.4) -> None:
+                        gap: float = 2.4, flow_colour: str = INK) -> None:
     """Panel (d), right: the same cell i at three times. The water stored at the end of step n
     is mixed with the inflows of step n+1; outflows and the water stored at the end of step n+1
     carry the mixture."""
@@ -332,7 +334,7 @@ def draw_tracking_cells(ax, x0: float = 7.0, y: float = 1.7, size: float = 1.0,
     water_cell(ax, (xa, y), size, 0.6, 0.25)
     water_cell(ax, (xb, y), size, 0.55, 0.42, "mixed")
     water_cell(ax, (xc, y), size, 0.5, 0.42)
-    cell_terms(ax, xb, y, h, y + 0.3)
+    cell_terms(ax, xb, y, h, y + 0.3, flow_colour)
     low = y - h + 0.15
     for x_from, x_to in ((xa + h, xb - h), (xb + h, xc - h)):
         arrow(ax, (x_from, low), (x_to, low), MUTED, width=2.2)

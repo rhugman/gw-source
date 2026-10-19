@@ -1,5 +1,5 @@
-"""Gallery figure of the reduced paper: one full-width figure with every type of output the
-examples produce, and a single-column crop of the method schematic.
+"""Figures of the reduced paper: the method figure (Fig. 1), the gallery of output types
+(Fig. 2) and the checks of worked examples A and B (Fig. 3).
 
 Each panel answers one question about the supply well of the tutorial aquifer (40 x 40 cells
 of 50 m, a river at x = 1.5 km, a west edge of fixed head and an 800 m3/d well):
@@ -22,7 +22,19 @@ caption numbers are in QUOTED. Panel (g) reuses the PEST++ IES output of example
 All maps share the 2 km x 2 km extent, the sky-blue river cells and the white well star of
 example_figures.py, and are drawn in model metres with km ticks on the outer panels only.
 
-The method crop draws panel (b) of Fig. 1 alone (method_figures.draw_graph), one column wide.
+Fig. 1 is one column wide. Panel (a) is the eight-cell example (method_figures.draw_graph).
+Panel (b) is the snapshot against transient tracking of the full draft's Fig. 1d
+(method_figures.draw_snapshot_cell and draw_tracking_cells), stacked in two rows so that it fits
+one column, with the grey intercell arrows of panel (a).
+
+Fig. 3 is two columns wide. Panel (a) is the particle share of weight-losing PRT particles on
+the example model, with the F = 0.1 and 0.5 contours of full mixing (full-draft Fig. 2b,
+example_figures.compute_quickstart). Panel (b) is the well's water by source in the
+unit-concentration example of Bedekar et al. (2024) against the values read off their Fig. 2
+(full-draft Fig. 11a, example_figures_b.compute_fig11). Both source scripts' QUOTED numbers are
+asserted again, and the numbers Section 4 quotes with this figure are in QUOTED_EXAMPLES.
+The backward maps of full-draft Fig. 11 (b-f) stay in the SI, redrawn alone as
+figS24_unit_concentration_maps.
 
     PYTHONPATH=src:tutorials:studies/paper python studies/paper/gallery_figure.py
 """
@@ -44,12 +56,15 @@ import transient_figure as tf  # noqa: E402
 
 import gwsource as gs  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
+from matplotlib.lines import Line2D  # noqa: E402
 from matplotlib.colors import BoundaryNorm, ListedColormap, LogNorm, Normalize  # noqa: E402
 
 WORK_DIR = mfig.WORK_DIR / "gallery_figure"
 IES_MASTER = efb.WORK_DIR / "fig10" / "master"  # PEST++ IES output of example_figures_b.py
 FIG_NAME = "fig_gallery"
 METHOD_NAME = "fig_method_single"
+EXAMPLES_NAME = "fig_examples_ab"
+BEDEKAR_MAPS_NAME = "figS24_unit_concentration_maps"
 WELL = "supply_well"
 YEAR = 365.25  # days
 EXTENT = 2000.0  # m, every map
@@ -87,6 +102,24 @@ QUOTED = {
     "seasonal steps": (36, 0),
     "years tracked": (30, 0),
     "realisations": (50, 0),
+}
+
+# Numbers that Section 4 quotes with Fig. 3, in the format of QUOTED.
+QUOTED_EXAMPLES = {
+    "F contours": ((0.1, 0.5), 0),
+    "area F > 0.5 (km2)": (1.143, 3), "area P > 0.5 (km2)": (1.168, 3),
+    "F > 0.5 vs P (%)": (-2.1, 1), "F > 0.1 vs P (%)": (35, 0),
+    "P cells outside F > 0.1": (0, 0),
+    "edge cells": (372, 0), "mean |P - F|, edge": (0.164, 3),
+    "captured (m3/d)": (799.9, 1),
+    "read-off times": (15, 0),
+    "lateral inflow at 25 yr (%)": (48.2, 1), "recharge at 25 yr (%)": (29.2, 1),
+    "stream at 25 yr (%)": (22.5, 1),
+    "largest difference (points)": (1.3, 1), "year of the largest difference": (10, 0),
+}
+STREAM_LABEL_XY = {  # (year, share, va) of the direct labels of Fig. 3b
+    "storage": (3.2, 0.73, "bottom"), "lateral inflow": (24.6, 0.51, "bottom"),
+    "recharge": (24.6, 0.305, "bottom"), "stream": (24.6, 0.205, "top"),
 }
 
 
@@ -396,18 +429,156 @@ def make_gallery(out_dir: Path, panels: dict, height: float = 3.78,
     return mfig.save(fig, out_dir, fig_name)
 
 
-def make_method_single(out_dir: Path, height: float = 1.62,
-                       fig_name: str = METHOD_NAME) -> list[Path]:
-    """Panel (b) of the method schematic alone, one column wide: F on the eight-cell graph."""
+def draw_transient_rows(ax, x_cell: float = 4.2, y_snapshot: float = 4.6,
+                        y_tracking: float = 1.7) -> None:
+    """Fig. 1b: the snapshot cell above, the same cell under transient tracking below."""
+    mfig.draw_snapshot_cell(ax, (x_cell, y_snapshot), flow_colour=mfig.MUTED)
+    mfig.draw_tracking_cells(ax, x0=0.95, y=y_tracking, flow_colour=mfig.MUTED)
+    ax.plot([-0.1, 7.6], [3.3, 3.3], color=mfig.GRID, lw=0.8)
+    ax.text(-0.1, y_snapshot + 1.05, "snapshot", ha="left", va="top", fontsize=7.5)
+    ax.text(-0.1, 3.2, "transient tracking", ha="left", va="top", fontsize=7.5)
+    mfig.blank_axes(ax, (-0.15, 7.65), (0.25, 5.7))
+
+
+def make_method_single(out_dir: Path, height: float = 4.2,
+                       fig_name: str = METHOD_NAME, split: float = 0.385) -> list[Path]:
+    """Fig. 1, one column wide: (a) F on the eight-cell graph, (b) snapshot against tracking."""
     step = mfig.graph_step()
     f, inflow, _ = mfig.graph_fractions(step)
     assert inflow == 6.0 and abs(f[6] - 6 / 11) < 1e-12, (inflow, f[6])
     fig = plt.figure(figsize=(SINGLE_WIDTH, height))
-    ax = fig.add_axes((0.0, 0.0, 1.0, 0.9))
-    mfig.draw_graph(ax, f)
-    mfig.draw_graph_labels(ax, inflow)
-    fig.text(0.02, 0.985, "Backward fraction F to a well", ha="left", va="top", fontsize=8,
-             fontweight="bold")
+    title_h = 0.24 / height  # figure fraction of a panel title
+    ax_a = fig.add_axes((0.0, 1.0 - split, 1.0, split - title_h))
+    mfig.draw_graph(ax_a, f)
+    mfig.draw_graph_labels(ax_a, inflow)
+    ax_b = fig.add_axes((0.0, 0.0, 1.0, 1.0 - split - title_h - 0.01))
+    draw_transient_rows(ax_b)
+    for y, text in ((0.995, "(a) Backward fraction F to a well"),
+                    (1.0 - split - 0.005, "(b) Snapshot against transient tracking")):
+        fig.text(0.02, y, text, ha="left", va="top", fontsize=8, fontweight="bold")
+    return mfig.save(fig, out_dir, fig_name)
+
+
+def compute_examples(work: Path = WORK_DIR) -> dict:
+    """Fig. 3: the particle check of example A and the Bedekar et al. (2024) run of example B."""
+    hbd, _ = ef.import_tutorial_modules()
+    mf6 = mfig.find_mf6()
+    quick = ef.compute_quickstart(hbd, work, mf6)
+    quick_values = ef.quickstart_values(quick)
+    ef.check_quoted(quick_values, ef.QUOTED["fig2"])
+    bedekar = efb.compute_fig11(work, mf6)
+    bedekar_values = efb.fig11_values(bedekar)
+    efb.check_quoted(bedekar_values, efb.QUOTED_FIG11, "Fig. 11")
+    layer = map_layer(quick["run"].grb_file, quick["step"],
+                      quick["prt"].cell_capture_fraction, quick["well_cell"], hbd)
+    return {"a": {**layer, "f": quick["f"]}, "b": bedekar,
+            "values": {"quick": quick_values, "bedekar": bedekar_values}}
+
+
+def examples_values(data: dict, thresholds: tuple = ef.THRESHOLDS) -> dict:
+    """Return the computed (or drawn) value of every QUOTED_EXAMPLES key."""
+    quick, bedekar = data["values"]["quick"], data["values"]["bedekar"]
+    values = {"F contours": thresholds, "read-off times": len(efb.PAPER_FIG2),
+              "largest difference (points)":
+                  bedekar["largest difference from the read-offs (points)"],
+              "year of the largest difference": bedekar["year of the largest difference"]}
+    for name in ("area F > 0.5 (km2)", "area P > 0.5 (km2)", "F > 0.5 vs P (%)",
+                 "F > 0.1 vs P (%)", "P cells outside F > 0.1", "edge cells",
+                 "mean |P - F|, edge", "captured (m3/d)"):
+        values[name] = quick[name]
+    for name in ("lateral inflow", "recharge", "stream"):
+        values[f"{name} at 25 yr (%)"] = 100.0 * bedekar[f"{name} at 25 yr"]
+    return values
+
+
+def draw_particle_share(fig, ax, cax, layer: dict) -> None:
+    """Fig. 3a: particle share per release cell, with the F = 0.1 and 0.5 contours."""
+    image = draw_layer(ax, layer, ef.F_CMAP, Normalize(0.0, 1.0))
+    ef.draw_f_contours(ax, layer["grb"], layer["step"], layer["f"])
+    ef.km_axes(ax, extent=EXTENT, step_km=0.5)
+    ax.xaxis.labelpad = 1
+    bar = fig.colorbar(image, cax=cax, ticks=(0.0, 0.25, 0.5, 0.75, 1.0))
+    bar.set_label("particle share (-)", labelpad=2)
+    bar.outline.set_linewidth(0.5)
+    bar.ax.tick_params(labelsize=7, length=2, pad=1)
+
+
+def draw_bedekar(ax, data: dict, label_xy: dict = STREAM_LABEL_XY) -> None:
+    """Fig. 3b: the well's water by source through time, lines against the read-off circles."""
+    shares = data["shares"]
+    paper = efb.PAPER_FIG2.copy()
+    paper.insert(0, "storage", 1.0 - paper.sum(axis=1))
+    for group in efb.BEDEKAR_GROUPS:
+        colour = efb.BEDEKAR_COLOURS[group]
+        ax.plot(shares.index, shares[group], color=colour, lw=1.2)
+        ax.plot(paper.index, paper[group], "o", color=colour, ms=3.2, mfc="white", mew=0.8)
+        x, y, va = label_xy[group]
+        ax.text(x, y, efb.BEDEKAR_LABELS[group], color=colour, fontsize=7, va=va,
+                ha="left" if group == "storage" else "right")
+    key = [Line2D([], [], color=mfig.MUTED, lw=1.2),
+           Line2D([], [], marker="o", color=mfig.MUTED, ms=3.2, mfc="white", mew=0.8, ls="none")]
+    ax.legend(key, ["transient tracking", "Bedekar et al. (2024)"], loc="upper right",
+              bbox_to_anchor=(1.0, 1.0), handlelength=1.6, borderaxespad=0.2)
+    ax.set_xlim(0.0, efb.BEDEKAR_YEARS)
+    ax.set_ylim(0.0, 1.0)
+    ax.set_xticks((0, 5, 10, 15, 20, 25))
+    ax.set_yticks((0.0, 0.25, 0.5, 0.75, 1.0))
+    ax.set_xlabel("years since pumping started", labelpad=1)
+    ax.set_ylabel("share of the pumped water (-)", labelpad=2)
+
+
+def make_examples(out_dir: Path, data: dict, height: float = 2.75,
+                  fig_name: str = EXAMPLES_NAME) -> list[Path]:
+    """Fig. 3, two columns wide: (a) particle share and F, (b) the Bedekar et al. (2024) check."""
+    width = FULL_WIDTH
+    left, bottom, top, right = 0.42, 0.37, 0.25, 0.08  # in
+    side = height - bottom - top  # square map, and the height of every panel
+    cax_x = left + side + 0.08
+    b_left = cax_x + 0.1 + 0.95  # room for the colour bar ticks and label, and (b)'s y label
+
+    def to_fig(x: float, w: float) -> tuple:
+        """Axes box in figure fractions from inches, at the shared bottom and height."""
+        return (x / width, bottom / height, w / width, side / height)
+
+    fig = plt.figure(figsize=(width, height))
+    ax_a = fig.add_axes(to_fig(left, side))
+    cax = fig.add_axes(to_fig(cax_x, 0.1))
+    ax_b = fig.add_axes(to_fig(b_left, width - b_left - right))
+    draw_particle_share(fig, ax_a, cax, data["a"])
+    draw_bedekar(ax_b, data["b"])
+    for ax, text in ((ax_a, "(a) Particle share against F"),
+                     (ax_b, "(b) The well's water by origin")):
+        ef.panel_title(ax, text)
+    return mfig.save(fig, out_dir, fig_name)
+
+
+def make_bedekar_maps(out_dir: Path, data: dict, height: float = 1.75,
+                      fig_name: str = BEDEKAR_MAPS_NAME) -> list[Path]:
+    """SI figure: layer-2 maps of the fraction pumped within 1, 5, 10 and 25 years, and steady F."""
+    spec, first = data["spec"], data["first"]
+    panels = [(data["windows"][years], f"({'abcd'[i]}) {years} year{'s' * (years > 1)}")
+              for i, years in enumerate(efb.BEDEKAR_WINDOWS)]
+    panels.append((data["steady"], "(e) steady F"))
+    fig = plt.figure(figsize=(FULL_WIDTH, height))
+    grid = fig.add_gridspec(1, 5, left=0.065, right=0.9, top=0.87, bottom=0.2, wspace=0.12)
+    well_rc = efb.node_rc(data["well_node"], spec)
+    for i, (values, text) in enumerate(panels):
+        ax = fig.add_subplot(grid[0, i])
+        layer2 = gs.export.to_grid(first, values)[1]
+        image = efb.draw_field(ax, layer2, spec, cmap=ef.F_CMAP, vmin=0.0, vmax=1.0)
+        efb.mark_cell(ax, spec, well_rc, {"marker": "*", "ms": 8, "color": ef.STAR_COLOUR,
+                                          "mec": "black", "mew": 0.6, "ls": "none"})
+        efb.map_axes(ax, spec, (0, 0.5, 1), ylabel=i == 0)
+        ax.set_xticklabels(["0", "0.5", "1"])
+        if i == 0:
+            ax.set_yticklabels(["0", "0.5", "1"])
+        ax.xaxis.labelpad = 1
+        ef.panel_title(ax, text)
+    box = ax.get_position()
+    cax = fig.add_axes((0.915, box.y0, 0.012, box.height))
+    bar = fig.colorbar(image, cax=cax, ticks=(0.0, 0.5, 1.0))
+    bar.set_label("fraction to the well (-)")
+    bar.outline.set_linewidth(0.5)
     return mfig.save(fig, out_dir, fig_name)
 
 
@@ -419,9 +590,11 @@ def main(
     work: Path = WORK_DIR,
     gallery: bool = True,
     method: bool = True,
+    examples: bool = True,
     quoted: dict = QUOTED,
+    quoted_examples: dict = QUOTED_EXAMPLES,
 ) -> None:
-    """Compute the panels, assert the quoted numbers and draw the gallery and the method crop."""
+    """Compute the panels, assert the quoted numbers and draw Figs 1, 2 and 3."""
     mfig.paper_style()
     start = time.perf_counter()
     if gallery:
@@ -432,6 +605,13 @@ def main(
         print("wrote", make_gallery(out_dir, panels))
     if method:
         print("wrote", make_method_single(out_dir))
+    if examples:
+        data = compute_examples(work)
+        values = examples_values(data)
+        print("examples:", values)
+        check_quoted(values, quoted_examples)
+        print("wrote", make_examples(out_dir, data))
+        print("wrote", make_bedekar_maps(out_dir, data["b"]))
     print(f"done in {time.perf_counter() - start:.1f} s")
 
 
