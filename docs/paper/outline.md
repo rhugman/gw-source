@@ -67,6 +67,7 @@ The reduced draft read as dry staccato. Methods and the three worked examples sh
 | 11 | 2026-10-19 | Methods gets the snapshot-against-tracking schematic as a second panel of Fig. 1, and shows the backward-in-time equation (Eq. S14) with its plain reading. | Author, open question 3 |
 | 12 | 2026-10-19 | A compact main-text figure for examples A and B: the particle-share map and the Bedekar et al. (2024) curves. | Author, open question 4 |
 | 13 | 2026-10-19 | The MODFLOW 6 run time (44 s) leaves the abstract and Section 3. The speed argument rests on the trace time. | Author, open question 5 |
+| 14 | 2026-10-19 | Equations get a short plain reading of their core idea, one or two sentences, not a derivation in words. | Author, after Methods v1 came out at 2,605 words |
 
 Decisions carried forward from 2026-10-15 (the outline on `paper-draft-alt`, its Section 6):
 - The notebooks are named once, in the Section 4 opening.
