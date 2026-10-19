@@ -75,12 +75,12 @@ Notes on these tools:
 
   | Script | Figures |
   |---|---|
-  | `gallery_figure.py` | reduced Fig. 2: one panel per output type |
-  | `method_figures.py` | method schematic; `fig_method_single` is reduced Fig. 1 |
+  | `gallery_figure.py` | reduced Fig. 2: one panel per output type; gate `method` draws Fig. 1 (a: eight-cell example, b: snapshot against transient tracking); gate `examples` draws Fig. 3 (particle share, Bedekar curves) and SI Figure S4 |
+  | `method_figures.py` | method schematic of the full draft; `draw_transient` supplies Fig. 1b |
   | `example_figures.py` | full Figs 2–6 |
   | `example_figures_b.py` | full Figs 7, 8, 10, 11 |
   | `transient_figure.py` | full Fig. 9 |
-  | `neversink_figures.py` | Neversink figures; gate `fig_single` is reduced Fig. 3, gate `fig_si_cd` the SI figure |
+  | `neversink_figures.py` | Neversink figures; gate `fig_single` is reduced Fig. 4 (round 2), gate `fig_si_cd` the SI figure |
   | `si_dispersion_figure.py` | SI numerical dispersion |
   | `verification.py` | verification figures |
 
