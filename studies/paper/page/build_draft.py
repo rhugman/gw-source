@@ -198,7 +198,7 @@ def main_words(draft_dir: str) -> int:
     return n
 
 
-PAGE_TITLES = {"draft_reduced": "Paper Draft (Reduced)"}
+PAGE_TITLES = {"draft_reduced": "Paper Draft (Round 2)"}
 
 
 def build(repo: str, out_dir: str, draft: str = "draft") -> str:
