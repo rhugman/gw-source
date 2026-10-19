@@ -305,6 +305,8 @@ Points in order:
 
 Figure: Fig. 2b and 2d.
 
+- [From Methods, 2026-10-19] Example C now carries two points cut from Methods: agreement in the overall mean travel time is not an independent test, because any method that conserves water gives it as the volume of water bound for the sink divided by its inflow. It tests the volume attributed to the sink. And the time compared with PRT is the time to entry of the sink cell ({SI: method in full}), because particle trackers stop particles there.
+
 #### Table 1 and its paragraph (about 450 words including the table text)
 
 **Purpose.** Give the reader the full set of questions the code answers, what each notebook checks and how well, and where to find it. The paragraph before the table says that each notebook ships with the code (Section 7) and runs in seconds to about a minute.
