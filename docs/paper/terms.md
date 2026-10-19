@@ -63,9 +63,9 @@ The single list of terms for the paper, its figures and its supporting informati
 
 | term | wording used in the paper | definition |
 |---|---|---|
-| streams as cells | "streams as cells" | SFR leakage is a source term of the aquifer cell; tracing stops at the stream, and the stream share is reported as SFR leakage. |
-| stream network | "stream network" | The SFR reaches (12,316 on Neversink) are added to the traced system as extra cells linked by stream routing, so stream leakage is traced up the stream to where its water entered. Replaces "reaches as graph nodes" (not in text). |
-| stream share | "stream share" | Share of the wells' water that enters as SFR leakage (streams as cells). |
+| stream reaches as source and sink terms | "the stream reaches stay source and sink terms of the aquifer cells" (Section 2 wording; also "left as source and sink terms") | The default. SFR leakage is a source or sink term of the aquifer cell it exchanges water with. The trace stops at the stream, and the stream share is reported as SFR leakage. Lakes and multi-aquifer wells are treated the same way. Code and NS call this "streams as cells" (not in text: the phrase reads as the opposite choice, round 2). |
+| stream network | "traced as cells of their own" (Section 2 wording), "the stream network" | The SFR reaches (12,316 on Neversink) are traced as cells of their own, from the package budget file, linked by stream routing and the water mover, so stream leakage is traced up the stream to where its water entered. Replaces "reaches as graph nodes" and "streams as nodes" (not in text). |
+| stream share | "stream share" | Share of the wells' water that enters as SFR leakage, with the stream reaches as source and sink terms of the aquifer cells. A study should say which of the two choices it made, because the split by source depends on it (Section 4, example C). |
 
 ## Capture wording
 
@@ -93,4 +93,4 @@ The single list of terms for the paper, its figures and its supporting informati
 
 ## Words not used in the paper prose
 
-Jaccard (except once at the definition of overlap), graph, node, edge, adjoint (only when naming the backward-in-time methods [NW99, CP06]: in §5.1, and once where backward tracking in time is introduced or its novelty stated), duality (except once, at the definition of the forward–backward check), topological, pivoting (except once in §5.2), out-normalised, mask, thinning/thinned, flux-weighted, net mode, circulation cells (for flow loops), captured (see above), credit/credited (see above), ground truth, quadrature, residual (use cell budget error), pipeline, robust, leverage, plumbing, first-class, out of the box, under the hood, true transient.
+Jaccard (except once at the definition of overlap), streams as cells (see Streams), graph, node, edge, adjoint (only when naming the backward-in-time methods [NW99, CP06]: in §5.1, and once where backward tracking in time is introduced or its novelty stated), duality (except once, at the definition of the forward–backward check), topological, pivoting (except once in §5.2), out-normalised, mask, thinning/thinned, flux-weighted, net mode, circulation cells (for flow loops), captured (see above), credit/credited (see above), ground truth, quadrature, residual (use cell budget error), pipeline, robust, leverage, plumbing, first-class, out of the box, under the hood, true transient.
