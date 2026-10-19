@@ -62,6 +62,11 @@ The reduced draft read as dry staccato. Methods and the three worked examples sh
 | 6 | 2026-10-19 | The ensemble example leaves the worked examples and becomes a table row. The speed argument for ensembles stays in Section 3. | Author: "replace ensembles with trace splits of water source and travel time" |
 | 7 | 2026-10-19 | Style: one idea per sentence stays, but a sentence may carry its reason or consequence, and paragraphs get connecting sentences. | External feedback: "a pretty dry read" |
 | 8 | 2026-10-19 | The 6-page cap is relaxed. Comprehension beats length. Page limits are decided later. | Author |
+| 9 | 2026-10-19 | Example C is the sink's water by source and by travel time, as read in this outline. | Author, open question 1 |
+| 10 | 2026-10-19 | Table 1 names the notebooks by number only. Section 7 points once to the repository. | Author, open question 2 |
+| 11 | 2026-10-19 | Methods gets the snapshot-against-tracking schematic as a second panel of Fig. 1, and shows the backward-in-time equation (Eq. S14) with its plain reading. | Author, open question 3 |
+| 12 | 2026-10-19 | A compact main-text figure for examples A and B: the particle-share map and the Bedekar et al. (2024) curves. | Author, open question 4 |
+| 13 | 2026-10-19 | The MODFLOW 6 run time (44 s) leaves the abstract and Section 3. The speed argument rests on the trace time. | Author, open question 5 |
 
 Decisions carried forward from 2026-10-15 (the outline on `paper-draft-alt`, its Section 6):
 - The notebooks are named once, in the Section 4 opening.
@@ -90,7 +95,7 @@ Word counts below are prose words with HTML comments removed (the count used her
 | 2 | Method | 655 | 1,800 | Fig. 1 (and a proposed Fig. 2, see Section 4 of this outline) |
 | 3 | Software and cost | 144 | 250 | – |
 | 4 | Worked examples (A, B, C and Table 1) | 1,376 | 2,050 (table text about 450 of it) | Fig. 2 gallery, Table 1, perhaps one example figure |
-| 5 | A regional model: Neversink | 504 | 550 | Fig. 3 |
+| 5 | A regional model: Neversink | 504 | 550 | Fig. 4 |
 | 6 | Trade-offs and conclusions | 349 | 400 | – |
 | 7 | Code and data availability | 97 | 100 | – |
 | | Total | 4,043 | about 6,100 | |
@@ -278,7 +283,7 @@ Figure: Fig. 2e and 2f. See Section 4 of this outline for a possible example fig
 
 #### Example C. Where does the well's water come from by source, and how old is it? (about 450 words; notebooks 01 §6, 06 and 07)
 
-> **Question to the author.** This example is the orchestrator's reading of your words "replace ensembles with trace splits of water source and travel time". We read them as one worked example on a sink's water split by source and by travel time, checked against the closure check and PRT mean travel times. Is that reading right? If you meant something else, for example a split of the ensemble results by source and travel time, this example changes.
+> **Decided (2026-10-19).** The author confirmed this reading: one worked example on a sink's water split by source and by travel time, checked against the closure check and PRT mean travel times.
 
 **Purpose.** Many studies need the integral answers more than the edge of an area. How much of the well's water is river water? How old is the water from each source? These answers depend much less on mixing than the edge does, which makes them the outputs a practitioner can use with most confidence.
 
@@ -346,7 +351,7 @@ Points in order:
    - Do not write that full mixing lies "within the range" of particle results. Among particle runs that conserve water, it lies below that range (0.30–0.41 against 0.62–0.998). The "inside that range" of NS §2 and its summary includes particles that lose weight only at wells, which do not conserve water.
 9. The link to example C. With streams as cells, stream leakage supplies 43 % of the wells' water. With the stream network it all traces back to recharge. Along weight-losing particle paths the split is 49 % recharge and 51 % stream, against 57 % and 43 % under full mixing. evidence: NS Summary "Streams"; NS §3 (`prt_sources_by_well.csv`). This shows that on a regional model the split by source can differ between methods by several percentage points, even though the totals agree. Mark the reason as inferred.
 
-Figure: Fig. 3 stays (F with the published cells, and F > 0.1 against the published cells). See Section 4 of this outline for a possible third panel.
+Figure: Fig. 4 (was Fig. 3) stays (F with the published cells, and F > 0.1 against the published cells). See Section 4 of this outline for a possible third panel.
 
 ### 3.6 Trade-offs and conclusions (about 400 words)
 
@@ -370,11 +375,11 @@ Unchanged from `draft_reduced/sections/07_availability.md`, with its four [check
 | Item | Status | Notes |
 |---|---|---|
 | Fig. 1, the eight-cell example | Stays, may change | It now carries gross and net accounting in Methods. Propose a second small panel or a caption sentence that gives net F = 1 in the well cell beside gross F = 6/11 = 0.55. `studies/paper/gallery_figure.py` make_method_single; `method_figures.py` draw_gross_net already draws a gross-and-net panel. |
-| Proposed figure for Methods: snapshot against transient tracking | Proposal, not decided | Methods now explains transient tracking and backward tracking in time at length. A schematic would help. The full draft's Figure 1, panel (d), already draws one cell as a snapshot and the same cell carried through storage from step n to n + 1 (`studies/paper/method_figures.py` draw_transient). It could join Fig. 1 as panel (b), one column wide. |
+| Fig. 1 panel (b): snapshot against transient tracking | Decided (decision 11) | Methods now explains transient tracking and backward tracking in time at length. A schematic would help. The full draft's Figure 1, panel (d), already draws one cell as a snapshot and the same cell carried through storage from step n to n + 1 (`studies/paper/method_figures.py` draw_transient). It could join Fig. 1 as panel (b), one column wide. |
 | Fig. 2, the gallery | Stays | Panels a–h map onto examples A, B, C and Table 1 (see the Fig. 2 column). Caption: panel (g) needs a sentence on posterior realisations, now that the ensemble example is gone. |
-| Proposed example figure | Proposal, not decided | Examples A and B make claims the gallery cannot show: F against the particle share (A) and the well's water by origin through time against the published curves (B). One compact two-panel figure could hold the particle-share map ({SI: contributing area against particle tracking}, panel b) and the Bedekar curves with the read-offs ({SI: the unit-concentration example rebuilt}, panel a). Alternatively these stay in the SI. |
+| New Fig. 3, examples A and B | Decided (decision 12) | Examples A and B make claims the gallery cannot show: F against the particle share (A) and the well's water by origin through time against the published curves (B). One compact two-panel figure could hold the particle-share map ({SI: contributing area against particle tracking}, panel b) and the Bedekar curves with the read-offs ({SI: the unit-concentration example rebuilt}, panel a). The Neversink figure becomes Fig. 4. |
 | Table 1, the ten notebooks | New | Section 3.4 of this outline. It is the first main-text table. |
-| Fig. 3, Neversink | Stays, may grow | Section 5 grows. Propose adding panel (c), the F > 0.1 area against the weight-losing particle area, from {SI: Neversink particle area and ensemble mean F}, panel (a), because point 8 of Section 3.5 quotes it. |
+| Fig. 4 (was Fig. 3), Neversink | Stays, may grow | Section 5 grows. Propose adding panel (c), the F > 0.1 area against the weight-losing particle area, from {SI: Neversink particle area and ensemble mean F}, panel (a), because point 8 of Section 3.5 quotes it. |
 | Cost table for Neversink | Proposal, not decided | The trace and the four PRT runs of point 4 of Section 3.5, with time, number of particles and output size, could be a short table instead of prose. |
 
 ## 5. The SI after the move
@@ -386,17 +391,13 @@ Unchanged from `draft_reduced/sections/07_availability.md`, with its four [check
 - **Text S3, the worked examples in brief** (`si/G_examples.md`, 3,613 words). Shrinks. Its paragraphs "Sources and area", "Transient tracking", "Mean travel time" and "A new well's source mix" move into examples A, B and C. Its paragraphs on accounting, the forward trace, grids, seasonal snapshots, streams and linked models, and ensembles stay, because they back the rows of Table 1. The transient check table stays.
 - **Figures S2–S5.** S2 (area against particles) and S5 (the unit-concentration example) move to the main text if the proposed example figure is accepted. Otherwise they stay. S3 (snapshots against transient tracking) stays. S4 (probability of contribution before and after history matching) stays and is now cited from Table 1 row 09.
 - **Text S4, the Neversink comparison** (`si/D.md`). Stays. The ensemble timing moves to Section 5.
-- **Figure S6, Neversink particle area and ensemble mean F.** Its panel (a) moves to Fig. 3 if that proposal is accepted.
+- **Figure S6, Neversink particle area and ensemble mean F.** Its panel (a) moves to Fig. 4 if that proposal is accepted.
 - **Text S5 and Figure S7, numerical dispersion.** Stay.
 - `si/numbering.md` needs a rebuild after the move. Labels are reassigned on every build.
 
 ## 6. Open questions for the author
 
-1. **Example C.** Is our reading of "replace ensembles with trace splits of water source and travel time" right (see the note at the top of example C)?
-2. **How Table 1 names the notebooks.** By number and file name in a column (for example `01_quickstart`), or by number only with one pointer to the repository in Section 7? The rule so far has been to name the notebooks once.
-3. **A figure for transient tracking in Methods.** Add the snapshot-against-tracking schematic (full draft Figure 1, panel d) to Fig. 1, or leave Methods with one figure? A related choice: does Methods show the backward-in-time equation (Eq. S14), or only its plain reading?
-4. **A main-text figure for examples A and B.** Promote the particle-share map and the Bedekar curves into one compact figure, or rely on the gallery and the SI?
-5. **The MODFLOW 6 run time.** You said that the comparison against MODFLOW 6 is irrelevant for Neversink. Should the 44 s also leave the abstract and Section 3, so the ensemble argument rests only on the trace time (9 s per realisation for two traces)?
+All five were answered on 2026-10-19 (decisions 9–13 in Section 1.5). Example C stands as read. Table 1 names the notebooks by number. Fig. 1 gets the transient panel and Methods shows the backward-in-time equation. Examples A and B get a compact main-text figure. The MODFLOW 6 run time leaves the abstract and Section 3.
 
 ## 7. Numbers not found
 
