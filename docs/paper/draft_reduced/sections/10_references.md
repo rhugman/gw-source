@@ -4,6 +4,10 @@
 
 Bedekar, V., C. Neville, M.J. Tonkin, R.D. Bartlett, and P. Plato. 2024. A unit-concentration method to quantify source contribution. *Groundwater* 62, no. 2: 303–309. https://doi.org/10.1111/gwat.13333 <!-- checked against the full-text PDF (references/docs/): Methods Brief, Groundwater 62, no. 2 (March–April 2024), pp. 303–309, doi 10.1111/gwat.13333. Received January 2023, accepted June 2023, © 2023 NGWA, so it appeared online in 2023. Dated 2024, the year of the issue, as the journal's own running footer does. -->
 
+Cornaton, F., and P. Perrochet. 2006. Groundwater age, life expectancy and transit time distributions in advective–dispersive systems: 1. Generalized reservoir theory. *Advances in Water Resources* 29, no. 9: 1267–1291. https://doi.org/10.1016/j.advwatres.2005.10.009
+
+Corson-Dosch, N.T., M.N. Fienen, J.S. Finkelstein, A.T. Leaf, J.T. White, J. Woda, and J.H. Williams. 2022. Areas contributing recharge to priority wells in valley-fill aquifers in the Neversink River and Rondout Creek drainage basins, New York. U.S. Geological Survey Scientific Investigations Report 2021–5112. Reston, Virginia: USGS. https://doi.org/10.3133/sir20215112
+
 Environment Agency. 2019. *Manual for the Production of Groundwater Source Protection Zones*. Bristol, UK: Environment Agency. https://assets.publishing.service.gov.uk/media/5d41a020e5274a0a0bf7757c/Manual-for-the-production-of-Groundwater-Source-Protection-Zones.pdf
 
 Fienen, M.N., and N.T. Corson-Dosch. 2021. Groundwater model archive and workflow for Neversink/Rondout Basin, New York, source water delineation. U.S. Geological Survey data release. https://doi.org/10.5066/P9HWSOHP <!-- creators, year and title from the DataCite record of the DOI; DOI from bibliography.md [COR22] and docs/neversink_study.md §1 -->
@@ -25,6 +29,8 @@ Partington, D., P. Brunner, C.T. Simmons, R. Therrien, A.D. Werner, G.C. Dandy, 
 Pollock, D.W. 2016. User guide for MODPATH Version 7—A particle-tracking model for MODFLOW. U.S. Geological Survey Open-File Report 2016–1086. Reston, Virginia: USGS. https://doi.org/10.3133/ofr20161086 <!-- DOI from the suggested citation in references/docs/text/2016_Pollock_MODPATH7_OFR2016-1086.txt; bibliography.md gives the PDF URL -->
 
 Potter, S.T., E. Moreno-Barbero, and C.E. Divine. 2008. MODALL: A practical tool for designing and optimizing capture systems. *Ground Water* 46, no. 2: 335–340. https://doi.org/10.1111/j.1745-6584.2007.00410.x <!-- checked against the article PDF (references/docs/, 2026-10-13): authors Scott T. Potter, Elena Moreno-Barbero and Craig E. Divine; a Methods Note; p. 335 footer "Vol. 46, No. 2—GROUND WATER—March–April 2008 (pages 335–340)" and doi 10.1111/j.1745-6584.2007.00410.x -->
+
+Provost, A.M., C.D. Langevin, and J.D. Hughes. 2017. Documentation for the "XT3D" option in the Node Property Flow (NPF) Package of MODFLOW 6. U.S. Geological Survey Techniques and Methods, book 6, chap. A56. Reston, Virginia: USGS. https://doi.org/10.3133/tm6A56 <!-- not in bibliography.md; suggested citation on the USGS Publications Warehouse page pubs.usgs.gov/publication/tm6A56 -->
 
 Visser, A., R. Heerdink, H.P. Broers, and M.F.P. Bierkens. 2009. Travel time distributions derived from particle tracking in models containing weak sinks. *Ground Water* 47, no. 2: 237–245. https://doi.org/10.1111/j.1745-6584.2008.00542.x <!-- Crossref checked 2026-10-15; cited in §4.1 as the precedent for splitting particles at weak sinks (abstract: a fraction of each particle leaves at the weak sink, set by the ratio of sink flux to cell inflow); [check] read the methods section before submission: exact ratio and whether the weight compounds over successive weak sinks -->
 

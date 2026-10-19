@@ -4,7 +4,7 @@ This text describes how the code is tested and the models behind the worked exam
 
 ### Inputs and cost
 
-{SI: inputs, selections and outputs} lists what the code reads, how destinations and sources are chosen and what it returns. On the regional model of Section 5, one MODFLOW 6 run takes 44 s. One full-mixing trace of the nine destination groups takes 2–3 s. For comparison, PRT on the same flows took about 5 min for 122,112 particles released at one height, with full particle tracks. <!-- moved from si/D.md in SI round 1; docs/neversink_study.md Summary ("MODFLOW 6 takes 44 s"; trace 2 to 3 s) and "Reproducing" (the two MF6 runs take 44 s and 75 s; PRT released at four heights, 488,448 particles, about 13 minutes each with a track file of about 6 GB; single-height runs, 122,112 particles, about 5 minutes; the reproduction of the published mask runs PRT five times, about 30 s each, only termination records written) -->
+{SI: inputs, selections and outputs} lists what the code reads, how destinations and sources are chosen and what it returns. <!-- round 2: the cost sentences (MODFLOW 6 44 s, trace 2–3 s, PRT about 5 min) moved to main-text Section 5 and Text S4; was moved from si/D.md in SI round 1; docs/neversink_study.md Summary ("MODFLOW 6 takes 44 s"; trace 2 to 3 s) and "Reproducing" (the two MF6 runs take 44 s and 75 s; PRT released at four heights, 488,448 particles, about 13 minutes each with a track file of about 6 GB; single-height runs, 122,112 particles, about 5 minutes; the reproduction of the published mask runs PRT five times, about 30 s each, only termination records written) -->
 
 ### Verification
 
