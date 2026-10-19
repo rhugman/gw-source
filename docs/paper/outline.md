@@ -73,7 +73,7 @@ Decisions carried forward from 2026-10-15 (the outline on `paper-draft-alt`, its
 - The notebooks are named once, in the Section 4 opening.
 - The test-model verification stays in the SI.
 - The Neversink pumping scenarios stay out.
-- The title is *Where does it come from and where does it go? Fast, open-source flow tracing for MODFLOW 6 models*.
+- The title is *Where does it come from and where does it go? Open-source flow tracing for MODFLOW 6 models*.
 
 ## 2. Key messages
 
