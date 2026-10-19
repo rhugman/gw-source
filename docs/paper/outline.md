@@ -92,13 +92,13 @@ Word counts below are prose words with HTML comments removed (the count used her
 |---|---|---|---|---|
 | 00 | Title, impact statement, abstract, key words | 337 | 340 | – |
 | 1 | Introduction | 581 | 650 | – |
-| 2 | Method | 655 | 1,800 | Fig. 1 (and a proposed Fig. 2, see Section 4 of this outline) |
+| 2 | Method | 655 | 1,630 | Fig. 1 (and a proposed Fig. 2, see Section 4 of this outline) |
 | 3 | Software and cost | 144 | 250 | – |
 | 4 | Worked examples (A, B, C and Table 1) | 1,376 | 2,050 (table text about 450 of it) | Fig. 2 gallery, Table 1, perhaps one example figure |
 | 5 | A regional model: Neversink | 504 | 550 | Fig. 4 |
 | 6 | Trade-offs and conclusions | 349 | 400 | – |
 | 7 | Code and data availability | 97 | 100 | – |
-| | Total | 4,043 | about 6,100 | |
+| | Total | 4,043 | about 5,930 | |
 
 ### 3.0 Title, impact statement, abstract, key words (about 340 words)
 
@@ -128,7 +128,7 @@ Points in order:
    - Change: the reduced draft's sentence on ensembles ("Risk-based studies run an ensemble … The code is fast enough to trace every version.") becomes one sentence on speed at scale that points to Section 5. Keep the Fienen et al. (2022) citation, because Section 5 uses their model.
 6. What the paper does. Change: "Section 4 works through ten examples" becomes "Section 4 works through three examples in depth and summarises ten notebooks in a table". Section 5 tests the code on a published regional model. Section 6 sets out the trade-offs.
 
-### 3.2 Method (about 1,800 words)
+### 3.2 Method (about 1,630 words)
 
 **Purpose.** A reader must be able to understand every output in Sections 4 and 5 from this section alone, without the SI. Each concept is explained where it first appears. Each equation gets a plain reading. "In words:" appears at most once.
 
@@ -168,9 +168,15 @@ Proposed subsections, as bold run-in heads:
 - Eq. (3) in volume form (now Eq. S4), with a plain reading. It mirrors Eq. (2) with inflows in place of outflows.
 - G is the long-run share. It equals the concentration of a unit-concentration transport run at equilibrium (checked in Table 1, row 03).
 
-**2.5 Volumes (about 120 words).**
+**2.5 Volumes and the water-budget checks (about 200 words).**
 - A fraction times a flow gives a volume of water per unit time. Volume through = F × O. Volume from = F × the cell's inflow through its source terms. evidence: `si/B.md` "Volumes"; `src/gwsource/metrics.py`.
 - The volume from, summed over all cells package by package, splits the destination's water by source (Fig. 2b, example C). The forward trace gives the matching volumes to each sink.
+
+- The checks, condensed (author comment 2026-10-19: "not too important; can be condensed or folded into other sections or SI"). About 80 words, as the last points of this subsection:
+  - Adding Eq. (2) over all cells gives the closure check. In plain words: the source water traced to the destination, corrected for the cell budget errors, adds up to the water the destination takes. No equation in the main text. evidence: `si/B.md` "Why the water-budget checks hold exactly".
+  - One sentence names the other two checks (forward–backward and boundary control) and says that, because they include the cell budget errors, they hold exactly for any flow field ({SI: method in full}).
+  - Keep the caveat: the checks test the solution. They cannot show that the flow model is right, or that full mixing describes how water moves in the aquifer. evidence: `draft/sections/02_methods.md` Section 2.5, last paragraph.
+  - The derivations of all three checks (Eqs S6 and S8, and the reason the double sum cancels) stay in the SI.
 
 **2.6 Gross and net accounting at weak sinks (about 200 words).**
 - Recall the weak sink of Section 1. Under gross accounting each sink term takes its share of the cell's outflow, as in a transport model. This is the default. evidence: `draft/sections/02_methods.md` Section 2.4; `src/gwsource/config.py`.
@@ -179,15 +185,7 @@ Proposed subsections, as bold run-in heads:
 - At a small well the difference can be several times the pumping (Table 1, row 02: 6.7 times). We would use net accounting to compare with a FlowSource study.
 - One sentence: net accounting needs no cell budget error term, and its details are in {SI: method in full}.
 
-**2.7 Why the water-budget checks hold exactly (about 250 words).**
-- Purpose first: a user needs to know whether a trace can be trusted, and what a check can and cannot tell.
-- Adding Eq. (2) over all cells gives the backward closure check, Eq. (4) (now Eq. S6). Each flow between two cells appears once on each side, so only the source and sink terms and the cell budget errors are left. In plain words: the source water traced to the destination, corrected for the cell budget errors, adds up to the water the destination takes. evidence: `si/B.md` "Why the water-budget checks hold exactly".
-- The forward–backward check, Eq. (5) (now Eq. S8): the volume from a source to a destination is the same whether traced backward or forward. Give the one-sentence reason (the double sum of the cell-to-cell flows cancels).
-- The boundary-control check: the fractions to all sink terms add up to 1 in every cell with outflow.
-- Because the checks include the cell budget errors, they hold exactly for any flow field. A reported error larger than round-off points to a fault in the tracing.
-- The checks test the solution. They cannot show that the flow model is right, or that full mixing describes how water moves in the aquifer. evidence: `draft/sections/02_methods.md` Section 2.5, last paragraph. Keep this caveat.
-
-**2.8 Mean travel time (about 200 words).**
+**2.7 Mean travel time (about 200 words).**
 - Purpose first: fractions say how much water arrives, not when.
 - The water volume of a cell, V = porosity × saturated volume. Fractions need no porosity, but travel times do. Porosity is an explicit input with no default. evidence: `si/B.md` "Mean travel time"; `src/gwsource/traveltime.py`.
 - The mean residence time of a cell, τ = V/O. Eq. (6) (now Eq. S10) and the mean travel time m/F, with a plain reading: each cell adds its residence time weighted by its F, and the sum passes upstream with the outflow shares.
@@ -195,7 +193,7 @@ Proposed subsections, as bold run-in heads:
 - A mean travel time averages fast and slow water that have mixed in the cells. It is not a first-arrival time.
 - Defined under gross accounting only.
 
-**2.9 Transient flow: snapshots and transient tracking (about 300 words).**
+**2.8 Transient flow: snapshots and transient tracking (about 300 words).**
 - Purpose first: in a transient model, the water reaching a sink depends on what happened in earlier steps.
 - A snapshot traces each time step on its own flows, as if they were steady. Storage release becomes a source term and storage gain a sink term. A snapshot assumes that water reaches the sink in the same step it entered, so it cannot show wet-season recharge reaching the well in the dry season. It also cannot say where the water released from storage came from. The published descriptions of the reference method treat transient models in this way. evidence: `draft/sections/02_methods.md` Section 2.7, paragraph 1; `draft_reduced/sections/01_introduction.md` (Environment Agency 2019, Appendix C4.4).
 - Transient tracking extends full mixing through time. We refer to it as transient tracking. Water from the chosen sources is tagged. Storage terms are not source or sink terms. Instead they change the water volume of the cell from step to step.
@@ -206,7 +204,7 @@ Proposed subsections, as bold run-in heads:
 - Mention that the water volumes and the length of the transport step affect the result, and point to {SI: method in full} for the two volume options and transport sub-steps. Example B quotes their effect.
 - Hydraulic mixing cells (Partington et al. 2011) carry mixed water through storage in a similar way. evidence: `draft_reduced/sections/02_methods.md`.
 
-**2.10 Backward tracking in time (about 230 words).**
+**2.9 Backward tracking in time (about 230 words).**
 - Purpose first: forward tracking cannot tell which of the water now in the aquifer will reach the sink, and by when.
 - Backward tracking in time solves the backward counterpart of each step, from the end of the simulation to its start. Say once that this is not MODPATH backward tracking, in which particles run against the flow from the sink. It is the discrete analogue of adjoint methods (Neupauer and Wilson 1999; Cornaton and Perrochet 2006). evidence: `docs/paper/terms.md` (backward tracking in time); `si/B.md` "Backward tracking in time".
 - Eq. (9) (now Eq. S14), or its plain reading only if the writer judges the equation too heavy (see open question 3).
