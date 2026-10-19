@@ -227,7 +227,10 @@ Points in order:
    - Keep the caveat: tracing inside each PEST++ model run is untested. evidence: `draft_reduced/sections/04_examples.md` (Ensembles, last paragraph).
 5. Testing: ten test models and two published examples ({SI: verification checks on the test models}). evidence: `draft_reduced/sections/03_software.md`.
 
-Change: drop the MODFLOW 6 run time (44 s) from this section (see open question 5).
+Change: drop the MODFLOW 6 run time (44 s) from this section (decision 13). The main comparison of cost is against particle tracking (author comment 2026-10-19):
+- Point 3 sets the trace against PRT on the same flows in one sentence: 2–3 s for the trace, against about 30 s for a PRT run that writes only end points and 5 to 13 min with full tracks (Section 5 gives the detail and the fairness caveat). evidence: NS "Reproducing" and the workflow run times.
+- Add the same comparison on the example model if the notebooks record it: the F trace against the PRT run of notebook 01 §8 (18,208 particles) [check: the notebook does not print the PRT run time yet; add a timing to tutorial 01 on `tutorials-paper-sync` or leave the example-model comparison out].
+- The speed argument for ensembles (point 4) then reads as: a trace costs a small fraction of a particle run, so it can be repeated for every realisation where a particle run could not.
 
 ### 3.4 Worked examples (about 2,050 words)
 
