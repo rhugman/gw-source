@@ -1,6 +1,6 @@
 ## {SI: software, verification and models}
 
-This text describes how the code is tested and the models behind the worked examples of Section 4, so that a reader can rebuild them without the code. All example models are small and synthetic. Each example ships with the code as a Jupyter notebook that builds its model, runs MODFLOW 6 and reproduces its numbers and figure (Section 7). Lengths are in metres and times in days. Rows and columns are counted from 1, from the north-west corner, and layers from the top. <!-- tutorials/herebedragons.py module docstring and AquiferSpec; tutorials/README.md table (notebooks 01–10); sections/04a_examples.md §4 opening (rows and columns counted from 1); notebook table and run times cut in SI round 1 (reviews/si_r1_prose.md, S2) -->
+This text describes how the code is tested and the models behind the worked examples of Section 3, so that a reader can rebuild them without the code. All example models are small and synthetic. Each example ships with the code as a Jupyter notebook that builds its model, runs MODFLOW 6 and reproduces its numbers and figure (Section 6). Lengths are in metres and times in days. Rows and columns are counted from 1, from the north-west corner, and layers from the top. <!-- tutorials/herebedragons.py module docstring and AquiferSpec; tutorials/README.md table (notebooks 01–10); sections/04a_examples.md §4 opening (rows and columns counted from 1); notebook table and run times cut in SI round 1 (reviews/si_r1_prose.md, S2) -->
 
 ### Inputs and cost
 
@@ -8,13 +8,13 @@ This text describes how the code is tested and the models behind the worked exam
 
 ### Verification
 
-The automated tests run on ten small test models and two hand-built networks. {SI: verification checks on the test models} shows the largest error of each check. The test models cover the DIS, DISV and DISU grids, the XT3D option, storage, streams (SFR), the water mover (MVR), multi-aquifer wells (MAW), lakes (LAK), the unsaturated zone (UZF) and simulations split into linked models. Test model 1 is the base case. It is one layer of 20 × 30 cells of 50 m, with constant heads on the west edge, a river along one column, recharge and a well pumping 800 m³/d. The two hand-built networks are the worked example of Foley and Black (2013) and a network of 15 cells with flow loops. The archived code release (Section 7) describes the test models in tests/models/README.md. It lists the error of each check on each model in docs/verification.md. <!-- tests/models/common.py (BaseSpec: 20 x 30 cells of 50 m, top 20, botm -30, k 10, rech 1e-3, chd_head 5, riv_col 22, riv_stage 6, wel_rate -800, six inactive cells); tests/models/*.py; studies/paper/verification.py docstring; test-model table and per-check tables moved to tests/models/README.md and docs/verification.md in SI round 1 -->
+The automated tests run on ten small test models and two hand-built networks. {SI: verification checks on the test models} shows the largest error of each check. The test models cover the DIS, DISV and DISU grids, the XT3D option, storage, streams (SFR), the water mover (MVR), multi-aquifer wells (MAW), lakes (LAK), the unsaturated zone (UZF) and simulations split into linked models. Test model 1 is the base case. It is one layer of 20 × 30 cells of 50 m, with constant heads on the west edge, a river along one column, recharge and a well pumping 800 m³/d. The two hand-built networks are the worked example of Foley and Black (2013) and a network of 15 cells with flow loops. The archived code release (Section 6) describes the test models in tests/models/README.md. It lists the error of each check on each model in docs/verification.md. <!-- tests/models/common.py (BaseSpec: 20 x 30 cells of 50 m, top 20, botm -30, k 10, rech 1e-3, chd_head 5, riv_col 22, riv_stage 6, wel_rate -800, six inactive cells); tests/models/*.py; studies/paper/verification.py docstring; test-model table and per-check tables moved to tests/models/README.md and docs/verification.md in SI round 1 -->
 
 ### The example model
 
 The example model is one convertible layer (DIS) of 40 × 40 cells of 50 m, 2 km on each side. The top is at 20 m and the bottom at −30 m. The hydraulic conductivity is 5 m/d everywhere. Constant heads of 10 m (CHD) fill the 40 cells of column 1. A river (RIV) fills the 40 cells of column 31, with a stage of 6 m, a bottom of 4 m and a conductance of 500 m²/d per cell. Recharge of 5 × 10⁻⁴ m/d (RCH) falls on every cell. The supply well (WEL) pumps 800 m³/d from row 21, column 29. Its cell centre is 100 m west of the river cell centres. The model is steady state. Travel times and particle tracking use a porosity of 0.3. <!-- tutorials/herebedragons.py (AquiferSpec: nrow = ncol = 40, delr = delc = 50, top 20, botm -30, k 5, strt 10, rech 5e-4, chd_head 10, riv_col 30 (0-based), riv_stage 6, riv_cond 500, riv_rbot 4, wells supply_well (20, 28) -800; build_quickstart: icelltype 1); tutorials/06_travel_time/06_travel_time.ipynb settings (POROSITY 0.3) -->
 
-The weight-losing PRT particles of Section 4 are released from every source term of every cell with $F > 10^{-6}$. Each source term gets 16 release points, spread over the cell in plan. This gives 18,208 particles from 1,133 cells. <!-- src/gwsource/prt.py PrtConfig (fraction_threshold 1e-6, subdivisions 2: 4 k^2 = 16 points per DIS cell, z_levels: one level in a one-layer grid, thin_weak_sinks True); tutorials/01_quickstart/01_quickstart.ipynb §8 and tutorials/06_travel_time/06_travel_time.ipynb §5 (PrtConfig(porosity=0.3), "18208 particles from 1133 cells") -->
+The weight-losing PRT particles of Section 3 are released from every source term of every cell with $F > 10^{-6}$. Each source term gets 16 release points, spread over the cell in plan. This gives 18,208 particles from 1,133 cells. <!-- src/gwsource/prt.py PrtConfig (fraction_threshold 1e-6, subdivisions 2: 4 k^2 = 16 points per DIS cell, z_levels: one level in a one-layer grid, thin_weak_sinks True); tutorials/01_quickstart/01_quickstart.ipynb §8 and tutorials/06_travel_time/06_travel_time.ipynb §5 (PrtConfig(porosity=0.3), "18208 particles from 1133 cells") -->
 
 ### Variants of the example model
 
@@ -46,32 +46,32 @@ For the comparison, four MODFLOW 6 GWT models carry one tagged group each. They 
 
 ## {SI: inputs, selections and outputs}
 
-**Table.** What the code reads, how destinations and sources are chosen, and what it returns. The last column gives where each item is shown, in the main text (Section 4) or in {SI: the worked examples in brief}. MODFLOW 6 option names are given where a user must set them. <!-- moved from si/H_tables.md in SI round 1; "Shown in" pointers changed to Text S3; evidence: src/gwsource (mf6io.py, network.py, selectors.py, metrics.py, traveltime.py, transient.py, tracking.py, ensemble.py, export.py, prt.py); tutorials 01–10 (calls used in each) -->
+**Table.** What the code reads, how destinations and sources are chosen, and what it returns. The last column gives where each item is shown, in the main text (Section 3) or in {SI: the worked examples in brief}. MODFLOW 6 option names are given where a user must set them. <!-- moved from si/H_tables.md in SI round 1; "Shown in" pointers changed to Text S3; evidence: src/gwsource (mf6io.py, network.py, selectors.py, metrics.py, traveltime.py, transient.py, tracking.py, ensemble.py, export.py, prt.py); tutorials 01–10 (calls used in each) -->
 
 | | Item | What it is or needs | Shown in |
 |---------|-----------------|--------------------------------------------------------|------------------|
-| **Inputs** | Binary grid file | Cell connections of a DIS, DISV or DISU grid. Written by MODFLOW 6 by default | Section 4, Text S3 |
-| | GWF budget file | Cell-to-cell flows and every source and sink term. SAVE_FLOWS in each package, budget saved in Output Control | Section 4 |
-| | Every time step saved | Needed for transient tracking (SAVE BUDGET ALL) | Section 4, Text S3 |
-| | Saturated thickness | For travel times and transient tracking. NPF SAVE_SATURATION, or the head file | Section 4, Text S3 |
-| | Porosity | Given by the user. Needed for travel times and transient tracking, not for fractions | Section 4, Text S3 |
-| | Package budget files | SFR, LAK, MAW, UZF and MVR budgets (BUDGET FILEOUT), to trace through package networks | Section 4, Text S3 |
-| | Linked models | GWF models joined by exchanges, read as one system (SAVE_FLOWS in the exchange) | Section 4, Text S3 |
-| **Selections** | Package | All terms of a package, such as all recharge or all wells | Section 4 |
-| | Boundname | Terms with a given boundname, such as one well. Read from the package input files | Section 4 |
+| **Inputs** | Binary grid file | Cell connections of a DIS, DISV or DISU grid. Written by MODFLOW 6 by default | Section 3, Text S3 |
+| | GWF budget file | Cell-to-cell flows and every source and sink term. SAVE_FLOWS in each package, budget saved in Output Control | Section 3 |
+| | Every time step saved | Needed for transient tracking (SAVE BUDGET ALL) | Section 3, Text S3 |
+| | Saturated thickness | For travel times and transient tracking. NPF SAVE_SATURATION, or the head file | Section 3, Text S3 |
+| | Porosity | Given by the user. Needed for travel times and transient tracking, not for fractions | Section 3, Text S3 |
+| | Package budget files | SFR, LAK, MAW, UZF and MVR budgets (BUDGET FILEOUT), to trace through package networks | Section 3, Text S3 |
+| | Linked models | GWF models joined by exchanges, read as one system (SAVE_FLOWS in the exchange) | Section 3, Text S3 |
+| **Selections** | Package | All terms of a package, such as all recharge or all wells | Section 3 |
+| | Boundname | Terms with a given boundname, such as one well. Read from the package input files | Section 3 |
 | | Boundary number | Terms with given boundary numbers in a package | – |
 | | Cells | All terms in the given cells (gross accounting), or the cells themselves (net accounting) | Text S3 |
-| | Zone | Cells with a given zone value, alone or with a package, such as the recharge on one field | Section 4, Text S3 |
-| **Outputs** | Backward fraction F | Share of each cell's water that ends at the destination | Section 4 |
-| | Forward fraction G | Share of each cell's water that came from the source | Section 4, Text S3 |
-| | Volumes | Volume through, volume from and volume to, and their split by package | Section 4 |
-| | Gross and net accounting | Water attributed to a weak-sink well under each rule. Boundary-control maps | Section 4, Text S3 |
-| | Budget checks | Closure, forward–backward and boundary-control checks with every trace | Section 4, Text S3 |
-| | Mean travel time | Mean time to the destination under full mixing | Section 4, Text S3 |
-| | Snapshot statistics | Minimum, mean and maximum F over time steps. Cells always, sometimes or never above a threshold | Section 4, Text S3 |
-| | Transient tracking | Tagged fractions c (forward) and w (backward in time). Destination's water by source, time step and initial water | Section 4, Text S3 |
-| | Ensemble statistics | Mean, probability of exceeding a threshold, and exact or histogram quantiles over realisations | Section 4 |
-| | PRT release points | Particle runs on the same flows, for comparison | Section 4, Text S3 |
+| | Zone | Cells with a given zone value, alone or with a package, such as the recharge on one field | Section 3, Text S3 |
+| **Outputs** | Backward fraction F | Share of each cell's water that ends at the destination | Section 3 |
+| | Forward fraction G | Share of each cell's water that came from the source | Section 3, Text S3 |
+| | Volumes | Volume through, volume from and volume to, and their split by package | Section 3 |
+| | Gross and net accounting | Water attributed to a weak-sink well under each rule. Boundary-control maps | Section 3, Text S3 |
+| | Budget checks | Closure, forward–backward and boundary-control checks with every trace | Section 3, Text S3 |
+| | Mean travel time | Mean time to the destination under full mixing | Section 3, Text S3 |
+| | Snapshot statistics | Minimum, mean and maximum F over time steps. Cells always, sometimes or never above a threshold | Section 3, Text S3 |
+| | Transient tracking | Tagged fractions c (forward) and w (backward in time). Destination's water by source, time step and initial water | Section 3, Text S3 |
+| | Ensemble statistics | Mean, probability of exceeding a threshold, and exact or histogram quantiles over realisations | Section 3 |
+| | PRT release points | Particle runs on the same flows, for comparison | Section 3, Text S3 |
 | | Export | NumPy and netCDF files. GeoPackage polygons for GIS | – |
 
 ## {SI: verification checks on the test models}
