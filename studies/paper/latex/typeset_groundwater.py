@@ -156,7 +156,7 @@ def pandoc_many(chunks: list) -> list:
     if not chunks:
         return []
     src = f"\n\n{SPLIT}\n\n".join(chunks)
-    cmd = [PANDOC, "-f", "markdown+tex_math_dollars+autolink_bare_uris-auto_identifiers-implicit_figures-subscript-superscript",
+    cmd = [PANDOC, "-f", "markdown+tex_math_dollars+autolink_bare_uris-auto_identifiers-implicit_figures-subscript-superscript-fancy_lists",
            "-t", "latex", "--wrap=none", "--syntax-highlighting=none"]
     out = subprocess.run(cmd, input=src, capture_output=True, text=True, check=True).stdout
     parts = [p.strip() for p in re.split(rf"\n*{SPLIT}\n*", out)]
