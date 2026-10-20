@@ -1,4 +1,4 @@
-"""Selectors by boundname (per stress period), by zone array on DIS, DISV and DISU grids, by term."""
+"""Selectors by boundname (per stress period), by zone array (DIS, DISV, DISU) and by term entry."""
 
 from dataclasses import replace
 
