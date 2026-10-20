@@ -31,3 +31,8 @@ references/docs/text/
 # Local Claude Code settings
 .claude/settings.local.json
 .claude/.cc-writes
+
+# Notes, write-ups and the paper stay local (not tracked)
+PLAN.md
+references/
+docs/

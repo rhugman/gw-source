@@ -19,6 +19,7 @@ Stresses are given on (row, col) of the tutorial grid; the river reaches carry t
 'river_north' and 'river_south', and wells carry their own names.
 """
 
+import importlib.util
 import shutil
 import sys
 from dataclasses import dataclass, field, replace
@@ -41,7 +42,10 @@ IMS_SETTINGS = {
     "rcloserecord": 1.0e-8,
     "linear_acceleration": "bicgstab",
 }
-SEASONS = ("winter", "spring", "summer", "autumn")
+VORONOI_BACKGROUND = 50.0  # m: vorflow mesh size away from the features (as the DIS cells)
+VORONOI_WELL_SIZE = 10.0  # m: vorflow mesh size at the wells
+VORONOI_RIVER_SIZE = 12.5  # m: vorflow mesh size along the river
+SEASONS = ("wet", "wet-to-dry", "dry", "dry-to-wet")  # named by recharge (SEASON_RECHARGE)
 SEASON_RECHARGE = (1.8, 1.0, 0.1, 1.1)  # multipliers of AquiferSpec.rech
 SEASON_PUMPING = (0.8, 1.0, 1.4, 0.8)  # multipliers of the well rates
 FEATURE_STYLES = {  # package: scatter style for overlay_features()
@@ -74,11 +78,6 @@ def exe_path(name: str, bin_dir: Path | None = None) -> Path:
 def mf6_exe() -> Path:
     """Return the MODFLOW 6 executable in <repo>/bin."""
     return exe_path("mf6")
-
-
-def triangle_exe() -> Path:
-    """Return the triangle executable in <repo>/bin (Voronoi grids)."""
-    return exe_path("triangle")
 
 
 def work_dir(name: str, clean: bool = False) -> Path:
@@ -351,21 +350,74 @@ def build_layered(
 # ---------------------------------------------------------------- (c) DISV Voronoi and DISU
 
 
-def voronoi_gridprops(ws: Path, exe: Path, spec: AquiferSpec, max_area: float) -> dict:
-    """Build a Voronoi grid over the tutorial domain with Triangle; return DISV properties."""
-    from flopy.utils.triangle import Triangle
-    from flopy.utils.voronoi import VoronoiGrid
+def require_vorflow():
+    """Return the vorflow module, failing with an install hint if it is missing."""
+    assert importlib.util.find_spec("vorflow") is not None, (
+        "the Voronoi grid needs vorflow, an optional dependency of the tutorials only "
+        "(gwsource itself does not need it): pip install vorflow"
+    )
+    import vorflow
 
-    tri_ws = Path(ws) / "triangle"
-    tri_ws.mkdir(parents=True, exist_ok=True)
-    tri = Triangle(model_ws=str(tri_ws), exe_name=str(exe), maximum_area=max_area, angle=30.0)
-    tri.add_polygon([(0.0, 0.0), (spec.lx, 0.0), (spec.lx, spec.ly), (0.0, spec.ly)])
-    tri.build(verbose=False)
-    return VoronoiGrid(tri).get_disv_gridprops()
+    return vorflow
+
+
+def vorflow_cells(
+    spec: AquiferSpec,
+    background: float = VORONOI_BACKGROUND,
+    well_size: float = VORONOI_WELL_SIZE,
+    river_size: float = VORONOI_RIVER_SIZE,
+):
+    """Mesh the tutorial domain with vorflow; return its Voronoi cells as a GeoDataFrame.
+
+    background is the mesh size away from the features [m]. The mesh is refined to well_size
+    at each well (a point) and to river_size along the river (a line), and grows back to
+    background with vorflow's default growth factor (1.2 from cell to cell). Each well point
+    is the centre of its cell, and the river cells are centred on the river line.
+    """
+    from shapely.geometry import LineString, Point, box
+
+    vorflow = require_vorflow()
+    vorflow.set_verbosity(0)  # no progress messages; warnings and errors still show
+    riv_x = (spec.riv_col + 0.5) * spec.delr
+    blueprint = vorflow.ConceptualMesh()
+    blueprint.add_polygon(box(0.0, 0.0, spec.lx, spec.ly), zone_id=1)
+    blueprint.add_line(LineString([(riv_x, 0.0), (riv_x, spec.ly)]), "river", river_size)
+    for bname, rc, _ in spec.wells:
+        blueprint.add_point(Point(spec.xy(rc)), bname, well_size)
+    polys, lines, points = blueprint.generate()
+    mesher = vorflow.MeshGenerator(background_lc=background)
+    mesher.generate(polys, lines, points)
+    return vorflow.VoronoiTessellator(mesher, blueprint).generate()
+
+
+def disv_gridprops(cells, decimals: int = 6) -> dict:
+    """Return DISV ncpl, nvert, vertices and cell2d of Voronoi cells (clockwise, shared vertices).
+
+    cells is a GeoDataFrame of polygons with the generator of each cell in columns x and y.
+    The generator is the cell centre, so each connection is perpendicular to its shared face.
+    Vertices that agree to `decimals` decimal places [m] are merged.
+    """
+    from shapely.geometry.polygon import orient
+
+    index, vertices, cell2d = {}, [], []
+    for icell, (polygon, xc, yc) in enumerate(zip(cells.geometry, cells["x"], cells["y"])):
+        ring = orient(polygon, sign=-1.0).exterior.coords[:-1]  # MF6 needs clockwise vertices
+        iverts = []
+        for x, y in ring:
+            key = (round(x, decimals), round(y, decimals))
+            if key not in index:
+                index[key] = len(vertices)
+                vertices.append([len(vertices), x, y])
+            iverts.append(index[key])
+        cell2d.append([icell, float(xc), float(yc), len(iverts), *iverts])
+    return {"ncpl": len(cell2d), "nvert": len(vertices), "vertices": vertices, "cell2d": cell2d}
 
 
 def voronoi_stress_cells(gridprops: dict, spec: AquiferSpec) -> dict[str, list[int]]:
-    """Place the stresses on Voronoi cells by geometry: west edge, river line, well points."""
+    """Place the stresses on Voronoi cells by geometry: west edge, river line, well points.
+
+    The river cells are the cells that the river line crosses over a length > 0.
+    """
     from flopy.utils.gridintersect import GridIntersect
     from shapely.geometry import LineString, Point
 
@@ -377,7 +429,8 @@ def voronoi_stress_cells(gridprops: dict, spec: AquiferSpec) -> dict[str, list[i
     gi = GridIntersect(mg)
     riv_x = (spec.riv_col + 0.5) * spec.delr
     river = LineString([(riv_x, 0.0), (riv_x, spec.ly)])
-    riv = sorted(int(i) for i in gi.intersects(river, dataframe=False).cellids)
+    crossed = gi.intersect(river, geo_dataframe=False)
+    riv = sorted(int(i) for i, length in zip(crossed.cellids, crossed.lengths) if length > 0.0)
     xv = np.array([v[1] for v in gridprops["vertices"]])
     chd = [i for i, c in enumerate(gridprops["cell2d"]) if xv[np.array(c[4:], int)].min() < 1e-6]
     wells = [int(gi.intersects(Point(spec.xy(rc)), dataframe=False).cellids[0])
@@ -388,19 +441,29 @@ def voronoi_stress_cells(gridprops: dict, spec: AquiferSpec) -> dict[str, list[i
 def build_voronoi(
     ws: Path,
     exe: Path,
-    triangle: Path,
     spec: AquiferSpec | None = None,
-    max_area: float = 2500.0,
+    background: float = VORONOI_BACKGROUND,
+    well_size: float = VORONOI_WELL_SIZE,
+    river_size: float = VORONOI_RIVER_SIZE,
 ) -> ModelRun:
     """Steady 1-layer DISV Voronoi version of the quickstart model (same physical problem).
 
-    max_area is Triangle's largest triangle area [m2]; the Voronoi cells are about that size.
-    The river conductance is shared so that its total matches the DIS model.
+    The grid comes from vorflow (vorflow_cells): cells about `background` m across, refined
+    to well_size at the wells and to river_size along the river. The river conductance is
+    shared equally among the river cells so that its total matches the DIS model.
     """
     spec = AquiferSpec() if spec is None else spec
-    name = "voronoi"
+    gridprops = disv_gridprops(vorflow_cells(spec, background, well_size, river_size))
+    return build_disv(ws, exe, gridprops, spec, name="voronoi")
+
+
+def build_disv(ws: Path, exe: Path, gridprops: dict, spec: AquiferSpec, name: str) -> ModelRun:
+    """Steady 1-layer DISV quickstart model on any polygon grid (stresses by voronoi_stress_cells).
+
+    gridprops holds DISV ncpl, nvert, vertices and cell2d (disv_gridprops). The river
+    conductance is shared equally among the river cells so that its total matches the DIS model.
+    """
     ws = Path(ws)
-    gridprops = voronoi_gridprops(ws, triangle, spec, max_area)
     cells = voronoi_stress_cells(gridprops, spec)
     ncpl = gridprops["ncpl"]
     sim, gwf = make_sim(name, ws, exe, STEADY)
@@ -435,6 +498,106 @@ def build_voronoi(
         "chd_cells": cells["chd"],
     }
     return run_model(sim, gwf, name, ws, dis_filename, spec, info)
+
+
+def rotated_square_cells(
+    spec: AquiferSpec,
+    side: float,
+    anchor: tuple[float, float],
+    angle: float = 45.0,
+    decimals: int = 6,
+):
+    """Tile the tutorial domain with squares rotated by `angle` degrees; return a GeoDataFrame.
+
+    One square is centred on `anchor` [m]. Squares cut by the domain edge are clipped. Each
+    cell keeps its square centre in columns x and y when the clipped cell still covers it
+    (the connections to its neighbours then stay perpendicular to the shared faces), and the
+    centroid of the clipped cell otherwise. Corners and centres are rounded to `decimals`
+    decimal places [m], so neighbours share exact corners and a line through a row of centres
+    touches the neighbouring squares at their corners only.
+    """
+    import geopandas as gpd
+    from shapely.geometry import Point, Polygon, box
+
+    domain = box(0.0, 0.0, spec.lx, spec.ly)
+    theta = np.radians(angle)
+    u = side * np.array([np.cos(theta), np.sin(theta)])  # lattice vector along the first side
+    v = side * np.array([-np.sin(theta), np.cos(theta)])  # lattice vector along the second side
+
+    def point(a: float, b: float) -> tuple[float, float]:
+        """Return the rounded position anchor + a u + b v."""
+        x, y = np.asarray(anchor) + a * u + b * v
+        return round(float(x), decimals), round(float(y), decimals)
+
+    n = int(np.ceil(np.hypot(spec.lx, spec.ly) / side)) + 1
+    polygons, xs, ys = [], [], []
+    for i in range(-n, n + 1):
+        for j in range(-n, n + 1):
+            xc, yc = point(i, j)
+            if not (-side <= xc <= spec.lx + side and -side <= yc <= spec.ly + side):
+                continue
+            corners = [point(i + a, j + b) for a, b in ((-.5, -.5), (.5, -.5), (.5, .5), (-.5, .5))]
+            cell = Polygon(corners).intersection(domain)
+            if cell.geom_type != "Polygon" or cell.area < 1e-6 * side**2:
+                continue
+            centre = (xc, yc) if cell.covers(Point(xc, yc)) else cell.centroid.coords[0]
+            polygons.append(cell)
+            xs.append(float(centre[0]))
+            ys.append(float(centre[1]))
+    return gpd.GeoDataFrame({"x": xs, "y": ys}, geometry=polygons)
+
+
+def build_rotated_squares(
+    ws: Path, exe: Path, side: float, spec: AquiferSpec | None = None, angle: float = 45.0
+) -> ModelRun:
+    """Steady DISV quickstart model on squares rotated by `angle`, one centred on the first well.
+
+    The river, the west edge and the wells are placed on the cells by the rules of
+    build_voronoi (voronoi_stress_cells).
+    """
+    spec = AquiferSpec() if spec is None else spec
+    anchor = spec.xy(spec.wells[0][1])
+    gridprops = disv_gridprops(rotated_square_cells(spec, side, anchor, angle))
+    return build_disv(ws, exe, gridprops, spec, name="rotated")
+
+
+# ---------------------------------------------------------------- edge of a capture zone
+
+
+def edge_band_area(F: np.ndarray, area: np.ndarray, low: float = 0.1, high: float = 0.9) -> float:
+    """Return the summed area of the cells with low < F < high (the edge band) [area units]."""
+    F = np.asarray(F, dtype=float)
+    return float(np.asarray(area)[(F > low) & (F < high)].sum())
+
+
+def transect_profile(
+    centres: np.ndarray, values: np.ndarray, x: float, y: np.ndarray
+) -> np.ndarray:
+    """Return per-cell values interpolated linearly between cell centres along a line x = const."""
+    from scipy.interpolate import LinearNDInterpolator
+
+    interpolate = LinearNDInterpolator(np.asarray(centres)[:, :2], np.asarray(values, dtype=float))
+    return interpolate(np.full(len(y), x), np.asarray(y, dtype=float))
+
+
+def band_width_north(
+    y: np.ndarray, profile: np.ndarray, low: float = 0.1, high: float = 0.5
+) -> tuple[float, float, float]:
+    """Return (y at F = high, y at F = low, their distance) north of the peak of a profile.
+
+    profile is F sampled at the increasing positions y. Each crossing is the first one north of
+    the largest F, located by linear interpolation between samples.
+    """
+    y, profile = np.asarray(y, dtype=float), np.asarray(profile, dtype=float)
+    start = int(np.nanargmax(profile))
+    crossings = []
+    for level in (high, low):
+        below = np.flatnonzero(profile[start:] < level)
+        assert below.size, f"F does not fall below {level} north of the peak"
+        k = start + int(below[0])
+        f0, f1 = profile[k - 1], profile[k]
+        crossings.append(float(y[k - 1] + (f0 - level) / (f0 - f1) * (y[k] - y[k - 1])))
+    return crossings[0], crossings[1], crossings[1] - crossings[0]
 
 
 def build_disu(
@@ -522,7 +685,7 @@ def build_transient(
 ) -> ModelRun:
     """Quickstart model with STO: a steady first period, then seasonal recharge and pumping.
 
-    recharge and pumping are the four seasonal multipliers (winter, spring, summer, autumn).
+    recharge and pumping are the four seasonal multipliers (wet, wet-to-dry, dry, dry-to-wet).
     Every time step is saved. info holds the per-period multipliers and season names.
     """
     spec = AquiferSpec() if spec is None else spec
@@ -673,7 +836,7 @@ def build_maw(
     return run_model(sim, gwf, name, ws, dis_filename, spec, info)
 
 
-# ---------------------------------------------------------------- (g) random K ensembles
+# ---------------------------------------------------------------- (g) random K fields
 
 
 def random_k_field(
@@ -703,25 +866,6 @@ def build_realisation(
     run = build_quickstart(ws, exe, replace(spec, k=k))
     run.info.update({"k": k, "seed": seed})
     return run
-
-
-def build_ensemble(
-    root: Path,
-    exe: Path,
-    n_real: int,
-    seed: int = 1,
-    spec: AquiferSpec | None = None,
-    sigma_lnk: float = 0.8,
-    correlation_cells: float = 4.0,
-) -> list[Path]:
-    """Build and run n_real realisations in root/real_000, ...; return their folders."""
-    seeds = np.random.default_rng(seed).integers(0, 2**31 - 1, size=n_real)
-    folders = []
-    for i, real_seed in enumerate(seeds):
-        ws = Path(root) / f"real_{i:03d}"
-        build_realisation(ws, exe, int(real_seed), spec, sigma_lnk, correlation_cells)
-        folders.append(ws)
-    return folders
 
 
 # ---------------------------------------------------------------- multi-model and GWT
@@ -795,22 +939,23 @@ def run_gwt_tracer(
     tagged: tuple[str, ...] = ("rch",),
     strt: float | np.ndarray = 0.0,
     ims_kwargs: dict | None = None,
+    perioddata: list[tuple[float, int, float]] | None = None,
 ) -> Path:
     """Run an MF6 GWT unit-tracer model on a DIS model's saved flows; return the UCN file.
 
     Upstream advection, no dispersion, FLOW_IMBALANCE_CORRECTION; every bound of the tagged
     packages (pnames) has concentration 1, all other inflow 0; strt tags the initial water.
-    ims_kwargs override GWT_IMS.
+    ims_kwargs override GWT_IMS. perioddata (perlen, nstp, tsmult) replaces the flow model's
+    TDIS; MF6 reuses the single budget step of a steady flow model for every GWT step, so a
+    long period runs a steady model to equilibrium.
     """
     ws = Path(ws)
     ws.mkdir(parents=True, exist_ok=True)
     name = "gwt"
     sim = flopy.mf6.MFSimulation(sim_name=name, sim_ws=str(ws), exe_name=str(exe))
-    tdis = run.sim.tdis
-    flopy.mf6.ModflowTdis(
-        sim, nper=tdis.nper.get_data(), time_units="days",
-        perioddata=[tuple(r) for r in tdis.perioddata.get_data()],
-    )
+    if perioddata is None:
+        perioddata = [tuple(r) for r in run.sim.tdis.perioddata.get_data()]
+    flopy.mf6.ModflowTdis(sim, nper=len(perioddata), time_units="days", perioddata=perioddata)
     gwt = flopy.mf6.ModflowGwt(sim, modelname=name)
     flopy.mf6.ModflowIms(sim, **{**GWT_IMS, **(ims_kwargs or {})}, filename=f"{name}.ims")
     dis = run.gwf.dis

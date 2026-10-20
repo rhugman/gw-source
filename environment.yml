@@ -17,7 +17,10 @@ dependencies:
   - nbclient
   - nbformat
   - nbconvert
+  - pyemu
   - pip
   - pip:
       - flopy[codegen] @ git+https://github.com/modflowpy/flopy.git@develop
       - -e .
+      # optional, tutorials only: the Voronoi grid of tutorial 04 (gwsource itself does not need it)
+      - vorflow==0.2.0

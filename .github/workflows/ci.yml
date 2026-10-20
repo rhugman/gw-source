@@ -23,6 +23,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: System libraries for gmsh (vorflow)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libglu1-mesa libxrender1 libxcursor1 libxft2 libxinerama1
+
       - name: Set up the gw-source environment
         uses: mamba-org/setup-micromamba@v2
         with:
