@@ -63,6 +63,28 @@ def test_quickstart_builder(tmp_path, mf6_exe):
     assert hbd.feature_cells(step, "RIV").size == run.spec.nrow
 
 
+def test_voronoi_builder(tmp_path, mf6_exe):
+    """The vorflow DISV model centres the well cell on the well and the river cells on the river.
+
+    Its river conductance adds up to the DIS total, and the well's water closes on the pumping.
+    """
+    pytest.importorskip("vorflow")
+    import herebedragons as hbd
+
+    run = hbd.build_voronoi(tmp_path, mf6_exe)
+    spec = run.spec
+    step = gs.read_step(run.ws, boundnames=True)
+    centres = gs.export.cell_centres(run.grb_file)
+    well_node = run.info["well_nodes"]["supply_well"]
+    assert np.allclose(centres[well_node], spec.xy(spec.wells[0][1]))
+    riv_x = (spec.riv_col + 0.5) * spec.delr
+    assert np.allclose(centres[run.info["riv_cells"], 0], riv_x)
+    riv = run.gwf.get_package("riv").stress_period_data.get_data(0)
+    assert riv["cond"].sum() == pytest.approx(spec.riv_cond * spec.nrow, rel=1e-12)
+    res = gs.backward(step, {"well": gs.select(step, boundnames=["supply_well"])})
+    assert res.volume_from["well"].sum() == pytest.approx(800.0, rel=1e-8)
+
+
 def load_tutorial_helpers(folder: str):
     """Import a tutorial's own helpers.py under a unique module name (each tutorial has one)."""
     import importlib.util
@@ -97,3 +119,24 @@ def test_bedekar_builder(tmp_path, mf6_exe):
     assert shares["lateral inflow"] == pytest.approx(0.48, abs=0.01)
     assert shares["recharge"] == pytest.approx(0.29, abs=0.01)
     assert shares["stream"] == pytest.approx(0.23, abs=0.01)
+
+
+def test_dispersion_problem_a(tmp_path, mf6_exe):
+    """Tutorial 11's problem A pumps 500 m3/d and its F > 0.5 zone is close to the analytical zone.
+
+    On 100 m cells with the flow along the rows, the study gives an F > 0.5 area 6.9 % larger than
+    the zone of Javandel and Tsang (1986) and a band 0.1 < F < 0.9 of 3.3 cells.
+    """
+    helpers = load_tutorial_helpers("11_numerical_dispersion")
+    import herebedragons as hbd
+
+    spec = helpers.ProblemA()
+    raster = helpers.make_raster(spec.lx, spec.ly, 2.5, 200.0)
+    raster.set_reference(helpers.capture_zone_mask(raster.xr, raster.yr, spec))
+    run = helpers.problem_a_run(tmp_path, mf6_exe, hbd.exe_path("triangle"), spec, "DIS", 100.0, raster)
+    res = gs.backward(run["step"], helpers.well_group(run["step"]))
+    assert res.destination_inflow[helpers.WELL] == pytest.approx(500.0, rel=1e-8)
+    rows = {r["method"]: r for r in helpers.metrics_rows({}, run, raster)}
+    assert rows["full mixing"]["area_err_0.5"] == pytest.approx(0.0686, abs=2e-3)
+    assert rows["full mixing"]["band_cells"] == pytest.approx(3.33, abs=0.02)
+    assert rows["cell-averaged exact"]["band_cells"] < 1.0
