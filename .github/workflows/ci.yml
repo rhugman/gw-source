@@ -44,6 +44,10 @@ jobs:
           get-modflow --repo modflow6-nightly-build --downloads-dir "${RUNNER_TEMP}" bin
           get-modflow --repo executables --subset triangle --downloads-dir "${RUNNER_TEMP}" bin
 
+      - name: Download PEST++ (tutorial 09)
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: get-pestpp --downloads-dir "${RUNNER_TEMP}" bin
+
       - name: Record versions
         run: |
           python -c "import json, flopy; from importlib.metadata import distribution; d = json.loads(distribution('flopy').read_text('direct_url.json') or '{}'); print('FloPy', flopy.__version__, d.get('vcs_info', {}).get('commit_id', 'unknown'))"
@@ -51,3 +55,9 @@ jobs:
 
       - name: Run tests
         run: pytest -v
+
+      # The notebooks and the benchmark-sized checks are deselected by default (pyproject.toml
+      # addopts); run them on the weekly schedule and on manual runs only, even if the step above failed.
+      - name: Run tutorial and slow tests
+        if: ${{ !cancelled() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
+        run: pytest -v -m "tutorials or slow"
