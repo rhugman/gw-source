@@ -23,10 +23,10 @@ Run from anywhere with the project environment; the realisations run in N_WORKER
 
     python studies/neversink/ensemble_run.py
 
-The scenario part runs the five other published pumping scenarios (scenarios.py, the realisation's own
-priority-well multiplier kept) on N_SUBSET realisations at rows evenly spread over the 357 runs
-with a mask (357: all of them), and compares each with its scenario's masks; the base-rate
-results are also analysed on that subset.
+The scenario part runs the five other published pumping scenarios (scenarios.py, the
+realisation's own priority-well multiplier kept) on N_SUBSET realisations at rows evenly spread
+over the 357 runs with a mask (357: all of them), and compares each with its scenario's masks;
+the base-rate results are also analysed on that subset.
 
 Edit the gates in __main__ to rerun parts. The runs are resumable: a realisation with a summary
 file is skipped. Output goes to studies/neversink/output/ensemble/ and .../scenarios/<qrat>/

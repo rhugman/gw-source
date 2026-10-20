@@ -430,9 +430,10 @@ def compare_prt_rules(
     """Run PRT once and evaluate two capture rules on the same tracks.
 
     First-destination stop rule: stop in the first destination cell (first_destination_visits).
-    Whole-path gross rule: gross accounting along the whole path (capture_along_paths). Returns one row for thinned and
-    one for plain particles (config.thin_weak_sinks is not used): captured flow of the group and
-    of each well under both rules, end-status counts and the weight left by end status.
+    Whole-path gross rule: gross accounting along the whole path (capture_along_paths). Returns
+    one row for thinned and one for plain particles (config.thin_weak_sinks is not used):
+    captured flow of the group and of each well under both rules, end-status counts and the
+    weight left by end status.
     """
     t0 = time.perf_counter()
     _, release, tracks = prt_tracks(ws, step, result, exe, prt_ws, config, group)

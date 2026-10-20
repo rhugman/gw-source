@@ -417,8 +417,8 @@ def comparisons(
 ) -> None:
     """Write the R1 matches, the paired full-mixing comparison and the probability tables.
 
-    ens_dir and scenario_dir hold the base-rate ensemble and the scenario runs; base_maps (default ens_dir) the
-    base-rate probability maps.
+    ens_dir and scenario_dir hold the base-rate ensemble and the scenario runs; base_maps
+    (default ens_dir) the base-rate probability maps.
     """
     reals = gm.sample_realisations(60)
     matches = r1_matches(reals, gm.QRATS, pairing, plan, mech_dir)

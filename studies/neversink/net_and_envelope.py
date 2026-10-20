@@ -37,10 +37,10 @@ the gross closure are both asserted to 1e-9 of the group's flow.
 Envelope. The dispersion study (studies/dispersion, tutorial 11) tests F > 0.1 as a
 conservative envelope of a particle reference zone on synthetic problems. Here the reference is
 the thinned flux-weighted PRT run released over the cell volume (output/prt_volume_thin1, the
-volume release of workflow.py's PRT check): P is the flow-weighted share
-of the water released in a cell that reaches the priority wells. Both are evaluated on the start
-cells of the published particles (uppermost active layer), as in workflow.compare_masks, with
-strict thresholds (F > t, P > z) as in workflow.py. PRT was seeded from the source terms of cells with
+volume release of workflow.py's PRT check): P is the flow-weighted share of the water released
+in a cell that reaches the priority wells. Both are evaluated on the start cells of the
+published particles (uppermost active layer), as in workflow.compare_masks, with strict
+thresholds (F > t, P > z) as in workflow.py. PRT was seeded from the source terms of cells with
 F > 1e-6 (PrtConfig.fraction_threshold); start cells with 0 < F <= 1e-6 or without a source term
 got no particles and are given P = 0. Every start cell with F > 0.1 is seeded (asserted; counts
 in envelope_prt_notes.csv). The thinned particles lose weight at every weak sink by the

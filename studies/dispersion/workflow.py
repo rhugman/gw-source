@@ -7,9 +7,9 @@ Run from anywhere with the project environment (MF6 and triangle are taken from 
     python studies/dispersion/workflow.py
 
 Edit the gates in __main__ to rerun parts. Models and tables go to studies/dispersion/output/
-(git-ignored); figures to studies/dispersion/output/figures/. The transient part reads the particle arrivals saved
-by the problem B part. Runtime on a 16-core laptop: about 6 minutes, most of it the MF6 PRT run
-on the finest grid of problem B (about 94,000 particles).
+(git-ignored); figures to studies/dispersion/output/figures/. The transient part reads the
+particle arrivals saved by the problem B part. Runtime on a 16-core laptop: about 6 minutes,
+most of it the MF6 PRT run on the finest grid of problem B (about 94,000 particles).
 """
 
 import json

@@ -24,10 +24,10 @@ kriging neighbours and the rounding of the written arrays. The current pyemu of 
 environment is not relied on for that, and the 2021 copy shipped with the source repository
 (python_packages_static/pyemu) does not import with NumPy 2. So the pieces of pyemu 2021 that
 PstFrom used (setup_pilotpoints_grid, OrdinaryKrige.calc_factors_grid, fac2real,
-apply_list_and_array_pars) are ported below with the same neighbour order and file rounding. The rebuilt base realisation is checked against
-the published calibrated input (neversink_optimal/, written from the iteration-4 base
-realisation by notebook 3.2), and three realisations against the simulated values in
-never_ies_0.noise_lt_obs.4.obs.csv.
+apply_list_and_array_pars) are ported below with the same neighbour order and file rounding. The
+rebuilt base realisation is checked against the published calibrated input (neversink_optimal/,
+written from the iteration-4 base realisation by notebook 3.2), and three realisations against
+the simulated values in never_ies_0.noise_lt_obs.4.obs.csv.
 
 The MODPATH Monte Carlo ensemble (modpath_par_ens.csv) is rebuilt with the notebook 3.2
 rejection sampling: iteration 4, phi < 3200 and |PERC_DISC| < 0.01 (read from the iteration-0
