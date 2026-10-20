@@ -2,7 +2,7 @@
 
 `gwsource` post-processes MODFLOW 6 groundwater-flow output to work out, for every cell, what fraction and volume of its water reaches a chosen destination (capture) or came from a chosen source (fate). It builds on the cell-mixing flow-tracing method of Foley & Black (2013) and Black & Foley (2013), solved as a sparse linear system so that cycles, weak sinks and many destinations are handled exactly.
 
-Status: early development (Phases 0–4: steady and transient snapshot tracing, netCDF/GeoPackage export, Eulerian mean travel time, an MF6 PRT comparison helper, an ensemble driver, multi-model simulations and package networks, and true transient forward/adjoint tracking through storage).
+Status: in development. The package traces steady flow and single time steps of transient flow (snapshots), and it tracks water forward and backward through storage in transient flow. It computes the mean travel time from the flow field (Eulerian), and it exports results to netCDF and GeoPackage. It also handles multi-model simulations and package networks, and it includes an ensemble driver and a helper that compares results with MF6 particle tracking (PRT).
 
 ## Setup
 
@@ -16,7 +16,7 @@ This script:
 
 1. creates or updates the `gw-source` environment from `environment.yml` (conda-forge packages, FloPy from its `develop` branch, and this package installed editable);
 2. reinstalls FloPy `develop` and regenerates its MF6 classes from the MODFLOW 6 `develop` definition files;
-3. downloads the MODFLOW 6 nightly build (and `triangle`, used by a test model) into `bin/`;
+3. downloads the MODFLOW 6 nightly build, `triangle` (used by a test model) and PEST++ (with pyemu's `get-pestpp`, used by tutorial 09) into `bin/`;
 4. prints the FloPy version and commit and `mf6 --version`.
 
 Rerun it whenever you want to pick up new FloPy or MODFLOW 6 changes.
