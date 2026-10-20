@@ -1,11 +1,11 @@
-"""Neversink case study, stage 3 follow-up: where the stream water reaching the wells changes
-with pumping, and why the published contributing area grows more slowly than full mixing.
+"""Neversink case study, pumping-scenario follow-up: where the stream water reaching the wells
+changes with pumping, and why the published contributing area grows more slowly than full mixing.
 
 Sample. SAMPLE_N realisations at rows of modpath_par_ens.csv evenly spread over the 357 runs
 with a published mask (ensemble_run.scenario_subset) plus the base (calibrated) realisation, each
-at base, half and maximum pumping (QRATS). Stage 3 kept only package totals per run; here every
-run is rebuilt as ensemble_run.run_realisation does (same parameters and scenario rule, the
-realisation's own priority-well multiplier kept), with the RCH and SFR
+at base, half and maximum pumping (QRATS). The scenario runs of ensemble_run keep only package
+totals per run; here every run is rebuilt as ensemble_run.run_realisation does (same parameters
+and scenario rule, the realisation's own priority-well multiplier kept), with the RCH and SFR
 flows given an IFLOWFACE auxiliary (top face where it is open, as in mp7_convention). The aux
 column does not change the flow solution, so one MF6 run serves both full mixing and PRT.
 
@@ -40,7 +40,8 @@ are compared with the published masks of the same scenario (moved back onto thei
 ensemble_run.read_mask): in distribution, by best match and with the realisation's own mask
 (mask_matches, mask_similarity).
 
-Run from anywhere with the project environment, outside the Claude Code sandbox (process pool):
+Run from anywhere with the project environment; the cases run in a process pool (some
+restricted environments forbid one):
 
     python studies/neversink/growth_mechanisms.py
 
@@ -395,10 +396,10 @@ def collect(out: Path) -> pd.DataFrame:
     return table
 
 
-def stage3_summary(
+def scenario_summary(
     qrat: str, ens_dir: Path = er.ENS_DIR, scenario_dir: Path = er.SCENARIO_DIR
 ) -> pd.DataFrame:
-    """Return the stage-2/3 summary rows of a scenario (all realisations run there)."""
+    """Return the ensemble_run summary rows of a scenario (all realisations run there)."""
     summary = er.collect_summary(er.scenario_dir_of(qrat, ens_dir, scenario_dir))
     summary["stream_share"] = summary["cells:SFR_0"] / summary["inflow"]
     return summary.rename(columns={"cells:expected_cells": "area:f_start"})
@@ -408,16 +409,17 @@ def sample_check(
     table: pd.DataFrame, qrats: tuple[str, ...] = QRATS, ens_dir: Path = er.ENS_DIR,
     scenario_dir: Path = er.SCENARIO_DIR,
 ) -> pd.DataFrame:
-    """Return medians of the sample against stage 3 (same realisations, and all of them).
+    """Return medians of the sample against the ensemble_run runs (same realisations, and all).
 
-    rerun_max_diff is the largest relative difference of the rerun to stage 3 per realisation.
+    rerun_max_diff is the largest relative difference of the rerun to the ensemble_run run of
+    the same realisation.
     """
     cols = ("inflow", "stream_share", "cells:RCHA", "area:f_start")
     rows = []
     for qrat in qrats:
         mine = table[table["qrat"] == qrat].set_index("real")
-        old = stage3_summary(qrat, ens_dir, scenario_dir).set_index("real")
-        same = old.loc[old.index.intersection(mine.index)]
+        ensemble = scenario_summary(qrat, ens_dir, scenario_dir).set_index("real")
+        same = ensemble.loc[ensemble.index.intersection(mine.index)]
         for col in cols:
             diff = (mine.loc[same.index, col] - same[col]).abs() / same[col].abs()
             rows.append(
@@ -426,11 +428,11 @@ def sample_check(
                     "quantity": col,
                     "sample_median": mine[col].median(),
                     "sample_median_without_base": mine.drop(index=BASE_REAL)[col].median(),
-                    "stage3_same_reals": same[col].median(),
-                    "stage3_all": old[col].median(),
+                    "scenario_same_reals": same[col].median(),
+                    "scenario_all": ensemble[col].median(),
                     "rerun_max_diff": float(diff.max()),
                     "n_sample": len(mine),
-                    "n_stage3": len(old),
+                    "n_scenario": len(ensemble),
                 }
             )
     return pd.DataFrame(rows)
@@ -722,7 +724,8 @@ def analyse(
 ) -> None:
     """Write the sample check, the reach tables (base to maxrat) and the growth decomposition.
 
-    ens_dir and scenario_dir hold the stage-2 and stage-3 runs the sample is checked against.
+    ens_dir and scenario_dir hold the base-rate ensemble and the scenario runs the sample is
+    checked against.
     """
     table = collect(out)
     table.to_csv(out / "summary.csv", index=False)
@@ -752,7 +755,7 @@ def main(
     ens_dir: Path = er.ENS_DIR,
     scenario_dir: Path = er.SCENARIO_DIR,
 ) -> None:
-    """Run the sample at the scenarios and analyse it against the stage-2 and stage-3 runs."""
+    """Run the sample at the scenarios and analyse it against the ensemble_run runs."""
     reals = sample_realisations(sample_n)
     if run:
         run_cases(out, reals, qrats, n_workers)

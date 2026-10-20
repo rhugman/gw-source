@@ -285,7 +285,7 @@ def transient_summary(curves: pd.DataFrame, substeps: tuple[int, ...]) -> pd.Dat
 
 
 def write_tables(out: Path, config) -> None:
-    """Write output/summary.md with the tables quoted in docs/dispersion_study.md."""
+    """Write output/summary.md with the metric, share and transient tables of the study."""
     a = pd.read_csv(out / "a_metrics.csv")
     b = pd.read_csv(out / "b_metrics.csv")
     shares = pd.read_csv(out / "b_shares.csv")

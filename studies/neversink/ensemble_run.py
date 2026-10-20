@@ -1,15 +1,16 @@
-"""Neversink case study, stage 2: the 358-realisation Monte Carlo ensemble at base pumping.
+"""Neversink case study: the 358-realisation Monte Carlo ensemble and the pumping scenarios.
 
 Every realisation of the rebuilt ensemble (pest_rebuild.py) is written, run with MF6 and traced
 backward from the eight priority wells twice: with streams as cells, and with the SFR reaches
-as package nodes. The published solver criterion is kept, so the stream network needs a looser
-aquifer exchange tolerance than the default (AQUIFER_RTOL_NETWORK; see docs/neversink_study.md).
+as package nodes. The published solver criterion is kept; under it the GWF and SFR budgets agree
+on the aquifer exchange less closely than the default network check asks, so the stream network
+is read with a looser tolerance (AQUIFER_RTOL_NETWORK).
 Per realisation the F of the uppermost active layer is kept (both traces) with a summary row;
 the workspace is deleted.
 
 The published masks (output/modpath_mc/{qrat}.zip) are stored one row south of their cells, and
 mask k belongs to run pest_rebuild.mask_run_order()[k], run r being row r of modpath_par_ens.csv
-(mc_masks.py, docs/neversink_study.md). read_mask moves a mask back onto its cells and
+(mc_masks.py tests both). read_mask moves a mask back onto its cells and
 mask_indices gives each realisation its own mask; every comparison here uses both. Per
 realisation, F is compared with its own mask (the mask columns of the summaries, recomputed from
 the saved F maps by analyse). Per ensemble, the published probability (the share of the 357
@@ -18,14 +19,14 @@ a threshold and with the mean F, and the contributing areas (and the wells' sour
 pumping scenario.
 
 Run from anywhere with the project environment; the realisations run in N_WORKERS processes
-(outside the Claude Code sandbox, which blocks process pools):
+(this needs a process pool; some restricted environments forbid one):
 
     python studies/neversink/ensemble_run.py
 
-Stage 3 runs the five other published pumping scenarios (scenarios.py, the realisation's own
-priority-well multiplier kept) on N_SUBSET realisations at rows evenly spread over the 357 runs
-with a mask (357: all of them), and compares each with its scenario's masks; the base-rate
-results are also analysed on that subset.
+The scenario part runs the five other published pumping scenarios (scenarios.py, the
+realisation's own priority-well multiplier kept) on N_SUBSET realisations at rows evenly spread
+over the 357 runs with a mask (357: all of them), and compares each with its scenario's masks;
+the base-rate results are also analysed on that subset.
 
 Edit the gates in __main__ to rerun parts. The runs are resumable: a realisation with a summary
 file is skipped. Output goes to studies/neversink/output/ensemble/ and .../scenarios/<qrat>/
@@ -223,8 +224,8 @@ def scenario_subset(n: int = N_SUBSET, n_runs: int = pr.N_MASKS) -> list[str]:
     """Return n realisations at rows of modpath_par_ens.csv evenly spread over 0 .. n_runs - 1.
 
     Rows 0 .. 356 are the runs with a published mask (n = 357: all of them). The sample is
-    defined by table row, not by mask index, so it is the same set of realisations as before the
-    mask pairing was corrected (when row and mask index were taken to be equal).
+    defined by table row, not by mask index, so it does not depend on how the masks are paired
+    with the realisations.
     """
     rows = np.unique(np.linspace(0, n_runs - 1, n).round().astype(int))
     names = all_realisations()
@@ -407,8 +408,9 @@ def own_mask_columns(
 ) -> pd.DataFrame:
     """Return the summary with every realisation's F maps compared with its own corrected mask.
 
-    Recomputed from the saved F maps, so it holds also for runs whose summary files predate the
-    corrected masks and pairing. Realisations without a mask get NaN.
+    The mask columns are recomputed from the saved F maps with read_mask and mask_indices, so
+    they do not rely on the mask columns stored in the summary files. Realisations without a
+    mask get NaN.
     """
     runs, masks = run_indices(), mask_indices()
     rows = []

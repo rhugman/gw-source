@@ -16,24 +16,24 @@ ModpathCellData.f90); on an internal face it falls back to a distributed source 
 adds it to the face whatever lies behind it, and a particle that leaves through a face with net
 boundary outflow terminates there (status 2). To match MODPATH 7, IFLOWFACE = -1 is set only
 where the cell has no active cell above (vertical pass-through cells, IDOMAIN -1, skipped, as
-MF6 connects across them), and 0 elsewhere. Every recharge cell of this model has an open top
-face; 2,209 of the 12,316 SFR reaches have an active cell above and stay distributed.
+MF6 connects across them), and 0 elsewhere. SFR reaches with an active cell above stay
+distributed.
 
-Dry start cells (drape). 25,610 of the 122,021 start cells are dry in the Newton solution
-(saturation 0, head below the cell bottom). With DrapeOption 1, MODPATH 7 moves a particle whose
+Dry start cells (drape). Many start cells are dry in the Newton solution (saturation 0, head
+below the cell bottom). With DrapeOption 1, MODPATH 7 moves a particle whose
 start cell is inactive to the top-most active cell below and keeps its local coordinates
 (MPath7.f90), so it starts at local z 0.5 of that cell's saturated thickness. PRT instead drops
 such a particle to the water table of the cell below (its DRAPE option also places it at the
-water table). drape_dry_starts() moves those starts to the first wet cell below explicitly;
-without it only 56 % of them end in the published end cell (99 % of the other starts do), with
-it 99 %. The published runs therefore treated dry cells as inactive. The MODPATH 7 source read
+water table). drape_dry_starts() moves those starts to the first wet cell below explicitly; the
+variants with and without it test, by their agreement with the published end cells, whether the
+published runs treated dry cells as inactive. The MODPATH 7 source read
 here (develop branch) marks a cell inactive only where its head equals HDRY, which MF6 does not
-write in this model, so this is inferred from the end points rather than from the code.
+write in this model, so this can only be inferred from the end points, not from the code.
 
-Remaining difference. The published runs also stop 1,139 particles (status 2) at a lateral face
-whose neighbour is dry, again as if the dry cell were inactive. PRT has no such rule: it passes
-the particle into the dry cell and drops it to the cell below. None of these particles ends in a
-priority well in the published runs; two of them do in PRT (SV_487).
+Remaining difference. The published runs also stop particles (status 2) at a lateral face whose
+neighbour is dry, as if the dry cell were inactive. PRT has no such rule: it passes the particle
+into the dry cell and drops it to the cell below. mp7_reproduction_status.csv counts the
+particles by MODPATH 7 and PRT status, so these stops show up there.
 
 Variants (PRT with STOP_AT_WEAK_SINK, EXTEND_TRACKING, no stop zone, termination records only):
 face assignment (IFLOWFACE as above, or MF6's default of distributing the boundary flows over
@@ -42,7 +42,8 @@ field or the published MF6 6.2 one (published_flows: its cell-to-cell and bounda
 the rerun budget file, saturation from its heads).
 
 A particle contributes if it ends in one of the eight priority well cells, as in the published
-mask (workflow.mp7_mask).
+mask (workflow.mp7_mask). reproduce() (called by workflow.py) writes mp7_iflowface_check.csv,
+mp7_reproduction.csv and mp7_reproduction_status.csv to studies/neversink/output/.
 """
 
 import shutil
