@@ -216,12 +216,16 @@ def isolate_closed_loops(
     closed = closed_components(matrix, graph.labels, tol)
     if not closed.any():
         return matrix, rhs, []
-    coo = matrix.tocoo()
-    keep = ~closed[coo.row] | (coo.row == coo.col)
-    fixed = sp.csr_matrix((coo.data[keep], (coo.row[keep], coo.col[keep])), shape=matrix.shape)
     rhs = np.array(rhs, dtype=float)
     rhs[closed] = 0.0
-    return fixed, rhs, _split_by_label(np.flatnonzero(closed), graph.labels)
+    return identity_rows(matrix, closed), rhs, _split_by_label(np.flatnonzero(closed), graph.labels)
+
+
+def identity_rows(matrix: sp.csr_matrix, closed: np.ndarray) -> sp.csr_matrix:
+    """Return matrix with the off-diagonal entries of the closed rows removed."""
+    coo = matrix.tocoo()
+    keep = ~closed[coo.row] | (coo.row == coo.col)
+    return sp.csr_matrix((coo.data[keep], (coo.row[keep], coo.col[keep])), shape=matrix.shape)
 
 
 @dataclass
