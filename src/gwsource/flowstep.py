@@ -48,6 +48,8 @@ class Package:
     (e.g. 'DRN' writes DRN and DRN-TO-MVR); empty means the record name itself.
     model is the GWF model that owns the record in a multi-model step (the name is then
     '<model>/<record name>'); partner is the other model of a GWF-GWF exchange record.
+    package_type is the MF6 package type of a package-node record (e.g. 'MAW' for 'MAW-1:RATE'),
+    so a selector can name the type whatever the package is called.
     """
 
     name: str
@@ -55,6 +57,7 @@ class Package:
     parent: str = ""
     model: str = ""
     partner: str = ""
+    package_type: str = ""
 
     @property
     def local_name(self) -> str:
@@ -63,12 +66,13 @@ class Package:
 
     @property
     def aliases(self) -> set[str]:
-        """Upper-case names a selector can use: name, local name, text, parent, text w/o -TO-MVR."""
+        """Upper-case selector names: name, local name, text, parent, type, text w/o -TO-MVR."""
         names = {
             self.name,
             self.local_name,
             self.text,
             self.parent,
+            self.package_type,
             self.text.removesuffix(MOVER_SUFFIX),
         }
         return {n.upper() for n in names if n}

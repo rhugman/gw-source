@@ -20,8 +20,9 @@ Edges (each water transfer counted once):
   outlet to lake, UZF cell to cell);
 - MVR (see below).
 Every other record is a source or sink term of its node (gwsource.packages lists them). Package
-node terms are named '<package>:<record>' (parent = the package), so select(package='MAW')
-selects all terms of the MAW wells and select(package='MAW', term='RATE') their pumping.
+node terms are named '<package>:<record>' (parent = the package name, package_type = its type),
+so select(package='MAW') selects all terms of the MAW wells, whatever the package is called, and
+select(package='MAW', term='RATE') their pumping.
 With several models, every term package name is prefixed '<model>/'; selectors also match the
 name without the prefix, so select(package='WEL') selects the wells of every model.
 
@@ -195,7 +196,8 @@ def package_terms(
     for pkg, block in zip(pkg_steps, blocks):
         for text, (node, q) in pkg.terms.items():
             name = f"{_prefix(block.model, multi)}{block.name}:{text}"
-            packages.append(Package(name, text, parent=block.name, model=block.model))
+            package = Package(name, text, block.name, block.model, package_type=block.package_type)
+            packages.append(package)
             parts["node"].append(node + block.offset)
             parts["flow"].append(q)
             parts["package"].append(np.full(len(node), len(packages) - 1, dtype=np.int64))

@@ -11,6 +11,9 @@ budgets' two sides of the stream-aquifer exchange differ by about 1e-3) fails th
 aquifer check and reads with a relaxed aquifer_rtol, the difference then in the reach residuals.
 """
 
+import shutil
+import subprocess
+
 import numpy as np
 import pytest
 from test_closure_duality import check_boundary_control, check_identities
@@ -19,6 +22,7 @@ from test_mf6io import mf6_diagonal
 import gwsource as gs
 from gwsource.assemble import cell_budget, flow_edges
 from gwsource.traveltime import exit_cell_closure, travel_time_closure
+from models.networks import MAW_RATE
 
 NETWORKS = {"m7_mover": ("SFR",), "m8_maw": ("MAW",), "m9_lak_uzf": ("LAK", "UZF")}
 POROSITY = 0.3
@@ -241,6 +245,21 @@ def test_selector_errors(model_run):
     net = gs.read_network(model_run("m8_maw").ws, package_nodes=("MAW",))
     with pytest.raises(AssertionError, match="no record text"):
         gs.select(net, package="MAW", term="NOT-A-RECORD")
+
+
+def test_package_type_selects_default_named_package(model_run, mf6_exe, tmp_path):
+    """With no package name in the name file (MF6 names it 'MAW-1'), package='MAW' still selects."""
+    shutil.copytree(model_run("m8_maw").ws, tmp_path, dirs_exist_ok=True)
+    nam_file = tmp_path / "m8_maw.nam"
+    nam_file.write_text(nam_file.read_text().replace("m8_maw.maw  maw", "m8_maw.maw"))
+    subprocess.run([str(mf6_exe)], cwd=tmp_path, capture_output=True, check=True)
+    net = gs.read_network(tmp_path, package_nodes=("MAW",))
+    assert net.block("MAW-1").package_type == "MAW"
+    pumping = gs.select(net, package="maw", bounds=[1], term="RATE")
+    assert pumping.terms.sum() == 1
+    assert net.term_flow[pumping.terms].sum() == pytest.approx(MAW_RATE)
+    named = gs.select(net, package="MAW-1", term="RATE")
+    np.testing.assert_array_equal(named.terms, pumping.terms)
 
 
 @pytest.fixture(scope="module")
