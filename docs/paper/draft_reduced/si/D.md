@@ -27,7 +27,7 @@ The table compares the delineations of the eight wells' contributing area on the
 | PRT, flow-weighted, weight-losing | released over the cell volume, P > 0.5 | 691 | 65 | 794 | 3,736 |
 | | released mid-cell, P > 0.5 | 707 | 66 | 781 | 3,722 |
 | | released at the water table, P > 0.5 | 502 | 42 | 592 | 2,413 |
-| PRT, flow-weighted, losing weight only at wells | released over the cell volume, P > 0.5 | 2,633 | 83 | 2,857 | 9,555 |
+| PRT, flow-weighted, losing weight only at wells | released over the cell volume, P > 0.5 | 2,633 | 83 | 2,857 | – |
 | PRT, published starts | MODFLOW 6 default, dry starts dropped to the water table | 730 | 67 | 730 | – |
 | | MODFLOW 6 default, dry starts draped | 754 | 69 | 754 | – |
 | | top face where open, dry starts dropped | 969 | 98 | 969 | – |
