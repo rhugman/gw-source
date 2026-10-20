@@ -18,6 +18,8 @@ Foley, C., and A. Black. 2013. Efficiently delineating volumetric capture areas 
 
 Goode, D.J. 1996. Direct simulation of groundwater age. *Water Resources Research* 32, no. 2: 289–296. https://doi.org/10.1029/95WR03401
 
+Javandel, I., and C.-F. Tsang. 1986. Capture-zone type curves: A tool for aquifer cleanup. *Ground Water* 24, no. 5: 616–625. https://doi.org/10.1111/j.1745-6584.1986.tb03710.x <!-- moved from the SI references in round 2 (cited in Table 1 row 11); not in bibliography.md; from docs/dispersion_study.md, References; DOI from Crossref -->
+
 Langevin, C.D., J.D. Hughes, E.R. Banta, R.G. Niswonger, S. Panday, and A.M. Provost. 2017. Documentation for the MODFLOW 6 Groundwater Flow Model. U.S. Geological Survey Techniques and Methods, book 6, chap. A55. Reston, Virginia: USGS. https://doi.org/10.3133/tm6A55 <!-- DOI and chapter from the suggested citation in references/docs/text/2017_Langevin_etal_MF6_GWF_TM6-A55.txt -->
 
 Langevin, C.D., A.M. Provost, S. Panday, and J.D. Hughes. 2022. Documentation for the MODFLOW 6 Groundwater Transport Model. U.S. Geological Survey Techniques and Methods, book 6, chap. A61. Reston, Virginia: USGS. https://doi.org/10.3133/tm6A61 <!-- DOI and chapter from the suggested citation in references/docs/text/2022_Langevin_etal_MF6_GWT_TM6-A61.txt -->

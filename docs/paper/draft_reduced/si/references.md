@@ -16,8 +16,6 @@ Hughes, J.D., C.D. Langevin, S.R. Paulinski, J.D. Larsen, and D. Brakenhoff. 202
 
 Hugman, R., and O. Sanchez. 2026. vorflow: Voronoi mesh generation for MODFLOW 6. Version 0.2.0. Software, released 5 October 2026. https://github.com/rhugman/vorflow <!-- from the repository's CITATION.cff (cff-version 1.2.0), read 2026-10-15; no DOI -->
 
-Javandel, I., and C.-F. Tsang. 1986. Capture-zone type curves: A tool for aquifer cleanup. *Ground Water* 24, no. 5: 616–625. https://doi.org/10.1111/j.1745-6584.1986.tb03710.x <!-- not in bibliography.md; from docs/dispersion_study.md, References; DOI from Crossref -->
-
 Langevin, C.D., J.D. Hughes, E.R. Banta, R.G. Niswonger, S. Panday, and A.M. Provost. 2017. Documentation for the MODFLOW 6 Groundwater Flow Model. U.S. Geological Survey Techniques and Methods, book 6, chap. A55. Reston, Virginia: USGS. https://doi.org/10.3133/tm6A55 <!-- DOI and chapter from the suggested citation in references/docs/text/2017_Langevin_etal_MF6_GWF_TM6-A55.txt -->
 
 McLane, C., and L. Cecan. 2009. Comment on "MODALL: A practical tool for designing and optimizing capture systems," by S.T. Potter, E. Moreno-Barbero, and C.E. Divine. *Ground Water* 47, no. 2: 172–173. https://doi.org/10.1111/j.1745-6584.2008.00527_1.x <!-- checked against the article PDF (references/docs/): volume, issue, pages 172–173 and authors' affiliation; the PDF gives the first author as "Charles McLane", with no middle initial; DOI 00527_1.x confirmed on Crossref (2026-10-12); the 00527.x printed in the PDF footer is Potter et al.'s reply -->
