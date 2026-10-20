@@ -1,7 +1,7 @@
 """Test problems, references and edge metrics local to tutorial 11 (numerical dispersion).
 
 Two steady one-layer problems, each built on square DIS cells and on Voronoi DISV cells of
-several sizes h (the dispersion study of docs/dispersion_study.md, condensed):
+several sizes h:
 
 - Problem A: uniform regional flow plus one pumping well in a confined aquifer of constant
   transmissivity T. The perimeter cells hold the analytical head h0 - i s + Q / (4 pi T) ln r^2
