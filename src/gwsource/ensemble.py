@@ -60,6 +60,8 @@ class EnsembleConfig:
     histogram_bins, histogram_range: the approximate-quantile histogram ({output: (low, high)};
         outputs not listed use (0, 1)).
     porosity: scalar or per-cell; enables travel-time outputs.
+    fraction_threshold: travel-time outputs are NaN where the fraction (F or G) is at or
+        below this (gwsource.traveltime.travel_time).
     max_workers: 1 (default) runs serially; > 1 uses that many processes.
     model: GWF model name if a simulation has several.
     boundnames: load each realisation's boundnames from the package input (FloPy), so groups

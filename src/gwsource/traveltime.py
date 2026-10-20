@@ -1,4 +1,4 @@
-"""Eulerian mean travel time (backward) and mean age (forward) under full mixing (PLAN §2.6).
+"""Eulerian mean travel time (backward) and mean age (forward) under full mixing.
 
 Water volume and residence time
 -------------------------------

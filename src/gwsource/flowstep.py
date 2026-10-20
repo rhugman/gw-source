@@ -23,7 +23,7 @@ Conventions
 - ``saturated_thickness`` (optional, per cell) is the saturated thickness of the cell for this
   step; with ``area`` it gives the water volume that travel times need (gwsource.traveltime).
 
-Networks (Phase 4, gwsource.network): the "cells" may be the global nodes of a whole
+Networks (gwsource.network): the "cells" may be the global nodes of a whole
 simulation: the cells of every GWF model, then optional package nodes (SFR reaches, LAK lakes,
 MAW wells, UZF cells). ``blocks`` lists the contiguous node ranges (NodeBlock) in order;
 an empty list means a plain single-model step whose nodes are its cells. Package nodes have no

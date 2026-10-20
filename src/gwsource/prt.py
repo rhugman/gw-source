@@ -64,19 +64,20 @@ Consistency. If the release points resolve the sources and the cell survival spl
 weight among the outflow faces as the flow does, the captured flow equals the destination
 inflow (the duality of the gross method, now along advective paths). Observed:
 - 3-layer test model (wells in the bottom layer, a weak well upstream of a strong one):
-  402.6 of 405 m3/d with k = 3 and 2 levels, 405.3 with k = 4 and 16 levels. An earlier
-  version that released at the water table and stopped particles in the first destination
-  cell, dropping the rest of their weight, captured 266 m3/d; volume seeding with that stop
-  rule about 306 m3/d.
+  402.6 of 405 m3/d with k = 3 and 2 levels, 405.3 with k = 4 and 16 levels. Both parts of
+  the method matter: releasing at the water table and stopping particles in the first
+  destination cell, which drops the weight a weak well passes on, captures 266 m3/d; volume
+  seeding with that stop rule about 306 m3/d.
   With recharge on the top face (IFLOWFACE = -1, same GWF flows): 405.8 released on the top
   face, 412.7 seeded over the volume. With the CHD edges on their lateral faces instead (1
   west, 3 east; not in the test suite): 398 to 412 m3/d for k = 3..6 and 2..8 levels, the same
   scatter as volume seeding of the CHD (395 to 403): each edge cell brings ~126 m3/d, so a few
   particles on the capture-zone edge move the sum.
 - Neversink (4 layers, 1.68M cells, eight wells, k = 1, 4 levels): 3,736 of 3,671 m3/d,
-  every well within 11 % of its rate; the earlier version 1,940 (water table) and 3,005
-  (mid-cell). A single mid-cell height gives 3,722 there, so the z levels matter most where
-  the alternative would be the water table. Over five seeding layouts the total scattered
+  every well within 11 % of its rate. Stopping particles in the first destination cell gives
+  1,940 with release at the water table and 3,005 at mid-cell. Following the weight on, a
+  single mid-cell height gives 3,722, so the z levels matter most where the alternative
+  would be the water table. Over five seeding layouts the total scattered
   between 0.0 and +1.8 % without a trend (quadrature, not the thinning factor); the per-well
   errors shrank with the number of z levels (RMS 18 % with one, 6 % with four).
 Which sources supply the water differs between advection and mixing (Neversink: 51 % stream

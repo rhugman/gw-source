@@ -1,6 +1,6 @@
 """Solve (I - P) X = B for many right-hand sides; detect, report and (net mode) remove cycles.
 
-Solvers (PLAN §2.5):
+Solvers:
 - topological: if the dependency graph of the matrix is acyclic, permute it to lower-triangular
   form (dependencies first) and solve by substitution (scipy's compiled spsolve_triangular).
   This is the reference method's algorithm [FB13] in matrix form.

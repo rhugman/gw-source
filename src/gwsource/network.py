@@ -36,8 +36,7 @@ rates. The routed rate is taken off the provider's TO-MVR sink and the receiver'
 source; a remainder within MOVER_SNAP_RTOL of the original record (MF6 computes the moved share
 at the last outer iteration, so the records differ at solver tolerance) is set to 0 and shows up
 in the node residual instead. Transfers that cannot be routed stay sink and source terms, as
-without package nodes (Phase 2 behaviour). Movers between models (the simulation-level MVE)
-are not read.
+without package nodes. Movers between models (the simulation-level MVE) are not read.
 
 Residuals: the FLOW-JA-FACE diagonal of a cell keeps MF6's own residual (which includes its
 exchange flows); the diagonal of a package node is the sum of all its records in the package

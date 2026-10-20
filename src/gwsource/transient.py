@@ -1,10 +1,10 @@
 """Transient snapshots: trace selected time steps one by one and keep streaming statistics.
 
-Each selected time step is treated as an independent steady state (PLAN §2.7, Phase 2): storage
-release is a source term and storage gain a sink term, as the budget file reports them. The
-grid and budget files are opened once (mf6io.StepReader) and every step is read, traced and
-folded into running statistics before the next is read, so memory does not grow with the number
-of steps (unless keep_series=True).
+Each selected time step is treated as an independent steady state: storage release is a source
+term and storage gain a sink term, as the budget file reports them. The grid and budget files
+are opened once (mf6io.StepReader) and every step is read, traced and folded into running
+statistics before the next is read, so memory does not grow with the number of steps (unless
+keep_series=True).
 
 Groups are re-selected on every step, because the term list (and the bound number of a named
 boundary) can change between stress periods. Pass either a dict {group: select() keyword
