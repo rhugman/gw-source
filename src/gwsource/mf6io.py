@@ -28,9 +28,11 @@ and DRN-TO-MVR (the part handed to the mover). Both are outflows from the cell a
 equal the drain's head-dependent flow, so both are kept as sink terms; the cell budget closes
 against MF6's own residual with both, and would not close without the -TO-MVR record. Where the
 mover sends the water (here into the stream, which may leak it back into the aquifer through
-the SFR record) is a package-network question left to Phase 4. Records of one package share its
-name (paknam2); the second and later records of a package in a step are named
-'<package>:<text>' (e.g. 'DRN:DRN-TO-MVR') and keep the package as their parent.
+the SFR record) is not followed in a single-model step: gwsource.network routes it when the
+receiving package is read as package nodes (read_network / open_simulation with package_nodes=
+and the MVR budget file). Records of one package share its name (paknam2); the second and
+later records of a package in a step are named '<package>:<text>' (e.g. 'DRN:DRN-TO-MVR') and
+keep the package as their parent.
 
 GWF-GWF exchanges (checked with models split by FloPy's Mf6Splitter): with SAVE_FLOWS in the
 exchange file, each model's budget has one FLOW-JA-FACE record with IMETH = 6 per exchange,

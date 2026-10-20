@@ -1,6 +1,7 @@
-"""Graph-view data (gwsource.graphplot) on a hand-built split: edges, zone graph, sources."""
+"""Graph-view data (gwsource.graphplot) on a hand-built split and a single-model MF6 step."""
 
 import numpy as np
+import pytest
 
 import gwsource as gs
 from gwsource import graphplot as gp
@@ -54,3 +55,38 @@ def test_source_matrix_and_neighbourhood():
     np.testing.assert_allclose(matrix, [[6.0]])
     assert list(gp.neighbourhood(step, [1], hops=1)) == [0, 1]
     assert list(gp.neighbourhood(step, [1], hops=2)) == [0, 1, 2]
+
+
+def test_single_model_step_layers_and_positions(model_run):
+    """A plain read_step (no blocks) is one model: layer zones, node layers and cell centres."""
+    from gwsource.export import cell_centres
+
+    run = model_run("m2_dis3lay")
+    step = gs.read_step(run.ws)
+    nlay = step.grid_shape[0]
+    per_layer = step.n_cells // nlay
+    zones, names = gp.layer_zones(step)
+    assert names == [f"layer {k + 1}" for k in range(nlay)]
+    np.testing.assert_array_equal(zones, np.arange(step.n_cells) // per_layer)
+    np.testing.assert_array_equal(gp.node_layers(step), zones)
+    np.testing.assert_allclose(gp.node_positions(step), cell_centres(run.grb_file))
+    graph = gp.zone_graph(step, zones, names)
+    assert graph.flow.shape == (nlay, nlay) and graph.flow.sum() > 0.0
+
+
+def test_alluvial_shows_the_lowest_band():
+    """The y-limit sits one gap below the bottom of the longer stack, sources or groups."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    gap = 0.02
+    matrix = np.array([[1.0, 8.0], [5.0, 0.5], [0.5, 9.0]])
+    for m in (matrix, matrix.T):
+        fig, ax = plt.subplots()
+        labels, groups = [f"s{i}" for i in range(m.shape[0])], [f"g{j}" for j in range(m.shape[1])]
+        gp.plot_alluvial(labels, groups, m, ax, colors=["C0", "C1", "C2"], gap=gap)
+        # the bands are scaled so that the longer stack, with its gaps, runs from 1 down to 0
+        assert ax.get_ylim()[0] == pytest.approx(-gap)
+        plt.close(fig)

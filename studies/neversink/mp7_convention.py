@@ -293,42 +293,22 @@ def write_mp7_prt(
     stop_at_weak_sink=False lets the particles pass weak sinks; tracks=True also writes the
     release and cell-exit records (gwsource.prt.cell_visits), not only the terminations.
     """
-    if prt_ws.exists():
-        shutil.rmtree(prt_ws)
-    prt_ws.mkdir(parents=True)
+    n = len(starts)
+    release = gs.prt.ReleasePoints(
+        cell=starts["node0"].to_numpy(),
+        x=starts["x0"].to_numpy(),
+        y=starts["y0"].to_numpy(),
+        z=starts["zloc0"].to_numpy(),
+        weight=np.ones(n),
+        package=np.full(n, "", dtype=object),
+    )
     grid = gs.prt.load_prt_grid(gwf_ws, model, "DIS")
-    perioddata, time_units = gs.prt._tdis_perioddata(gwf_ws / "mfsim.tdis")
-    sim = flopy.mf6.MFSimulation(sim_name="prt", sim_ws=str(prt_ws), exe_name=str(exe))
-    flopy.mf6.ModflowTdis(sim, nper=len(perioddata), perioddata=perioddata, time_units=time_units)
-    prt = flopy.mf6.ModflowPrt(sim, modelname="prt")
-    flopy.mf6.ModflowPrtdis(prt, **{k: v for k, v in grid.dis_kwargs.items() if v is not None})
-    flopy.mf6.ModflowPrtmip(prt, porosity=porosity)
-    columns = zip(starts["node0"], starts["x0"], starts["y0"], starts["zloc0"])
-    packagedata = [(i, gs.prt._cellid(n, grid), x, y, z) for i, (n, x, y, z) in enumerate(columns)]
-    flopy.mf6.ModflowPrtprp(
-        prt,
-        nreleasepts=len(packagedata),
-        packagedata=packagedata,
-        local_z=True,
-        extend_tracking=True,
-        stop_at_weak_sink=stop_at_weak_sink,
-        exit_solve_tolerance=1e-5,
+    config = gs.prt.PrtConfig(porosity=porosity, exit_solve_tolerance=1e-5)
+    return gs.prt.write_prt(
+        prt_ws, gwf_ws, grid, release, config, exe, model,
+        budget_file=budget_file, stop_at_weak_sink=stop_at_weak_sink,
+        track_release=tracks, track_exit=tracks, clear_ws=True,
     )
-    flopy.mf6.ModflowPrtoc(
-        prt,
-        trackcsv_filerecord="prt.trk.csv",
-        track_release=tracks,
-        track_exit=tracks,
-        track_terminate=True,
-    )
-    gwf_files = [("GWFHEAD", gwf_ws / f"{model}.hds"), ("GWFBUDGET", budget_file)]
-    flopy.mf6.ModflowPrtfmi(
-        prt, packagedata=[(kind, gs.prt._relative(path, prt_ws)) for kind, path in gwf_files]
-    )
-    ems = flopy.mf6.ModflowEms(sim, filename="prt.ems")
-    sim.register_solution_package(ems, [prt.name])
-    sim.write_simulation(silent=True)
-    return sim
 
 
 def run_endpoints(sim: flopy.mf6.MFSimulation, keep: np.ndarray) -> dict[str, np.ndarray]:

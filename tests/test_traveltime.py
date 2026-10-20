@@ -140,6 +140,25 @@ def test_factor_is_reused_or_rebuilt(model_run):
         np.testing.assert_allclose(rebuilt.weighted_time[g], stored.weighted_time[g], atol=1e-9)
 
 
+def test_rebuilt_factor_follows_the_trace_config():
+    """A rebuilt factorisation isolates the trace's closed loops and uses its solver."""
+    from test_cycles import loop_step
+
+    from gwsource.traveltime import _system_factor
+
+    step = loop_step(exit_q=1e-10)  # exit share 1e-10: closed for tol 1e-9, not for the default
+    step.area, step.saturated_thickness = np.ones(step.n_cells), np.ones(step.n_cells)
+    groups = {"wel": gs.select(step, package="WEL")}
+    config = gs.TraceConfig(solver="lu", closed_loop_tol=1e-9)
+    res = gs.backward(step, groups, config)
+    assert [c.tolist() for c in res.closed_loops] == [[0, 1, 2]]
+    stored = gs.travel_time(step, res, POROSITY)
+    res.factor = None
+    assert _system_factor(step, res, "backward").kind == "lu"
+    rebuilt = gs.travel_time(step, res, POROSITY)
+    np.testing.assert_array_equal(rebuilt.weighted_time["wel"], stored.weighted_time["wel"])
+
+
 def test_heads_fallback_matches_saturation(model_run):
     """Without DATA-SAT the saturated thickness from heads equals DATA-SAT x (top - bot)."""
     for key in ("m1_dis", "m2_dis3lay"):

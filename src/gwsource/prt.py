@@ -35,10 +35,13 @@ What it does
    of it downstream (in the 3-layer test model with IFLOWFACE = -1 no recharge particle
    reaches the bottom-layer wells; volume seeding there credits them with 6.9 m3/d of it).
 3. PRT: a separate simulation (own folder) with PRT DIS/DISV copied from the GWF input, MIP
-   porosity, PRP with EXTEND_TRACKING (the last steady period is extended until particles
+   porosity, PRP with EXTEND_TRACKING (the steady period is extended until particles
    terminate), FMI reading the GWF head and budget files, and EMS. FloPy writes the input; the
    MF6 executable is passed explicitly. PRT needs DATA-SPDIS (NPF SAVE_SPECIFIC_DISCHARGE).
-   Particles run until they terminate (strong sink, boundary face); there is no stop zone.
+   The GWF model must have a single steady stress period: PRT moves the particles in the flows
+   of every period, but their weights and the destination shares come from one FlowStep.
+   Particles run until they terminate (strong sink, boundary face); there is no stop zone, and
+   track_particles() asserts that every particle terminated.
 4. Tracks: release, cell-exit and termination records (CSV track output). icell is the 1-based
    user node; the records give each particle's sequence of cells and the time it entered them.
 
@@ -61,19 +64,20 @@ Consistency. If the release points resolve the sources and the cell survival spl
 weight among the outflow faces as the flow does, the captured flow equals the destination
 inflow (the duality of the gross method, now along advective paths). Observed:
 - 3-layer test model (wells in the bottom layer, a weak well upstream of a strong one):
-  402.6 of 405 m3/d with k = 3 and 2 levels, 405.3 with k = 4 and 16 levels. An earlier
-  version that released at the water table and stopped particles in the first destination
-  cell, dropping the rest of their weight, captured 266 m3/d; volume seeding with that stop
-  rule about 306 m3/d.
+  402.6 of 405 m3/d with k = 3 and 2 levels, 405.3 with k = 4 and 16 levels. Both parts of
+  the method matter: releasing at the water table and stopping particles in the first
+  destination cell, which drops the weight a weak well passes on, captures 266 m3/d; volume
+  seeding with that stop rule about 306 m3/d.
   With recharge on the top face (IFLOWFACE = -1, same GWF flows): 405.8 released on the top
   face, 412.7 seeded over the volume. With the CHD edges on their lateral faces instead (1
   west, 3 east; not in the test suite): 398 to 412 m3/d for k = 3..6 and 2..8 levels, the same
   scatter as volume seeding of the CHD (395 to 403): each edge cell brings ~126 m3/d, so a few
   particles on the capture-zone edge move the sum.
 - Neversink (4 layers, 1.68M cells, eight wells, k = 1, 4 levels): 3,736 of 3,671 m3/d,
-  every well within 11 % of its rate; the earlier version 1,940 (water table) and 3,005
-  (mid-cell). A single mid-cell height gives 3,722 there, so the z levels matter most where
-  the alternative would be the water table. Over five seeding layouts the total scattered
+  every well within 11 % of its rate. Stopping particles in the first destination cell gives
+  1,940 with release at the water table and 3,005 at mid-cell. Following the weight on, a
+  single mid-cell height gives 3,722, so the z levels matter most where the alternative
+  would be the water table. Over five seeding layouts the total scattered
   between 0.0 and +1.8 % without a trend (quadrature, not the thinning factor); the per-well
   errors shrank with the number of z levels (RMS 18 % with one, 6 % with four).
 Which sources supply the water differs between advection and mixing (Neversink: 51 % stream
@@ -95,6 +99,7 @@ NotImplementedError for them.
 """
 
 import os
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -104,7 +109,14 @@ import numpy as np
 from .assemble import cell_budget, flow_edges, group_term_flows
 from .flowstep import FlowStep
 from .metrics import BackwardResult
-from .mf6io import _block_lines, _option_value, find_model_files
+from .mf6io import (
+    COMMENT_CHARS,
+    ModelFiles,
+    _block_lines,
+    _name_file_packages,
+    _option_value,
+    find_model_files,
+)
 from .selectors import Selection
 from .traveltime import cell_porosity
 
@@ -427,6 +439,47 @@ def _assert_spdis(budget_file: Path) -> None:
     )
 
 
+def _sto_period_one_transient(sto_file: Path) -> bool:
+    """Return True if the first stress period of a GWF STO file is transient.
+
+    MF6 makes a period with STO transient unless a PERIOD block says STEADY-STATE (checked on
+    MF6 6.9 dev with STO and no PERIOD block); the setting carries over to later periods.
+    """
+    transient, inside = True, False
+    for raw in Path(sto_file).read_text().splitlines():
+        tokens = [t.upper() for t in raw.split()]
+        if not tokens or tokens[0].startswith(COMMENT_CHARS):
+            continue
+        if tokens[:2] == ["BEGIN", "PERIOD"]:
+            if int(tokens[2]) > 1:
+                break
+            inside = True
+        elif tokens[0] == "END":
+            inside = False
+        elif inside and tokens[0] in ("STEADY-STATE", "TRANSIENT"):
+            transient = tokens[0] == "TRANSIENT"
+    return transient
+
+
+def assert_single_steady_period(files: ModelFiles) -> None:
+    """Assert that the GWF model has one stress period and that it is steady.
+
+    PRT tracks through the whole GWF time history, while the particle weights and destination
+    shares come from one FlowStep; they agree only if that step is the one steady flow field.
+    """
+    perioddata, _ = _tdis_perioddata(files.tdis_file)
+    assert len(perioddata) == 1, (
+        f"PRT tracking here needs a GWF model with a single steady stress period (it has "
+        f"{len(perioddata)}): the particles move in the flows of every period, but are weighted "
+        "with one step's"
+    )
+    sto = [path for ftype, path, _ in _name_file_packages(files.nam_file) if ftype == "STO"]
+    assert not (sto and _sto_period_one_transient(sto[0])), (
+        "PRT tracking here needs a steady stress period: the GWF STO package makes it transient "
+        "(set STEADY-STATE in its PERIOD 1 block)"
+    )
+
+
 def write_prt(
     prt_ws: Path,
     gwf_ws: Path,
@@ -435,13 +488,30 @@ def write_prt(
     config: PrtConfig,
     exe: str | Path,
     model: str | None = None,
+    budget_file: Path | None = None,
+    stop_at_weak_sink: bool = False,
+    track_release: bool = True,
+    track_exit: bool = True,
+    clear_ws: bool = False,
 ) -> flopy.mf6.MFSimulation:
-    """Write a PRT simulation tracking the release points until they leave the model."""
+    """Write a PRT simulation tracking the release points until they leave the model.
+
+    budget_file: GWF budget file for FMI instead of the model's own (e.g. a copy with edited
+        IFLOWFACE columns); it must hold DATA-SPDIS.
+    stop_at_weak_sink: PRP STOP_AT_WEAK_SINK (off by default, see the module docstring).
+    track_release, track_exit: also write release and cell-exit records (cell_visits() needs
+        both); termination records are always written.
+    clear_ws: delete prt_ws first, so no output of an earlier run is left in it.
+    """
     files = find_model_files(gwf_ws, model)
     assert files.head_file is not None, "PRT needs the GWF head file (OC HEAD FILEOUT)"
-    _assert_spdis(files.budget_file)
+    assert_single_steady_period(files)
+    budget_file = files.budget_file if budget_file is None else Path(budget_file)
+    _assert_spdis(budget_file)
     perioddata, time_units = _tdis_perioddata(files.tdis_file)
     prt_ws = Path(prt_ws)
+    if clear_ws and prt_ws.exists():
+        shutil.rmtree(prt_ws)
     prt_ws.mkdir(parents=True, exist_ok=True)
     sim = flopy.mf6.MFSimulation(sim_name="prt", sim_ws=str(prt_ws), exe_name=str(exe))
     flopy.mf6.ModflowTdis(sim, nper=len(perioddata), perioddata=perioddata, time_units=time_units)
@@ -449,7 +519,10 @@ def write_prt(
     dis_class = flopy.mf6.ModflowPrtdis if grid.grid_type == "DIS" else flopy.mf6.ModflowPrtdisv
     dis_class(prt, **{k: v for k, v in grid.dis_kwargs.items() if v is not None})
     n_cells = grid.ncpl * int(grid.dis_kwargs["nlay"])
-    flopy.mf6.ModflowPrtmip(prt, porosity=cell_porosity(config.porosity, n_cells))
+    porosity = cell_porosity(config.porosity, n_cells)
+    if np.ndim(config.porosity) == 0:
+        porosity = float(config.porosity)  # one value: MIP writes a constant
+    flopy.mf6.ModflowPrtmip(prt, porosity=porosity)
     packagedata = [
         (i, _cellid(c, grid), x, y, z)
         for i, (c, x, y, z) in enumerate(zip(release.cell, release.x, release.y, release.z))
@@ -460,17 +533,18 @@ def write_prt(
         packagedata=packagedata,
         local_z=True,
         extend_tracking=True,
+        stop_at_weak_sink=stop_at_weak_sink,
         exit_solve_tolerance=config.exit_solve_tolerance,
         stoptraveltime=config.stoptraveltime,
     )
     flopy.mf6.ModflowPrtoc(
         prt,
         trackcsv_filerecord="prt.trk.csv",
-        track_release=True,
-        track_exit=True,
+        track_release=track_release,
+        track_exit=track_exit,
         track_terminate=True,
     )
-    gwf_files = [("GWFHEAD", files.head_file), ("GWFBUDGET", files.budget_file)]
+    gwf_files = [("GWFHEAD", files.head_file), ("GWFBUDGET", budget_file)]
     flopy.mf6.ModflowPrtfmi(
         prt, packagedata=[(kind, _relative(path, prt_ws)) for kind, path in gwf_files]
     )
@@ -522,6 +596,16 @@ def endpoints(tracks: np.ndarray, n_particles: int) -> dict[str, np.ndarray]:
     out["status"][index] = term["istatus"]
     out["time"][index] = term["t"] - term["trelease"]
     return out
+
+
+def assert_terminated(ends: dict[str, np.ndarray], release: ReleasePoints) -> None:
+    """Assert that every particle has a termination record (end status >= 0)."""
+    open_ends = ends["status"] < 0
+    assert not open_ends.any(), (
+        f"{open_ends.sum()} of {release.n} particles did not terminate (flow weight "
+        f"{release.weight[open_ends].sum():.6g} of {release.weight.sum():.6g}); their capture "
+        "along the path is incomplete"
+    )
 
 
 def cell_visits(tracks: np.ndarray) -> dict[str, np.ndarray]:
@@ -665,8 +749,13 @@ def track_particles(
 
     step and result are the GWF step and its backward trace (gross). Particles are released
     from the source terms (all, or those in source) of cells with F > fraction_threshold.
+    The GWF model must have a single steady stress period, and every particle must terminate.
     """
     assert result.accounting == "gross", "use a gross-accounting backward result"
+    assert step.kstpkper is None or step.kstpkper[1] == 0, (
+        f"step {step.kstpkper} is not in the first stress period; PRT tracking here needs a "
+        "GWF model with a single steady stress period"
+    )
     check_cells_only(step, result.selections[group])
     files = find_model_files(gwf_ws, model)
     grid = load_prt_grid(gwf_ws, files.model, files.dis_type)
@@ -679,4 +768,5 @@ def track_particles(
     survival = weak_sink_survival(step) if config.thin_weak_sinks else 1.0 - share
     captured, arrival = capture_along_paths(cell_visits(tracks), release.n, share, survival)
     ends = endpoints(tracks, release.n)
+    assert_terminated(ends, release)
     return arrival_statistics(step, release, ends, captured, arrival, Path(prt_ws))

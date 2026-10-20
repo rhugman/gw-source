@@ -12,7 +12,9 @@ Conventions
   diagonal first); diagonal entries are ignored for the flow graph. MF6 writes the cell budget
   residual (net inflow) in the diagonal of FLOW-JA-FACE.
 - ``flowja[p]`` for connection p = (n, ja[p]) is the flow INTO cell n FROM cell ja[p] (MF6 sign
-  convention). It must be antisymmetric over the off-diagonal entries.
+  convention). It must be antisymmetric over the off-diagonal entries (validate_step checks it
+  to FLOWJA_RTOL relative to the largest flow, or 1, whichever is larger; parallel
+  connections of one cell pair are summed).
 - External terms are one entry per boundary (one row of an MF6 list budget record, or one cell
   of an array record such as STO-SS). ``term_flow`` is positive INTO the cell: a positive entry
   is a source term, a negative entry is a sink term. Entries with zero flow are neither.
@@ -22,7 +24,7 @@ Conventions
 - ``saturated_thickness`` (optional, per cell) is the saturated thickness of the cell for this
   step; with ``area`` it gives the water volume that travel times need (gwsource.traveltime).
 
-Networks (Phase 4, gwsource.network): the "cells" may be the global nodes of a whole
+Networks (gwsource.network): the "cells" may be the global nodes of a whole
 simulation: the cells of every GWF model, then optional package nodes (SFR reaches, LAK lakes,
 MAW wells, UZF cells). ``blocks`` lists the contiguous node ranges (NodeBlock) in order;
 an empty list means a plain single-model step whose nodes are its cells. Package nodes have no
@@ -33,11 +35,15 @@ output (NaN on cells, whose volume comes from porosity x area x saturated thickn
 from dataclasses import dataclass, field
 
 import numpy as np
+import scipy.sparse as sp
 
 MOVER_SUFFIX = "-TO-MVR"
 MOVER_TEXT = "TO-MVR"  # every mover record ends so ('UZF-GWD TO-MVR' has a space, not a dash)
 MODEL_SEP = "/"
 BLOCK_KINDS = ("model", "package")
+# antisymmetry of flowja, relative to the largest flow, or 1, whichever is larger (MF6 output
+# is exact)
+FLOWJA_RTOL = 1e-10
 
 
 @dataclass(frozen=True)
@@ -48,6 +54,8 @@ class Package:
     (e.g. 'DRN' writes DRN and DRN-TO-MVR); empty means the record name itself.
     model is the GWF model that owns the record in a multi-model step (the name is then
     '<model>/<record name>'); partner is the other model of a GWF-GWF exchange record.
+    package_type is the MF6 package type of a package-node record (e.g. 'MAW' for 'MAW-1:RATE'),
+    so a selector can name the type whatever the package is called.
     """
 
     name: str
@@ -55,6 +63,7 @@ class Package:
     parent: str = ""
     model: str = ""
     partner: str = ""
+    package_type: str = ""
 
     @property
     def local_name(self) -> str:
@@ -63,12 +72,13 @@ class Package:
 
     @property
     def aliases(self) -> set[str]:
-        """Upper-case names a selector can use: name, local name, text, parent, text w/o -TO-MVR."""
+        """Upper-case selector names: name, local name, text, parent, type, text w/o -TO-MVR."""
         names = {
             self.name,
             self.local_name,
             self.text,
             self.parent,
+            self.package_type,
             self.text.removesuffix(MOVER_SUFFIX),
         }
         return {n.upper() for n in names if n}
@@ -214,12 +224,31 @@ def validate_step(step: FlowStep) -> None:
     assert int(np.prod(step.grid_shape)) == n, "grid_shape must hold n_cells values"
     if step.fixed_volume is not None:
         assert len(step.fixed_volume) == n, "fixed_volume must have one value per node"
+    _assert_antisymmetric(step.ia, step.ja, step.flowja)
     if step.blocks:
         ends = [b.offset + b.n for b in step.blocks]
         starts = [b.offset for b in step.blocks]
         assert starts[0] == 0 and starts[1:] == ends[:-1] and ends[-1] == n, (
             "blocks must tile the nodes 0..n-1 in order"
         )
+
+
+def _assert_antisymmetric(ia: np.ndarray, ja: np.ndarray, flowja: np.ndarray) -> None:
+    """Assert that the off-diagonal flowja is antisymmetric: flow(n, m) = -flow(m, n).
+
+    Parallel connections between one pair of cells (hand-built graphs) are summed first.
+    """
+    n = len(ia) - 1
+    rows = connection_rows(ia)
+    off = rows != ja
+    q = flowja[off]
+    flows = sp.coo_matrix((q, (rows[off], ja[off])), shape=(n, n)).tocsr()
+    scale = max(float(np.abs(q).max(initial=0.0)), 1.0)
+    mismatch = float(np.abs((flows + flows.T).data).max(initial=0.0))
+    assert mismatch <= FLOWJA_RTOL * scale, (
+        f"flowja is not antisymmetric: a flow and its reverse differ by up to {mismatch:.3g} "
+        f"(tolerance {FLOWJA_RTOL:.0e} x {scale:.3g}, the largest flow or 1)"
+    )
 
 
 def connection_rows(ia: np.ndarray) -> np.ndarray:

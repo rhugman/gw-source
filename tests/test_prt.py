@@ -205,3 +205,69 @@ def test_capture_along_paths_follows_weight_past_partial_sinks():
     captured, mean_time = capture_along_paths(visits, 2, share, survival)
     np.testing.assert_allclose(captured, [0.5 * 0.4 + 0.5 * 0.6 * 1.0, 1.0])
     np.testing.assert_allclose(mean_time, [(0.2 * 10.0 + 0.3 * 30.0) / 0.5, 0.0])
+
+
+def test_prt_needs_a_single_steady_period(model_run, mf6_exe, tmp_path):
+    """Model 6 has four periods: tracking any of its steps is refused before PRT runs."""
+    run = model_run("m6_transient")
+    for kstpkper in ((0, 0), (0, 1)):
+        step = gs.read_step(run.ws, kstpkper=kstpkper)
+        res = gs.backward(step, {"wel": gs.select(step, package="WEL")})
+        with pytest.raises(AssertionError, match="single steady stress period"):
+            track_particles(run.ws, step, res, "wel", PrtConfig(POROSITY), mf6_exe, tmp_path)
+
+
+def period_block(iper: int, keyword: str) -> str:
+    """Return an STO PERIOD block holding one keyword."""
+    return f"BEGIN period {iper}\n  {keyword}\nEND period\n"
+
+
+def test_sto_period_one_transient(tmp_path):
+    """STO without a PERIOD block is transient in MF6; STEADY-STATE in period 1 makes it steady."""
+    from gwsource.prt import _sto_period_one_transient
+
+    texts = {
+        "BEGIN griddata\n  ss\n    CONSTANT 1e-5\nEND griddata\n": True,
+        period_block(1, "STEADY-STATE") + period_block(2, "TRANSIENT"): False,
+        period_block(1, "TRANSIENT"): True,
+        period_block(2, "STEADY-STATE"): True,
+    }
+    for i, (text, transient) in enumerate(texts.items()):
+        sto_file = tmp_path / f"m{i}.sto"
+        sto_file.write_text(text)
+        assert _sto_period_one_transient(sto_file) is transient, text
+
+
+def test_unterminated_particles_are_refused():
+    """A particle without a termination record fails the check, with its share of the weight."""
+    from gwsource.prt import ReleasePoints, assert_terminated
+
+    release = ReleasePoints(*(np.zeros(3) for _ in range(4)), np.array([1.0, 2.0, 3.0]),
+                            np.full(3, "RCH", dtype=object))
+    ends = {"cell": np.array([4, -1, 7]), "status": np.array([1, -1, 1]), "time": np.ones(3)}
+    with pytest.raises(AssertionError, match=r"1 of 3 particles did not terminate \(flow weight 2"):
+        assert_terminated(ends, release)
+    assert_terminated({**ends, "cell": np.array([4, 5, 7]), "status": np.array([1, 2, 1])}, release)
+
+
+def test_write_prt_options(model_run, mf6_exe, tmp_path):
+    """write_prt options: STOP_AT_WEAK_SINK, termination records only, scalar porosity, clear_ws."""
+    from gwsource.prt import load_prt_grid, release_points, write_prt
+
+    run = model_run("m1_dis")
+    step = gs.read_step(run.ws)
+    grid = load_prt_grid(run.ws, run.name, "DIS")
+    release = release_points(step, grid, np.ones(step.n_cells, bool), None, 1, np.array([0.5]))
+    prt_ws = tmp_path / "prt"
+    prt_ws.mkdir()
+    (prt_ws / "stale.txt").write_text("left over")
+    config = PrtConfig(porosity=POROSITY)
+    write_prt(prt_ws, run.ws, grid, release, config, mf6_exe, budget_file=run.budget_file,
+              stop_at_weak_sink=True, track_release=False, track_exit=False, clear_ws=True)
+    assert not (prt_ws / "stale.txt").exists()
+    prp = (prt_ws / "prt.prp").read_text().upper()
+    oc = (prt_ws / "prt.oc").read_text().upper()
+    mip = (prt_ws / "prt.mip").read_text().upper()
+    assert "STOP_AT_WEAK_SINK" in prp and "EXTEND_TRACKING" in prp
+    assert "TRACK_TERMINATE" in oc and "TRACK_RELEASE" not in oc and "TRACK_EXIT" not in oc
+    assert "CONSTANT" in mip

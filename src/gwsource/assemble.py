@@ -1,6 +1,6 @@
 """Assemble the linear systems of backward and forward tracing from a FlowStep.
 
-Gross accounting (default, PLAN §2.1-2.3). For cell i, with q_ij >= 0 the intercell flow i→j and
+Gross accounting (default). For cell i, with q_ij >= 0 the intercell flow i→j and
 q_k the external terms (positive into the cell):
     O_i = sum_j q_ij + sum_{k in i, q_k<0} |q_k|      (total outflow)
     I_i = sum_j q_ji + sum_{k in i, q_k>0} q_k        (total inflow)
@@ -9,7 +9,7 @@ Backward: F_i - sum_j (q_ij/O_i) F_j = sum_{k in D, q_k<0} |q_k| / O_i
 Forward:  G_i - sum_j (q_ji/I_i) G_j = sum_{k in S, q_k>0} q_k / I_i
 Cells with O_i = 0 (backward) or I_i = 0 (forward) get an identity row and zero right-hand side.
 
-Net accounting (the reference method, Foley & Black 2013; PLAN §2.4). Edges only:
+Net accounting (the reference method, Foley & Black 2013 [FB13]). Edges only:
     s_i = O^edges_i - I^edges_i,   T_i = I^edges_i + max(s_i, 0)
 Destination cells are absorbing (f = 1, their out-edges ignored); elsewhere
     f_i = sum_j q_ij f_j / T_i.

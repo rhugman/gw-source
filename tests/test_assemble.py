@@ -25,6 +25,19 @@ def test_from_edges_layout():
     assert list(step.term_bound) == [1, 2, 1]
 
 
+def test_flowja_must_be_antisymmetric():
+    """A FlowStep whose flow and reverse flow disagree is refused; a solver-level difference not."""
+    step = graph(3, [(0, 1, 2.0), (1, 2, 3.0)], [(0, 2.0, 0), (1, 1.0, 0), (2, -3.0, 1)])
+    fields = {k: getattr(step, k) for k in ("ia", "ja", "term_cell", "term_flow", "term_package",
+                                            "term_bound", "packages")}
+    flowja = step.flowja.copy()
+    flowja[1] = -2.5  # 0 -> 1 is 2.0 in row 1, 2.5 in row 0
+    with pytest.raises(AssertionError, match="not antisymmetric"):
+        gs.FlowStep(flowja=flowja, **fields)
+    flowja[1] = -2.0 * (1.0 + 1e-12)
+    gs.FlowStep(flowja=flowja, **fields)
+
+
 def test_chain():
     """Source -> pass-through -> sink: every fraction is 1 and volumes equal the throughflow."""
     step = graph(3, [(0, 1, 10.0), (1, 2, 10.0)], [(0, 10.0, 0), (2, -10.0, 1)])

@@ -1,4 +1,4 @@
-"""True transient mixing-cell tracking: tagged water carried through storage (PLAN §2.7, Phase 4).
+"""True transient mixing-cell tracking: tagged water carried through storage.
 
 Snapshots (gwsource.transient) treat each time step as a steady state in which storage release
 is a source and storage gain a sink. Here tagged water is carried from step to step instead:

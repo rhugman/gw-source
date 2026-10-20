@@ -1,4 +1,4 @@
-"""Eulerian mean travel time (backward) and mean age (forward) under full mixing (PLAN §2.6).
+"""Eulerian mean travel time (backward) and mean age (forward) under full mixing.
 
 Water volume and residence time
 -------------------------------
@@ -77,7 +77,7 @@ from .diagnostics import Check
 from .flowstep import FlowStep
 from .metrics import BackwardResult, ForwardResult
 from .network import global_values
-from .solve import Factor, factorize, isolate_closed_loops
+from .solve import Factor, factorize, identity_rows
 
 DEFAULT_FRACTION_THRESHOLD = 1e-10
 
@@ -154,16 +154,24 @@ def residence_time(volume: np.ndarray, throughflow: np.ndarray) -> np.ndarray:
 
 
 def _system_factor(step: FlowStep, result, mode: str) -> Factor:
-    """Return the result's stored factorisation, or rebuild it (closed loops isolated)."""
+    """Return the result's stored factorisation, or rebuild it as the trace built it.
+
+    The rebuild isolates the result's own closed loops (found with the trace's closed_loop_tol)
+    and uses the solver the trace used.
+    """
     if result.factor is not None:
         return result.factor
     edges = flow_edges(step)
     budget = cell_budget(step, edges)
     build = gross_backward_system if mode == "backward" else gross_forward_system
-    matrix, rhs = build(step, edges, budget, result.selections)
-    matrix, _, loops = isolate_closed_loops(matrix, rhs)
-    factor = factorize(matrix)
-    factor.zero_rows = np.concatenate(loops) if loops else None
+    matrix, _ = build(step, edges, budget, result.selections)
+    zero_rows = np.concatenate(result.closed_loops) if result.closed_loops else None
+    if zero_rows is not None:
+        closed = np.zeros(matrix.shape[0], dtype=bool)
+        closed[zero_rows] = True
+        matrix = identity_rows(matrix, closed)
+    factor = factorize(matrix, result.solver_used[0] if result.solver_used else "auto")
+    factor.zero_rows = zero_rows
     return factor
 
 

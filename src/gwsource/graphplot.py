@@ -26,7 +26,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .flowstep import FlowStep
+from .flowstep import FlowStep, NodeBlock
 from .metrics import BackwardResult
 
 
@@ -100,11 +100,26 @@ def zone_graph(
     return ZoneGraph(list(names), flow, term_in, term_out)
 
 
+def node_blocks(step: FlowStep) -> list[NodeBlock]:
+    """Return the step's node blocks; a plain single-model step is one block of all its cells."""
+    if step.blocks:
+        return step.blocks
+    shape = tuple(step.grid_shape)
+    return [NodeBlock("cells", "model", "", 0, step.n_cells, shape, step.grid_type)]
+
+
+def _grb_file(step: FlowStep, block: NodeBlock) -> str | None:
+    """Return the binary grid file of a model block (from the step notes), if known."""
+    if not step.blocks:
+        return step.notes.get("grb_file")
+    return step.notes.get("model_notes", {}).get(block.model, {}).get("grb_file")
+
+
 def layer_zones(step: FlowStep) -> tuple[np.ndarray, list[str]]:
     """Return zones and names: one zone per layer of each DIS/DISV model and one per package."""
     zones = np.full(len(step.ia) - 1, -1)
     names = []
-    for block in step.blocks:
+    for block in node_blocks(step):
         local = np.arange(block.n)
         if block.kind == "model" and block.grid_type in ("DIS", "DISV"):
             per_layer = block.n // block.grid_shape[0]
@@ -163,7 +178,7 @@ def subgraph_edges(step: FlowStep, nodes: np.ndarray) -> tuple[np.ndarray, np.nd
 def node_layers(step: FlowStep) -> np.ndarray:
     """Return the 0-based layer of each DIS/DISV cell; -1 for package nodes and DISU cells."""
     layers = np.full(len(step.ia) - 1, -1)
-    for block in step.blocks:
+    for block in node_blocks(step):
         if block.kind == "model" and block.grid_type in ("DIS", "DISV"):
             per_layer = block.n // block.grid_shape[0]
             layers[block.offset : block.offset + block.n] = np.arange(block.n) // per_layer
@@ -175,8 +190,8 @@ def node_positions(step: FlowStep) -> np.ndarray:
     from .export import cell_centres, package_points
 
     xy = np.full((len(step.ia) - 1, 2), np.nan)
-    for block in step.blocks:
-        grb_file = step.notes.get("model_notes", {}).get(block.model, {}).get("grb_file")
+    for block in node_blocks(step):
+        grb_file = _grb_file(step, block)
         if block.kind == "model" and grb_file is not None:
             xy[block.offset : block.offset + block.n] = cell_centres(grb_file)
     for node, point in package_points(step).items():
@@ -397,7 +412,8 @@ def plot_alluvial(
                     xytext=(4, 0), textcoords="offset points", ha="left", va="center",
                     fontsize=8, color=ink)
     ax.set_xlim(0, 1)
-    ax.set_ylim(min(left[-1], right[-1]) - matrix.max() * scale - gap, 1.0 + gap)
+    bottom = min(left[-1] - matrix[-1].sum() * scale, right[-1] - matrix[:, -1].sum() * scale)
+    ax.set_ylim(bottom - gap, 1.0 + gap)
     ax.set_axis_off()
 
 
