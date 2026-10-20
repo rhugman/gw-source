@@ -16,6 +16,8 @@ backward from the eight priority wells. Four views of the graph (gwsource.graphp
 Run with the project environment after workflow.py:
 
     python studies/neversink/network_figures.py
+
+Figures go to studies/neversink/output/figures/.
 """
 
 import sys
@@ -221,6 +223,7 @@ def local_zooms(step, result, xy, fig_dir: Path) -> Path:
 def main(out: Path = wf.OUT, fig_dir: Path = wf.FIG_DIR) -> list[Path]:
     """Trace the SFR network step and write the four figures."""
     _style()
+    fig_dir.mkdir(parents=True, exist_ok=True)
     step, result, _ = wf.trace_wells(out / "optimal_tight", package_nodes=("SFR",))
     xy = gp.node_positions(step)
     wells = well_points(step, result, xy)

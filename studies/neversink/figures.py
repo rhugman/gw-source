@@ -1,4 +1,4 @@
-"""Figures (PNG, light theme) of the Neversink stage-1 comparison.
+"""Figures (PNG, light theme) of the Neversink case study: base-model maps and ensemble results.
 
 Maps show the backward fraction F of the uppermost active cell to the eight priority wells on a
 single-hue blue ramp (0 to 1), the published MODPATH 7 contributing cells as an ink outline and

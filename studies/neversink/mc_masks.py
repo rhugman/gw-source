@@ -1,42 +1,40 @@
 """Neversink case study: which flow fields the published Monte Carlo masks come from.
 
-The 6 x 357 published masks (output/modpath_mc/{qrat}.zip, {qrat}_real{k}.dat) could not be
-paired with the rebuilt realisations (docs/neversink_study.md, Sections 6 and 7). Two
-bookkeeping steps of the published pipeline explain it; the flow fields are the rebuilt ones.
+The 6 x 357 published masks (output/modpath_mc/{qrat}.zip, {qrat}_real{k}.dat) do not line up
+with the rebuilt realisations when mask k is taken to be realisation k on its stored grid. This
+script tests two bookkeeping steps of the published pipeline that would explain it, keeping the
+rebuilt flow fields as they are.
 
-1. The masks lie one row south of the cells they describe. scripts/get_endpoints.py converts
-   the start coordinates of the captured particles to rows with
-   i = nrow - (y0 - 25) / 50, which is the 1-based row of a cell centre; a mask grid indexed
-   with it as a 0-based row is shifted one row south. Evidence (mask_offsets, calibrated_offsets):
-   - row 0 is empty in every mask (a 1-based row is never 0);
-   - every published cell lies on a start cell once the start cells are moved one row south,
-     against 24 cells off the start cells unshifted (baserat);
-   - the published mask of the calibrated model (from its end-point files) agrees best with the
-     Monte Carlo masks moved one row north.
-2. Mask k is not run k. scripts/modpath_mc_varq.py zips run r (row r of the scenario's parameter
-   table, modpath_par_ens.csv order) as mp_results_{r}_{qrat}.zip. The masks are numbered in the
-   order of those names sorted as text, where '_' sorts after the digits ('100_' before '10_'):
+1. Row offset. scripts/get_endpoints.py converts the start coordinates of the captured
+   particles to rows with i = nrow - (y0 - 25) / 50, which is the 1-based row of a cell centre;
+   a mask grid indexed with it as a 0-based row is shifted one row south. mask_offsets and
+   calibrated_offsets test this: whether row 0 is empty in every mask (a 1-based row is never
+   0), how many published cells lie on a start cell for each trial offset, and which offset
+   makes the published mask of the calibrated model (from its end-point files) agree best with
+   the Monte Carlo masks.
+2. Pairing. scripts/modpath_mc_varq.py zips run r (row r of the scenario's parameter table,
+   modpath_par_ens.csv order) as mp_results_{r}_{qrat}.zip. If the masks are numbered in the
+   order of those names sorted as text, where '_' sorts after the digits ('100_' before '10_'),
    mask k is run pest_rebuild.mask_run_order()[k]. Runs 0..356 have masks; run 357, the base
-   realisation, has none. The postprocessing that wrote the .dat files is not archived; the
-   order is inferred from the R1 matches below, not read from code.
+   realisation, has none. The postprocessing that wrote the .dat files is not archived, so the
+   order is tested against the R1 matches below rather than read from code.
 
 Both corrections live in ensemble_run: read_mask returns a mask moved back onto its cells
-(corrected=False: as stored, used here for the offset evidence) and mask_indices / run_indices
-give the pairing (pest_rebuild.mask_run_order). With both, the R1 masks of growth_mechanisms
-(PRT with the published conventions on the rebuilt flow fields, 60 realisations) match their
-paired published mask best in every case and scenario: Jaccard 0.989 to 1.000 (median 0.996) at
-base pumping, against 0.75 for the second-best mask (r1_matches, pairing_check). The
+(corrected=False: as stored, used here for the offset test) and mask_indices / run_indices give
+the pairing (pest_rebuild.mask_run_order). r1_matches and pairing_check compare the R1 masks of
+growth_mechanisms (PRT with the published conventions on the rebuilt flow fields, 60
+realisations) with every published mask, to check that each matches its paired mask best. The
 per-realisation comparisons of full mixing with its own mask are here (paired_comparison,
 region_areas); probability_comparison sets the published probability from the masks as stored
 against the corrected one.
 
-Scenario well multipliers. multiplier_test reruns six paired realisations with R1 only, with
-the realisation's own priority-well multiplier kept and replaced. Kept reproduces the masks
-(median Jaccard 0.998 at baserat, 0.995 at maxrat); replaced gives 0.965 and 0.967. The
-published scenarios therefore kept it, q = m (q_base + f (q_max - q_base)), which is the
-default of scenarios.scenario_pars.
+Scenario well multipliers. run_multiplier_test reruns six paired realisations with R1 only,
+with the realisation's own priority-well multiplier kept and replaced; multiplier_table gives
+each case's Jaccard index with its paired mask and with the best mask. Kept,
+q = m (q_base + f (q_max - q_base)), is the default of scenarios.scenario_pars.
 
-Run with the project environment; multiplier_test needs a process pool (outside the sandbox):
+Run with the project environment; run_multiplier_test needs a process pool (some restricted
+environments forbid one):
 
     python studies/neversink/mc_masks.py
 
@@ -234,7 +232,7 @@ def paired_comparison(
     """Compare every corrected mask with F of its own realisation and of the others.
 
     Per mask: area-matched Jaccard with its own F and with the F of the next mask's realisation
-    (the neighbour test of Section 6), and the rank of its own realisation among all 357 by
+    (a neighbour test), and the rank of its own realisation among all 357 by
     correlation. Summary: those counts and, per region, the correlation over the masks of the
     published area with the sum of F of the paired realisation.
     """
@@ -419,7 +417,7 @@ def comparisons(
 ) -> None:
     """Write the R1 matches, the paired full-mixing comparison and the probability tables.
 
-    ens_dir and scenario_dir hold the stage-2 and stage-3 runs; base_maps (default ens_dir) the
+    ens_dir and scenario_dir hold the base-rate ensemble and the scenario runs; base_maps (default ens_dir) the
     base-rate probability maps.
     """
     reals = gm.sample_realisations(60)

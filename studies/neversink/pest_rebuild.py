@@ -1,5 +1,5 @@
-"""Neversink case study, stage 2 prerequisite: MF6 input for any realisation of the published
-iES ensemble, without PEST++.
+"""Neversink case study, ensemble input: MF6 input for any realisation of the published iES
+ensemble, without PEST++.
 
 The published ensemble (Fienen and others 2021; Corson-Dosch and others 2021) is a set of
 multiplier parameters on the base model in neversink_mf6/. The PEST interface folder that turns
@@ -19,10 +19,12 @@ Parameterisation (all multipliers on the neversink_mf6 values, log-transformed):
 - SFR streambed K: one value per NHDPlus line_id written directly into the rhk column.
 - WEL rates and CHD heads: one multiplier per cell (CHD fixed at 1).
 
-pyemu is not in the project environment and the vendored 2021 copy does not import with
-NumPy 2, so the pieces of pyemu 2021 that PstFrom used (setup_pilotpoints_grid,
-OrdinaryKrige.calc_factors_grid, fac2real, apply_list_and_array_pars) are ported below with
-the same neighbour order and file rounding. The rebuilt base realisation is checked against
+The rebuilt files must match those that pyemu wrote in 2021 exactly, down to the order of the
+kriging neighbours and the rounding of the written arrays. The current pyemu of the project
+environment is not relied on for that, and the 2021 copy shipped with the source repository
+(python_packages_static/pyemu) does not import with NumPy 2. So the pieces of pyemu 2021 that
+PstFrom used (setup_pilotpoints_grid, OrdinaryKrige.calc_factors_grid, fac2real,
+apply_list_and_array_pars) are ported below with the same neighbour order and file rounding. The rebuilt base realisation is checked against
 the published calibrated input (neversink_optimal/, written from the iteration-4 base
 realisation by notebook 3.2), and three realisations against the simulated values in
 never_ies_0.noise_lt_obs.4.obs.csv.

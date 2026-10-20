@@ -1,14 +1,13 @@
-"""Neversink case study, stage 3 follow-up: why thinned PRT particles give a faster area growth
-than full mixing (Table 6 of docs/neversink_study.md: 4.51 and 4.76 against 4.07).
+"""Neversink case study, pumping-scenario follow-up: why the contributing area of thinned PRT
+particles can grow with pumping at a different rate than the area under full mixing.
 
-The areas of Table 6 are sums over the published start cells (one particle per cell at its
+The areas compared are sums over the published start cells (one particle per cell at its
 centre, local z 0.5) of the captured weight of that particle (gwsource.prt gross accounting), or
 of F of the start cell under full mixing. The cell value is not conserved, but the water is: with
-flux-weighted releases from every source, the thinned particles deliver the wells' inflow, split
-between recharge and stream leakage differently from full mixing (Section 3: 51 % stream water
-along the paths, 43 % under mixing, calibrated model). Since every start cell is a recharge cell,
-an area is close to the captured recharge divided by the recharge per contributing cell, so a
-different source split moves the area.
+flux-weighted releases from every source, the thinned particles deliver the wells' inflow, but
+can split it between recharge and stream leakage differently from full mixing. Since every
+start cell is a recharge cell, an area is close to the captured recharge divided by the
+recharge per contributing cell, so a different source split moves the area.
 
 Per case (realisation, scenario) the flow field is rebuilt as in growth_mechanisms (RCH and SFR
 with an IFLOWFACE column) and two flux-weighted PRT runs are made from every source term of the
@@ -40,18 +39,14 @@ Two checks: quadrature (FINE_K plan subdivisions on the base realisation) and th
 (run_through_check: the share of the water released in, or carried by particles into, the
 partially captured reach cells that reaches the wells along the paths, against F).
 
-Findings (base realisation; docs/neversink_study.md Section 7). The single particle is a good
-quadrature of the dense distributed release (areas within 6 %, growth ratio 0.94 to 1.02; four
-times as many points change the area by about one cell), but neither converges to F: the dense
-area is 794 cells at base pumping against 910 for F. The difference is the source split: 17
-losing reach cells 0.5 to 1 km from the U wells leak 1,655 m3/d, of which mixing sends 69 % to
-the wells and the paths 90 % (+341 m3/d, the whole stream excess of PRT); the wells then take
-13 % less recharge, and the area per unit captured recharge is the same, so the area is 13 %
-smaller. At half and maximum pumping these cells are captured almost fully (F 0.94 and 0.99)
-and the methods agree within 2 %. The vanishing base shortfall is the faster growth.
+The tables answer three questions: whether the single particle is a good quadrature of the
+dense distributed release (decomposition, the quadrature check), whether the dense release
+converges to F (areas), and which source cells carry any difference in the source split
+(source_growth, reaches, partial_reaches, the through check). Tables go to OUT_DIR and FINE_DIR
+(git-ignored).
 
-Run from anywhere with the project environment; the cases run in N_WORKERS processes (outside
-the Claude Code sandbox, which blocks process pools):
+Run from anywhere with the project environment; the cases run in N_WORKERS processes (this
+needs a process pool; some restricted environments forbid one):
 
     python studies/neversink/advective_growth.py
 
@@ -87,7 +82,7 @@ import gwsource as gs  # noqa: E402
 OUT_DIR = wf.OUT / "scenarios" / "advective_growth"
 MECH_DIR = wf.OUT / "scenarios" / "mechanisms60"  # single-particle results of the same cases
 # The base realisation and five of mechanisms60 spread over its range of growth ratios
-# (r3_thinned growth / F growth from 0.89 to 1.19, median 1.10)
+# (r3_thinned growth / F growth)
 REALS = ("base", "231", "353", "101", "196", "0")
 QRATS = gm.QRATS  # baserat, 0.5rat, maxrat
 CONVENTIONS = ("distributed", "top_face")

@@ -1,12 +1,13 @@
-"""Phase 5 dispersion study: how much does full mixing spread capture zones, and how much of it
-does face-to-face routing remove? Results are written up in docs/dispersion_study.md.
+"""Dispersion study: how much does full mixing spread capture zones, and how much of it
+does face-to-face routing remove? Tutorial 11 (tutorials/11_numerical_dispersion) walks through
+the same two test problems.
 
 Run from anywhere with the project environment (MF6 and triangle are taken from <repo>/bin):
 
     python studies/dispersion/workflow.py
 
 Edit the gates in __main__ to rerun parts. Models and tables go to studies/dispersion/output/
-(git-ignored); figures to docs/figures/. The transient part reads the particle arrivals saved
+(git-ignored); figures to studies/dispersion/output/figures/. The transient part reads the particle arrivals saved
 by the problem B part. Runtime on a 16-core laptop: about 6 minutes, most of it the MF6 PRT run
 on the finest grid of problem B (about 94,000 particles).
 """
@@ -27,7 +28,7 @@ import figures  # noqa: E402
 import runs  # noqa: E402
 
 OUT = HERE / "output"
-FIG_DIR = REPO / "docs" / "figures"
+FIG_DIR = OUT / "figures"
 BIN = REPO / "bin"
 
 

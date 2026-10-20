@@ -1,4 +1,4 @@
-"""Neversink/Rondout case study, stage 1: capture of the eight priority wells in the calibrated
+"""Neversink/Rondout case study, base model: capture of the eight priority wells in the calibrated
 (base) model, gwsource backward tracing against the published MODPATH 7 contributing areas.
 
 The model is the USGS Neversink/Rondout MODFLOW 6 model (Fienen and others 2021; Corson-Dosch and
@@ -17,7 +17,7 @@ Run from anywhere with the project environment (MF6 from <repo>/bin):
     python studies/neversink/workflow.py
 
 Edit the gates in __main__ to rerun parts. Model copies and tables go to
-studies/neversink/output/ (git-ignored).
+studies/neversink/output/ (git-ignored), figures to studies/neversink/output/figures/.
 """
 
 import shutil
@@ -39,7 +39,7 @@ MODEL_SRC = SOURCE / "neversink_optimal"
 REF_OUT = SOURCE / "output" / "neversink_mf6_optimal_output"
 MP7_OUT = SOURCE / "output" / "neversink_mp7_optimal_output"
 OUT = HERE / "output"
-FIG_DIR = REPO / "docs" / "figures"
+FIG_DIR = OUT / "figures"
 BIN = REPO / "bin"
 
 MODEL = "neversink"
@@ -65,7 +65,8 @@ TIGHT_DVCLOSE = (1e-4, 1e-6)
 # PRT checks: (release_z, thin_weak_sinks); release_z None spreads the points over the cell volume
 PRT_CASES = ((None, True), (None, False), (1.0, True), (0.5, True))
 PRT_Z_LEVELS = 4
-# PRT diagnosis (earlier against current capture rule): water table, mid-cell, cell volume
+# PRT diagnosis (first-destination stop rule against whole-path gross rule): water table,
+# mid-cell, cell volume
 PRT_DIAGNOSIS_Z = (1.0, 0.5, None)
 
 
@@ -380,8 +381,8 @@ def repeat_visits(tracks: np.ndarray, n_visits: int) -> int:
 def first_destination_visits(visits: dict[str, np.ndarray], share: np.ndarray) -> dict:
     """Return each particle's visits up to and including the first cell with share > 0.
 
-    Capture along these paths is the earlier rule: a particle stops in the first destination
-    cell it enters, which takes share x its remaining weight; the rest of the weight is dropped.
+    Capture along these paths is the first-destination stop rule: a particle stops in the first
+    destination cell it enters, which takes share x its remaining weight; the rest is dropped.
     """
     p = visits["particle"]
     hit = (share[visits["cell"]] > 0).astype(np.int64)
@@ -426,10 +427,10 @@ def compare_prt_rules(
     group: str = "priority",
     wells: dict = PRIORITY_WELLS,
 ) -> list[dict]:
-    """Run PRT once and evaluate the earlier and the current capture rule on the same tracks.
+    """Run PRT once and evaluate two capture rules on the same tracks.
 
-    Earlier rule: stop in the first destination cell (first_destination_visits). Current rule:
-    gross accounting along the whole path (capture_along_paths). Returns one row for thinned and
+    First-destination stop rule: stop in the first destination cell (first_destination_visits).
+    Whole-path gross rule: gross accounting along the whole path (capture_along_paths). Returns one row for thinned and
     one for plain particles (config.thin_weak_sinks is not used): captured flow of the group and
     of each well under both rules, end-status counts and the weight left by end status.
     """
@@ -455,19 +456,19 @@ def compare_prt_rules(
     rows = []
     for thin in (True, False):
         survival = gs.prt.weak_sink_survival(step) if thin else 1.0 - shares[group]
-        old = captured_flows(first, release, shares, survival)
-        new = captured_flows(visits, release, shares, survival)
+        stop_first = captured_flows(first, release, shares, survival)
+        whole_path = captured_flows(visits, release, shares, survival)
         left = weight_left(visits, release, survival)
         rows.append(
             {
                 "thin_weak_sinks": thin,
                 **common,
-                "captured_first_cell": old[group],
-                "captured_whole_path": new[group],
-                "gain_later_visits": new[group] - old[group],
+                "captured_first_cell": stop_first[group],
+                "captured_whole_path": whole_path[group],
+                "gain_later_visits": whole_path[group] - stop_first[group],
                 **{f"left_status_{s}": float(left[status == s].sum()) for s in np.unique(status)},
-                **{f"first_cell_{w}": old[w] for w in wells},
-                **{f"whole_path_{w}": new[w] for w in wells},
+                **{f"first_cell_{w}": stop_first[w] for w in wells},
+                **{f"whole_path_{w}": whole_path[w] for w in wells},
             }
         )
     return rows
@@ -510,7 +511,7 @@ def save_fractions(path: Path, result: gs.BackwardResult, n_cells: int) -> None:
 
 # ---------------------------------------------------------------- PRT sources by well
 # One thinned PRT run (volume seeding) evaluated for every well group, to split each well's
-# particle capture by source package and compare it with full mixing (Section 3).
+# particle capture by source package and compare it with full mixing.
 SOURCE_PACKAGES = ("RCHA", "SFR_0")
 # Plan distance classes [m] of a source cell from the well; below 75 m: the well cell and its
 # eight neighbours (50 m cells)
@@ -687,7 +688,7 @@ def main(
     out: Path = OUT,
     fig_dir: Path = FIG_DIR,
 ) -> None:
-    """Run the selected parts of stage 1; tables go to out."""
+    """Run the selected parts of the base-model study; tables go to out, figures to fig_dir."""
     exe = mf6_exe()
     out.mkdir(parents=True, exist_ok=True)
     ws, ws_tight = out / "optimal", out / "optimal_tight"
@@ -760,6 +761,7 @@ def main(
         sys.path.insert(0, str(HERE))
         import figures
 
+        fig_dir.mkdir(parents=True, exist_ok=True)
         figures.capture_maps(out, fig_dir, grid_idomain(ws), PRIORITY_WELLS)
         figures.jaccard_table(out).to_csv(out / "agreement_with_mp7.csv", index=False)
 
