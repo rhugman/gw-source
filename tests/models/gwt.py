@@ -1,4 +1,4 @@
-"""MF6 GWT unit-concentration models that read a test model's flows through FMI (Phase 4B check).
+"""MF6 GWT unit-concentration models that read a test model's flows through FMI (an independent check of the source fractions).
 
 The GWT model is a separate simulation with the flow model's DIS and TDIS. FMI reads the GWF
 head and budget files (so the flows are exactly those gwsource reads). ADV is UPSTREAM, there

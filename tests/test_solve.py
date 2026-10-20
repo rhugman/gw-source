@@ -5,6 +5,7 @@ import pytest
 
 import gwsource as gs
 from gwsource.assemble import Edges
+from gwsource.diagnostics import cell_residual
 from gwsource.solve import (
     _kahn_order,
     find_cycles,
@@ -15,7 +16,7 @@ from gwsource.solve import (
 
 
 def random_dag_step(n: int, seed: int) -> gs.FlowStep:
-    """Return a random acyclic flow graph with recharge everywhere and wells in the last cells."""
+    """Return a random acyclic flow graph with recharge everywhere and wells where cells need a sink."""
     rng = np.random.default_rng(seed)
     src, dst = [], []
     for i in range(n - 5):
@@ -26,10 +27,12 @@ def random_dag_step(n: int, seed: int) -> gs.FlowStep:
     inflow = np.bincount(dst, weights=q, minlength=n)
     outflow = np.bincount(src, weights=q, minlength=n)
     recharge = rng.uniform(0.5, 2.0, size=n)
-    sink = inflow + recharge - outflow  # makes every cell balance exactly
-    cells = np.concatenate([np.arange(n), np.arange(n)])
-    flows = np.concatenate([recharge, np.minimum(-sink, 0.0)])
-    pkg = np.concatenate([np.zeros(n, int), np.ones(n, int)])
+    recharge += np.maximum(outflow - inflow - recharge, 0.0)  # cover any outflow the inflow cannot
+    sink = inflow + recharge - outflow  # >= 0, and as a well term makes every cell balance exactly
+    wells = np.flatnonzero(sink > 0.0)
+    cells = np.concatenate([np.arange(n), wells])
+    flows = np.concatenate([recharge, -sink[wells]])
+    pkg = np.concatenate([np.zeros(n, int), np.ones(wells.size, int)])
     perm = rng.permutation(n)  # so the natural order is not already topological
     packages = [gs.Package("RCH", "RCH"), gs.Package("WEL", "WEL")]
     return gs.from_edges(n, perm[src], perm[dst], q, perm[cells], flows, pkg, packages=packages)
@@ -39,6 +42,7 @@ def random_dag_step(n: int, seed: int) -> gs.FlowStep:
 def test_topological_matches_lu(seed):
     """Both solvers give the same fractions to machine precision on acyclic graphs."""
     step = random_dag_step(200, seed)
+    np.testing.assert_allclose(cell_residual(step), 0.0, atol=1e-12)
     groups = gs.groups_by_term(step, step.term_flow < 0.0)
     for trace in (gs.backward, gs.forward):
         if trace is gs.forward:

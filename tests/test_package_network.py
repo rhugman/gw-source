@@ -144,7 +144,7 @@ def test_mover_routes_drained_water_to_the_well(kstpkper, model_run):
 
 
 def test_without_package_nodes_mover_stays_a_sink(model_run):
-    """open_simulation without package nodes gives the Phase 2 (cells-only) results."""
+    """open_simulation without package nodes gives the cells-only results."""
     run = model_run("m7_mover")
     step, net = gs.read_step(run.ws), gs.read_network(run.ws)
     assert net.package_names == step.package_names
