@@ -4,6 +4,7 @@ from . import (
     diagnostics,
     ensemble,
     export,
+    graphplot,
     network,
     packages,
     prt,
