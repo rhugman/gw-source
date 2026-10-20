@@ -14,11 +14,6 @@ Order: the rows of this table, alias rows left out. The order follows the first 
 | {SI: travel-time identity} | Text S1 | {SI: method in full} | – |
 | {SI: water volume options} | Text S1 | {SI: method in full} | – |
 | {SI: software, verification and models} | Text S2 | – | 03_software.md |
-| {SI: example and test models} | Text S2 | {SI: software, verification and models} | – |
-| {SI: ensemble and history-matching set-up} | Text S2 | {SI: software, verification and models} | – |
-| {SI: inputs, selections and outputs} | Table S2 | – | 03_software.md |
-| {SI: verification checks on the test models} | Figure S1 | – | 03_software.md |
-| {SI: verification on the test models} | Figure S1 | {SI: verification checks on the test models} | – |
 | {SI: the worked examples in brief} | Text S3 | – | 04_examples.md |
 | {SI: accounting at a small well} | Text S3 | {SI: the worked examples in brief} | – |
 | {SI: transient checks on the seasonal example model} | Text S3 | {SI: the worked examples in brief} | – |
