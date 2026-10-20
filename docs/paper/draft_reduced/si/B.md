@@ -60,7 +60,7 @@ Net accounting has no cell budget error term. It solves one destination group at
 
 ### Travel time to where the water enters the sink cell
 
-The mean travel time $t_i = m_i/F_i$ of Eq. (4) includes the time spent in the cell where the water leaves, for a well its own cell. Particle trackers that stop particles on entering a sink cell (MODFLOW 6 PRT, MODPATH) measure the time until the water enters that cell. The code also computes this time, as $(m_i - x_i)/F_i$, where $x$ solves $(\mathbf{I} - \mathbf{P})\,\mathbf{x} = \boldsymbol{\tau} \circ (\mathbf{S}\,\mathbf{D})$. Here $\circ$ is the cell-by-cell product. It is the full-mixing time that {SI: the worked examples in brief} compares with particles. <!-- src/gwsource/traveltime.py docstring (mean_time_to_exit_cell); the test-model-1 values (9,607 d and 9,574 d) moved to docs/verification.md in SI round 1 -->
+The mean travel time $t_i = m_i/F_i$ of Eq. (4) includes the time spent in the cell where the water leaves, for a well its own cell. Particle trackers that stop particles on entering a sink cell (MODFLOW 6 PRT, MODPATH) measure the time until the water enters that cell. The code also computes this time, as $(m_i - x_i)/F_i$, where $x$ solves $(\mathbf{I} - \mathbf{P})\,\mathbf{x} = \boldsymbol{\tau} \circ (\mathbf{S}\,\mathbf{D})$. Here $\circ$ is the cell-by-cell product. It is the full-mixing time that Section 3 compares with particles (Table 1, row 06). <!-- src/gwsource/traveltime.py docstring (mean_time_to_exit_cell); the test-model-1 values (9,607 d and 9,574 d) moved to docs/verification.md in SI round 1 -->
 
 ### Matrix form of transient tracking and backward tracking in time
 
