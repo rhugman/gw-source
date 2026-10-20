@@ -2,9 +2,9 @@
 
 ## {SI: the Neversink comparison}
 
-Section 4 compares full mixing with the published particle tracking of the Neversink/Rondout model (Fienen et al. 2022; Corson-Dosch et al. 2022). Section 4 also defines the calibrated model, the start cells, the published contributing cells and the overlap. This text reports the cost of the trace and of the particle runs, the delineations behind the overlaps and how the published particles end. The model is in a USGS data release (Fienen and Corson-Dosch 2021). <!-- evidence: docs/neversink_study.md §1, §6 and line 202 (rebuilt base realisation equals the published calibrated input); run 357 is the calibrated realisation; ensemble/summary.csv (358 realisations) -->
+Section 4 compares full mixing with the published particle tracking of the Neversink/Rondout model (Fienen et al. 2022; Corson-Dosch et al. 2022). Section 4 also defines the calibrated model, the start cells and the published contributing area. This text reports the cost of the trace and of the particle runs, the delineations behind the comparison and how the published particles end. The model is in a USGS data release (Fienen and Corson-Dosch 2021). <!-- evidence: docs/neversink_study.md §1, §6 and line 202 (rebuilt base realisation equals the published calibrated input); run 357 is the calibrated realisation; ensemble/summary.csv (358 realisations) -->
 
-The 122,021 start cells are the uppermost active cell of each column in three regions around the wells. <!-- evidence: docs/neversink_study.md §1 (three regions NE, S, W; 122,021 particles) --> The expected area of a map of F is the sum of F over the start cells. It is a size of the contributing area that needs no threshold. All Neversink cells are 50 m squares, so expected areas are expressed as numbers of cells. <!-- evidence: docs/neversink_study.md §1, §2 (three regions, 122,021 particles; Jaccard index); full draft Section 4.1 (expected area) and Section 5 (sum over the start cells; all cells are 50 m) -->
+The 122,021 start cells are the uppermost active cell of each column in three regions around the wells. <!-- evidence: docs/neversink_study.md §1 (three regions NE, S, W; 122,021 particles) --> The expected area of a map of F is the sum of F over the start cells. It is a size of the contributing area that needs no threshold. All Neversink cells are 50 m squares, so expected areas are expressed as numbers of cells. <!-- evidence: docs/neversink_study.md §1, §2 (three regions, 122,021 particles); full draft Section 4.1 (expected area) and Section 5 (sum over the start cells; all cells are 50 m) -->
 
 ### Cost of the trace and of the particle runs
 
@@ -14,25 +14,26 @@ The PRT runs of Section 4 differ in what they release and what they write. The r
 
 ### Delineations on one flow field
 
-The table compares the delineations of the eight wells' contributing area on the calibrated model, with the stream reaches left as source and sink terms of the aquifer cells. Each is compared with the 980 published contributing cells. <!-- table moved from the former Table S3 (si/D.md) in SI round 1 -->
+The table compares the delineations of the eight wells' contributing area on the calibrated model, with the stream reaches left as source and sink terms of the aquifer cells. Each is compared with the published contributing area of 980 cells. The table lists the size of each delineation and the share of the published area it covers. Both are needed, because a larger area covers more of the published area. <!-- table moved from the former Table S3 (si/D.md) in SI round 1 -->
 
-| method | delineation | overlap | expected area (cells) | flow attributed to the wells (m³/d) |
-|------------------------|------------------------------------|---------|-------------|------------------|
-| Full mixing, gross accounting | F > 0.1 | 0.30 | 910 | 3,671 |
-| | F > 0.5 | 0.41 | 910 | 3,671 |
-| | area-matched (980 cells) | 0.41 | 910 | 3,671 |
-| Full mixing, net accounting | F > 0.1 | 0.28 | 978 | 3,944 |
-| | F > 0.5 | 0.44 | 978 | 3,944 |
-| | area-matched (980 cells) | 0.40 | 978 | 3,944 |
-| PRT, flow-weighted, weight-losing | released over the cell volume, P > 0.5 | 0.62 | 794 | 3,736 |
-| | released mid-cell, P > 0.5 | 0.62 | 781 | 3,722 |
-| | released at the water table, P > 0.5 | 0.39 | 592 | 2,413 |
-| PRT, flow-weighted, losing weight only at wells | released over the cell volume, P > 0.5 | 0.29 | 2,857 | 9,555 |
-| PRT, published starts | MODFLOW 6 default, dry starts dropped to the water table | 0.62 | 730 | – |
-| | MODFLOW 6 default, dry starts draped | 0.65 | 754 | – |
-| | top face where open, dry starts dropped | 0.96 | 969 | – |
-| | top face where open, dry starts draped (published settings) | 0.998 | 982 | – |
+| method | delineation | area (cells) | published area covered (%) | expected area (cells) | flow attributed to the wells (m³/d) |
+|------------------------|------------------------------------|---------|---------|-------------|------------------|
+| Full mixing, gross accounting | F > 0.1 | 2,139 | 73 | 910 | 3,671 |
+| | F > 0.5 | 445 | 43 | 910 | 3,671 |
+| | area-matched (980 cells) | 980 | 58 | 910 | 3,671 |
+| Full mixing, net accounting | F > 0.1 | 2,470 | 76 | 978 | 3,944 |
+| | F > 0.5 | 478 | 46 | 978 | 3,944 |
+| | area-matched (980 cells) | 980 | 57 | 978 | 3,944 |
+| PRT, flow-weighted, weight-losing | released over the cell volume, P > 0.5 | 691 | 65 | 794 | 3,736 |
+| | released mid-cell, P > 0.5 | 707 | 66 | 781 | 3,722 |
+| | released at the water table, P > 0.5 | 502 | 42 | 592 | 2,413 |
+| PRT, flow-weighted, losing weight only at wells | released over the cell volume, P > 0.5 | 2,633 | 83 | 2,857 | 9,555 |
+| PRT, published starts | MODFLOW 6 default, dry starts dropped to the water table | 730 | 67 | 730 | – |
+| | MODFLOW 6 default, dry starts draped | 754 | 69 | 754 | – |
+| | top face where open, dry starts dropped | 969 | 98 | 969 | – |
+| | top face where open, dry starts draped (published settings) | 982 | 100 | 982 | – |
 
+<!-- author decision 2026-10-20: the overlap column (Jaccard index) replaced by the area of each delineation and the share of the 980 published cells it covers. Old overlap column, top to bottom: 0.30, 0.41, 0.41, 0.28, 0.44, 0.40, 0.62, 0.62, 0.39, 0.29, 0.62, 0.65, 0.96, 0.998. evidence: full mixing from net_vs_gross_mp7.csv priority rows (cells_F>0.1, cells_F>0.5 and the Jaccard columns, cells in both = J (980 + n) / (1 + J), whole numbers: gross 711, 417, 565; net 747, 449, 562 of 980), gross counts confirmed from fractions_cells.npz and mp7_priority.npz by $TMPDIR/cov/coverage.py; published starts from mp7_reproduction.csv (prt_cells and both_cells: 730 and 656, 754 and 680, 969 and 956, 982 and 980); flow-weighted PRT from cell_capture_fraction.npy of prt_volume_thin1, prt_z0.5_thin1, prt_z1_thin1 and prt_volume_thin0 at the start cells of mp7_priority.npz, P > 0.5 strict (691 and 637, 707 and 645, 502 and 414, 2,633 and 813), the same arrays as envelope_prt.csv (691 PRT cells); the Jaccard values in prt_comparison.csv imply 696 and 642 and 713 and 651 for the first two runs, a few cells off, cause not traced -->
 <!-- NS §2, Tables 1, 2a, 2b, 3, §3 reproduction table; agreement_with_mp7.csv, net_vs_gross_wells.csv (priority row: net_volume_from 3,943.5), net_vs_gross_mp7.csv (area_matched_F 0.279 gross, 0.303 net), prt_comparison.csv, mp7_reproduction.csv -->
 
 Thresholds are strict. The area-matched delineation takes the 980 start cells with the largest F. For flow-weighted PRT, the expected area is the particle weight that reaches the wells, in cells. For published starts, it is the number of start cells whose particle ends in a priority well. The flow-weighted particles were released from the source terms of the 30,180 cells with F > 10⁻⁶, in all layers. P is the share of the water released in a start cell that the particles deliver to the wells. The published-start runs use one unweighted particle per published start, stopped at every weak sink. "MODFLOW 6 default" spreads recharge and stream flows through the cell. "Top face where open" puts them on the top face through IFLOWFACE, the MODFLOW 6 setting that assigns a boundary flow to one cell face. <!-- NS §3 (30,180 cells with F > 1e-6, flux-weighted release in all layers; reproduction with IFLOWFACE −1 and draping); note shortened in SI round 1 -->
@@ -55,7 +56,7 @@ Each published MODPATH 7 particle on the calibrated model ends in one of three w
 
 <!-- evidence: studies/neversink/output/mp7_status.csv (particles, top_face, end_SFR_0, end_WEL_0, end_CHD_0 and per-well columns by status); per-well counts (SV_407 32, SV_487 97, U__55 116, U___7 58, U___8 163; SV_193 48, SV_227 115, U_917 351) in docs/neversink_study.md §2 -->
 
-The 980 published contributing cells are the 514 particles that end in the three priority wells that take all of their cell's outflow. They also include the 466 particles stopped in the five priority wells that take only part of it. <!-- evidence: docs/neversink_study.md §2; mp7_status.csv -->
+The 980 cells of the published contributing area are the start cells of the 514 particles that end in the three priority wells that take all of their cell's outflow. They also include the start cells of the 466 particles stopped in the five priority wells that take only part of it. <!-- evidence: docs/neversink_study.md §2; mp7_status.csv -->
 
 A buried stream cell is a cell with an SFR reach and another active cell above it. The published runs put recharge and stream flows on the top face of the cell. MODPATH 7 does this only where the top face has no active neighbour. Elsewhere the flow stays spread through the cell. A particle that reaches a stream cell with no active cell above therefore leaves through the top face (status 2). A particle that reaches a buried stream cell is stopped there as at a weak sink (status 3). Every particle that stops in a stream cell has an active cell above it. None of those that leave through a stream cell's top face has. <!-- evidence: docs/neversink_study.md §2 (MPBAS IFACE 6; ModpathCellData.f90) -->
 
