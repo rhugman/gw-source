@@ -12,7 +12,8 @@ Conventions
   diagonal first); diagonal entries are ignored for the flow graph. MF6 writes the cell budget
   residual (net inflow) in the diagonal of FLOW-JA-FACE.
 - ``flowja[p]`` for connection p = (n, ja[p]) is the flow INTO cell n FROM cell ja[p] (MF6 sign
-  convention). It must be antisymmetric over the off-diagonal entries.
+  convention). It must be antisymmetric over the off-diagonal entries (validate_step checks it
+  to FLOWJA_RTOL of the largest flow; parallel connections of one cell pair are summed).
 - External terms are one entry per boundary (one row of an MF6 list budget record, or one cell
   of an array record such as STO-SS). ``term_flow`` is positive INTO the cell: a positive entry
   is a source term, a negative entry is a sink term. Entries with zero flow are neither.
@@ -33,11 +34,13 @@ output (NaN on cells, whose volume comes from porosity x area x saturated thickn
 from dataclasses import dataclass, field
 
 import numpy as np
+import scipy.sparse as sp
 
 MOVER_SUFFIX = "-TO-MVR"
 MOVER_TEXT = "TO-MVR"  # every mover record ends so ('UZF-GWD TO-MVR' has a space, not a dash)
 MODEL_SEP = "/"
 BLOCK_KINDS = ("model", "package")
+FLOWJA_RTOL = 1e-10  # antisymmetry of flowja, relative to the largest flow (MF6 output is exact)
 
 
 @dataclass(frozen=True)
@@ -218,12 +221,31 @@ def validate_step(step: FlowStep) -> None:
     assert int(np.prod(step.grid_shape)) == n, "grid_shape must hold n_cells values"
     if step.fixed_volume is not None:
         assert len(step.fixed_volume) == n, "fixed_volume must have one value per node"
+    _assert_antisymmetric(step.ia, step.ja, step.flowja)
     if step.blocks:
         ends = [b.offset + b.n for b in step.blocks]
         starts = [b.offset for b in step.blocks]
         assert starts[0] == 0 and starts[1:] == ends[:-1] and ends[-1] == n, (
             "blocks must tile the nodes 0..n-1 in order"
         )
+
+
+def _assert_antisymmetric(ia: np.ndarray, ja: np.ndarray, flowja: np.ndarray) -> None:
+    """Assert that the off-diagonal flowja is antisymmetric: flow(n, m) = -flow(m, n).
+
+    Parallel connections between one pair of cells (hand-built graphs) are summed first.
+    """
+    n = len(ia) - 1
+    rows = connection_rows(ia)
+    off = rows != ja
+    q = flowja[off]
+    flows = sp.coo_matrix((q, (rows[off], ja[off])), shape=(n, n)).tocsr()
+    scale = max(float(np.abs(q).max(initial=0.0)), 1.0)
+    mismatch = float(np.abs((flows + flows.T).data).max(initial=0.0))
+    assert mismatch <= FLOWJA_RTOL * scale, (
+        f"flowja is not antisymmetric: a flow and its reverse differ by up to {mismatch:.3g} "
+        f"(largest flow {scale:.3g})"
+    )
 
 
 def connection_rows(ia: np.ndarray) -> np.ndarray:
