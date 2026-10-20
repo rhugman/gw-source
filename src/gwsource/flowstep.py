@@ -13,7 +13,8 @@ Conventions
   residual (net inflow) in the diagonal of FLOW-JA-FACE.
 - ``flowja[p]`` for connection p = (n, ja[p]) is the flow INTO cell n FROM cell ja[p] (MF6 sign
   convention). It must be antisymmetric over the off-diagonal entries (validate_step checks it
-  to FLOWJA_RTOL of the largest flow; parallel connections of one cell pair are summed).
+  to FLOWJA_RTOL relative to the largest flow, or 1, whichever is larger; parallel
+  connections of one cell pair are summed).
 - External terms are one entry per boundary (one row of an MF6 list budget record, or one cell
   of an array record such as STO-SS). ``term_flow`` is positive INTO the cell: a positive entry
   is a source term, a negative entry is a sink term. Entries with zero flow are neither.
@@ -40,7 +41,9 @@ MOVER_SUFFIX = "-TO-MVR"
 MOVER_TEXT = "TO-MVR"  # every mover record ends so ('UZF-GWD TO-MVR' has a space, not a dash)
 MODEL_SEP = "/"
 BLOCK_KINDS = ("model", "package")
-FLOWJA_RTOL = 1e-10  # antisymmetry of flowja, relative to the largest flow (MF6 output is exact)
+# antisymmetry of flowja, relative to the largest flow, or 1, whichever is larger (MF6 output
+# is exact)
+FLOWJA_RTOL = 1e-10
 
 
 @dataclass(frozen=True)
@@ -244,7 +247,7 @@ def _assert_antisymmetric(ia: np.ndarray, ja: np.ndarray, flowja: np.ndarray) ->
     mismatch = float(np.abs((flows + flows.T).data).max(initial=0.0))
     assert mismatch <= FLOWJA_RTOL * scale, (
         f"flowja is not antisymmetric: a flow and its reverse differ by up to {mismatch:.3g} "
-        f"(largest flow {scale:.3g})"
+        f"(tolerance {FLOWJA_RTOL:.0e} x {scale:.3g}, the largest flow or 1)"
     )
 
 

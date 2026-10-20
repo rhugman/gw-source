@@ -247,7 +247,7 @@ def test_unterminated_particles_are_refused():
     ends = {"cell": np.array([4, -1, 7]), "status": np.array([1, -1, 1]), "time": np.ones(3)}
     with pytest.raises(AssertionError, match=r"1 of 3 particles did not terminate \(flow weight 2"):
         assert_terminated(ends, release)
-    assert_terminated({**ends, "cell": np.array([4, 5, 7])}, release)
+    assert_terminated({**ends, "cell": np.array([4, 5, 7]), "status": np.array([1, 2, 1])}, release)
 
 
 def test_write_prt_options(model_run, mf6_exe, tmp_path):

@@ -599,8 +599,8 @@ def endpoints(tracks: np.ndarray, n_particles: int) -> dict[str, np.ndarray]:
 
 
 def assert_terminated(ends: dict[str, np.ndarray], release: ReleasePoints) -> None:
-    """Assert that every particle has a termination record (end cell >= 0)."""
-    open_ends = ends["cell"] < 0
+    """Assert that every particle has a termination record (end status >= 0)."""
+    open_ends = ends["status"] < 0
     assert not open_ends.any(), (
         f"{open_ends.sum()} of {release.n} particles did not terminate (flow weight "
         f"{release.weight[open_ends].sum():.6g} of {release.weight.sum():.6g}); their capture "
