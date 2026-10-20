@@ -4,7 +4,7 @@ The river line of model 1 is replaced by an SFR stream along the same column, fl
 south. Two drains sit upstream of the well; MVR moves 70 % of drain A's outflow and all of drain
 B's outflow into the first stream reach. Drains and wells carry boundnames. The upper stream reaches
 lose water to the aquifer, so drained water re-enters the aquifer downstream and part of it
-reaches the wells (the package-network routing test of Phase 4). SFR and MVR save their own
+reaches the wells (the test of routing through the package network). SFR and MVR save their own
 budget files (used only when tracing with package nodes). The model has two
 steady stress periods; the well list changes between them (different order, different wells),
 so the budget's bound number (ID2) of a named well differs by stress period.

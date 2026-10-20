@@ -121,10 +121,10 @@ def test_without_thinning_weak_sinks_overcount(model_run, mf6_exe, tmp_path):
 def test_layered_capture_matches_inflow(model_run, mf6_exe, tmp_path):
     """Layered model, wells in the bottom layer: the captured particle flow closes on the inflow.
 
-    Two defects of an earlier version under-counted here: all points released at the water table
-    (top-layer particles stay there, as the top face carries no flow) and particles stopped in
-    the first well cell, dropping the weight that the weak well passes on to the strong one.
-    Observed 402.6 of 405 m3/d (earlier version 266; volume seeding but stopping 306).
+    It guards against two ways of under-counting the capture: releasing all points at the water
+    table (top-layer particles stay there, as the top face carries no flow) and stopping
+    particles in the first well cell, which drops the weight the weak well passes on to the
+    strong one. Observed 402.6 of 405 m3/d.
     """
     run = model_run("m2_dis3lay")
     step = gs.read_step(run.ws)

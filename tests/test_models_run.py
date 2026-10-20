@@ -1,4 +1,4 @@
-"""Build and run every test model, and check the outputs Phase 1 relies on are present."""
+"""Build and run every test model, and check the outputs gwsource reads are present."""
 
 from pathlib import Path
 

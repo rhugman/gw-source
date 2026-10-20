@@ -1,4 +1,4 @@
-"""Package-network test models (Phase 4): MAW across layers (model 8), LAK + UZF + MVR (model 9).
+"""Package-network test models: MAW across layers (model 8), LAK + UZF + MVR (model 9).
 
 Model 8 is model 2's grid and stresses with a lower vertical conductivity and one MAW well
 screened in all three layers. With a small pumping rate the well takes water from the upper
