@@ -2,6 +2,8 @@
 
 How to pick up the gwsource paper for *Groundwater* in a new Claude session, and how the author likes the editing and review loop to run. Written 2026-10-16 at the end of the session that produced the reduced draft.
 
+> **Round 2 (2026-10-19 to 2026-10-20).** Work moved to branch `paper-draft-r2` (from `paper-draft-alt` at 3a709b6), worktree `.claude/worktrees/clever-mirzakhani-153553/.paper-wt/draft-r2`, artifact https://claude.ai/artifact/PVmLprZ7bRKNfzY2iX2z1v (code URL …/b62d33e3-a16b-4038-b7c9-9b74bda70aa1), outline artifact https://claude.ai/artifact/P7RNgY9zgxRSFUXEkXzetv. `paper-draft-alt` and its artifacts are frozen. The source is still `docs/paper/draft_reduced/`. At v76 the main text typesets to 11 two-column pages (last page 15 % full) and the SI to 16 pages (`docs/paper/export_reduced/paper_draft_r2_print.pdf`, `supporting_information.pdf`). Round 2 decisions are in `docs/paper/outline.md` §1.5, rows 1–21. Notebook 11 (numerical dispersion) is on `tutorials-paper-sync` at bea5b9b, not yet merged into `paper-draft-r2`. The sections below describe the state at the end of round 1 unless they say otherwise.
+
 ## Where things are
 
 **Branch:** `paper-draft-alt`.
@@ -163,6 +165,9 @@ The voice rules live in the `voice-hugman` skill. Load it for any manuscript pro
 
 ## Open items
 
+- Round 2: two Methods sentences carry `<!-- [author to confirm] -->` (why gross accounting is the default, and why travel times are gross only).
+- Round 2: the Fig. 4 legend still says "published cells". A redraw to match the text was offered and not yet answered.
+- Round 2: an alternative journal, *Environmental Modelling & Software*, was checked on 2026-10-20. It fits the scope as a research article. It would need an abstract of at most 150 words, 3–5 highlights, possibly a graphical abstract, and a fixed-field "Software availability" section. No length limit was found, and preprints are allowed anywhere. The Guide for Authors blocked automated reading, so check these limits in the live guide.
 - §7 of both drafts has these `[check]`s: the public URL, the release version and tag, the Zenodo DOI, and pinned MODFLOW 6 and FloPy versions. They wait for the author's Zenodo release, which comes before submission.
 - `10_references.md` has two `[check]`s: the page numbers of the Foley and Black proceedings paper, and one other entry.
 - Visser et al. (2009): the methods section has not been read to confirm how the particle-splitting precedent is cited.

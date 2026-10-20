@@ -68,6 +68,13 @@ The reduced draft read as dry staccato. Methods and the three worked examples sh
 | 12 | 2026-10-19 | A compact main-text figure for examples A and B: the particle-share map and the Bedekar et al. (2024) curves. | Author, open question 4 |
 | 13 | 2026-10-19 | The MODFLOW 6 run time (44 s) leaves the abstract and Section 3. The speed argument rests on the trace time. | Author, open question 5 |
 | 14 | 2026-10-19 | Equations get a short plain reading of their core idea, one or two sentences, not a derivation in words. | Author, after Methods v1 came out at 2,605 words |
+| 15 | 2026-10-20 | Section 3 Software is cut. The sections renumber: 3 Worked examples, 4 Neversink, 5 Trade-offs and conclusions, 6 Availability. | Author comment |
+| 16 | 2026-10-20 | The overlap (Jaccard) metric is dropped. Areas are compared by coverage of the published area plus area size. | Author comment |
+| 17 | 2026-10-20 | Table 1: one-sentence caption. The Output column describes outputs without values. Agreement is merged into "Compared with (agreement)", one value per row. | Author comments (option 2 approved) |
+| 18 | 2026-10-20 | Table 1 gets row 11, numerical dispersion (notebook 11, `tutorials/11_numerical_dispersion` on `tutorials-paper-sync` at bea5b9b). F > 0.5 area within 4.5 % for cells of 50 m or less. "Ten notebooks" became "eleven". | Author: "this should be an example notebook in the repo", option (a) |
+| 19 | 2026-10-20 | SI cut to what a reviewer needs. Former Text S2 (software, verification, models, Table S2, Figure S1) removed. Text S3 (now S2) trimmed to weight-losing particles, example B volumes and sub-steps, and ensembles. Text S5 (now S4) is a pointer to notebook 11. The Sources note under Table S1 is cut and its GWT test merged into footnote 1. | Author comments: "overkill for a paper; all of this is available in the repo" |
+| 20 | 2026-10-20 | Neversink SI: the delivery of particles that lose weight only at wells (9,555 m³/d) is cut. Flow weights on particles that shed none at sinks measure no real flow. | Author comment |
+| 21 | 2026-10-20 | Wording: "the chosen threshold"; "are less sensitive to mixing"; checks "are met to round-off", never "hold exactly"; "is equivalent to unit-concentration transport". | Author comments |
 
 Decisions carried forward from 2026-10-15 (the outline on `paper-draft-alt`, its Section 6):
 - The notebooks are named once, in the Section 4 opening.
