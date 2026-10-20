@@ -1,5 +1,9 @@
 """Shared helpers for the gwsource tutorials: paths, small MF6 model builders and map plots.
 
+This is the one support module that all tutorial notebooks import (as hbd). It holds the
+tutorial model builders, an MF6 GWT tracer runner, wrappers around FloPy's model splitter, and
+table and map helpers. It is tutorial code, not part of the gwsource API.
+
 The notebooks are the narrative; everything reusable lives here. Every builder writes and runs
 one small MODFLOW 6 model in the workspace it is given and returns a ModelRun. All models save
 what gwsource needs: the binary grid file, a budget file (SAVE_FLOWS on NPF, STO and every

@@ -1,6 +1,6 @@
 # gwsource tutorials
 
-Jupyter notebooks that teach cell-mixing flow tracing with `gwsource`, from a first capture zone to transient tracking and parameter ensembles. Each notebook builds its own small MODFLOW 6 model, runs in under about two minutes, and is committed with its outputs so it reads on GitHub without running it.
+Jupyter notebooks that teach cell-mixing flow tracing with `gwsource`, from a first capture zone to transient tracking and parameter ensembles. Each notebook builds its own small MODFLOW 6 model and runs in a few seconds to about three minutes (the table below gives the run time of each). The notebooks are committed with their outputs, so they read on GitHub without running them.
 
 ## Setup and launch
 
@@ -12,7 +12,9 @@ Jupyter notebooks that teach cell-mixing flow tracing with `gwsource`, from a fi
 
    The `gw-source` environment includes JupyterLab and the notebook tools (`environment.yml`). To add them to an existing environment: `mamba install -n gw-source -c conda-forge jupyterlab ipykernel nbclient nbformat nbconvert`.
 
-   Tutorial 04 also needs [vorflow](https://github.com/rhugman/vorflow) (Hugman and Sanchez 2026), which builds its Voronoi grid. It is an optional dependency of the tutorials only, not of `gwsource`. `environment.yml` installs it. To add it to an existing environment: `pip install vorflow`.
+   Tutorial 04 and section 5 of tutorial 11 also need [vorflow](https://github.com/rhugman/vorflow) (Hugman and Sanchez 2026), which builds their Voronoi grid of the tutorial aquifer. It is an optional dependency of the tutorials only, not of `gwsource`. `environment.yml` installs it. To add it to an existing environment: `pip install vorflow`.
+
+   Tutorial 09 also needs PEST++ (`bin/pestpp-ies`) for its history-matching section. `scripts/setup_env.sh` downloads it into `bin/` with pyemu's `get-pestpp` command. If it is missing, the notebook downloads it the same way.
 
 2. Launch JupyterLab from the repository root:
 
@@ -23,7 +25,7 @@ Jupyter notebooks that teach cell-mixing flow tracing with `gwsource`, from a fi
 
 3. Open a notebook and run all cells. Model workspaces are written to `tutorials/_work/<tutorial>/` (git-ignored; safe to delete).
 
-The notebooks share the model builders and plotting helpers in [`herebedragons.py`](herebedragons.py); the notebooks themselves are the narrative. To check that every notebook still runs: `pytest -m tutorials` (deselected from the default test run).
+The notebooks share one support module, [`herebedragons.py`](herebedragons.py). It holds the tutorial model builders, an MF6 GWT tracer runner, wrappers around the FloPy model splitter, and the table and map helpers. It is tutorial code, not part of the `gwsource` API. The notebooks themselves are the narrative. To check that every notebook still runs: `pytest -m tutorials` (deselected from the default test run).
 
 ## Order
 
@@ -47,7 +49,7 @@ Thresholds on the fraction through, and the numerical dispersion of full mixing,
 
 ## The tutorial models
 
-All models share one plan: a 2 km × 2 km unconfined aquifer in 50 m cells with recharge, a constant-head west edge (regional inflow), a north–south river and a supply well next to it. `herebedragons.py` builds variants of it:
+All models share one plan: a 2 km × 2 km unconfined aquifer in 50 m cells with recharge, a constant-head west edge that brings in regional inflow (in the stream variant of tutorial 07 it is an outlet instead), a north–south river and a supply well next to it. `herebedragons.py` builds variants of it:
 
 | Builder | Model |
 |---|---|
