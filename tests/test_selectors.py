@@ -1,4 +1,6 @@
-"""Selectors by boundname (per stress period) and by zone array on DIS, DISV and DISU grids."""
+"""Selectors by boundname (per stress period), by zone array on DIS, DISV and DISU grids, by term."""
+
+from dataclasses import replace
 
 import numpy as np
 import pytest
@@ -77,3 +79,19 @@ def test_zone_array_must_match_grid(model_run):
     step = gs.read_step(model_run("m1_dis").ws)
     with pytest.raises(AssertionError, match="zone array"):
         gs.select_zone(step, np.zeros(10), 1)
+
+
+def test_groups_by_term_keeps_entries_sharing_a_bound():
+    """Two cells connected to lake 1 both get a group, and the boundary control rows sum to 1."""
+    packages = [gs.Package("RCH", "RCH"), gs.Package("LAK-1", "LAK"), gs.Package("WEL", "WEL")]
+    step = gs.from_edges(
+        3, [0, 0], [1, 2], [4.0, 6.0], [0, 1, 2, 2], [10.0, -4.0, -5.0, -1.0], [0, 1, 1, 2],
+        packages=packages,
+    )
+    step = replace(step, term_bound=np.array([1, 1, 1, 1]))
+    groups = gs.groups_by_term(step, step.term_flow < 0.0)
+    assert list(groups) == ["LAK-1:1:1", "LAK-1:1:2", "WEL:1"]
+    assert [int(np.flatnonzero(g.terms)[0]) for g in groups.values()] == [1, 2, 3]
+    res = gs.backward(step, groups)
+    assert res.destination_inflow["LAK-1:1:1"] == pytest.approx(4.0)
+    np.testing.assert_allclose(sum(res.fraction_through[g] for g in groups), 1.0, atol=1e-14)

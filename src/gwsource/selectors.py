@@ -39,6 +39,7 @@ select(step, cells=global_nodes(step, "SFR", reaches)).
 Groups are plain dicts {group name: Selection}.
 """
 
+from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
 
@@ -158,14 +159,21 @@ def groups_by_package(step: FlowStep) -> dict[str, Selection]:
 
 
 def groups_by_term(step: FlowStep, term_mask: np.ndarray | None = None) -> dict[str, Selection]:
-    """Return one group per external term entry (optionally only those in term_mask)."""
+    """Return one group per external term entry (optionally only those in term_mask).
+
+    Groups are named '<package>:<bound>'. Entries that share a package and bound (the cells
+    connected to one lake or MAW well, a remote cell bordering several local cells) are named
+    '<package>:<bound>:<entry>', with the entry's index in the term table, so none is lost.
+    """
     idx = np.arange(step.n_terms) if term_mask is None else np.flatnonzero(term_mask)
+    names = [f"{step.packages[step.term_package[k]].name}:{step.term_bound[k]}" for k in idx]
+    counts = Counter(names)
     groups = {}
-    for k in idx:
+    for k, name in zip(idx, names):
         mask = np.zeros(step.n_terms, dtype=bool)
         mask[k] = True
-        name = f"{step.packages[step.term_package[k]].name}:{step.term_bound[k]}"
-        groups[name] = select(step, term_mask=mask)
+        key = name if counts[name] == 1 else f"{name}:{k}"
+        groups[key] = select(step, term_mask=mask)
     return groups
 
 
