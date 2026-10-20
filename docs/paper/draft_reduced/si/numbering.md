@@ -13,7 +13,6 @@ Order: the rows of this table, alias rows left out. The order follows the first 
 | {SI: solution of the linear systems} | Text S1 | {SI: method in full} | – |
 | {SI: travel-time identity} | Text S1 | {SI: method in full} | – |
 | {SI: water volume options} | Text S1 | {SI: method in full} | – |
-| {SI: software, verification and models} | Text S2 | – | 03_software.md |
 | {SI: the worked examples in brief} | Text S3 | – | 04_examples.md |
 | {SI: accounting at a small well} | Text S3 | {SI: the worked examples in brief} | – |
 | {SI: transient checks on the seasonal example model} | Text S3 | {SI: the worked examples in brief} | – |
