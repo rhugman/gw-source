@@ -209,13 +209,11 @@ def add_dis(gwf, spec: AquiferSpec, name: str, botm=None) -> str:
     return filename
 
 
-def add_npf_ic_oc(
-    gwf, name: str, k, icelltype, strt, save_specific_discharge: bool = True, **npf_kwargs
-) -> None:
+def add_npf_ic_oc(gwf, name: str, k, icelltype, strt, **npf_kwargs) -> None:
     """Add NPF (flows, saturation and specific discharge saved), IC, and OC (all heads, budgets)."""
     flopy.mf6.ModflowGwfnpf(
         gwf, icelltype=icelltype, k=k, save_flows=True, save_saturation=True,
-        save_specific_discharge=save_specific_discharge, **npf_kwargs,
+        save_specific_discharge=True, **npf_kwargs,
     )
     flopy.mf6.ModflowGwfic(gwf, strt=strt)
     flopy.mf6.ModflowGwfoc(
@@ -604,33 +602,22 @@ def band_width_north(
     return crossings[0], crossings[1], crossings[1] - crossings[0]
 
 
-def build_disu(
-    ws: Path, exe: Path, spec: AquiferSpec | None = None, with_vertices: bool = True
-) -> ModelRun:
-    """Steady DISU copy of the quickstart model (same cells and connections), vertices optional.
-
-    Without vertices the model has no geometry for maps or specific discharge; gwsource then
-    reads the cell area from the DISU input.
-    """
+def build_disu(ws: Path, exe: Path, spec: AquiferSpec | None = None) -> ModelRun:
+    """Steady DISU copy of the quickstart model (same cells and connections, with vertices)."""
     from flopy.utils.gridutil import get_disu_kwargs
 
     spec = AquiferSpec() if spec is None else spec
     name = "disu"
     disu_kwargs = get_disu_kwargs(
         1, spec.nrow, spec.ncol, np.full(spec.ncol, spec.delr), np.full(spec.nrow, spec.delc),
-        spec.top, np.array([spec.botm]), return_vertices=with_vertices,
+        spec.top, np.array([spec.botm]), return_vertices=True,
     )
-    if not with_vertices:
-        disu_kwargs.pop("nvert", None)
     sim, gwf = make_sim(name, ws, exe, STEADY)
     dis_filename = f"{name}.disu"
     flopy.mf6.ModflowGwfdisu(gwf, length_units="meters", filename=dis_filename, **disu_kwargs)
-    add_npf_ic_oc(
-        gwf, name, k=k_layer(spec).ravel(), icelltype=1, strt=spec.strt,
-        save_specific_discharge=with_vertices,
-    )
+    add_npf_ic_oc(gwf, name, k=k_layer(spec).ravel(), icelltype=1, strt=spec.strt)
     add_stresses(gwf, spec, lambda rc: (spec.node(rc),))
-    info = {"well_nodes": _well_nodes(spec), "with_vertices": with_vertices}
+    info = {"well_nodes": _well_nodes(spec)}
     return run_model(sim, gwf, name, ws, dis_filename, spec, info)
 
 
