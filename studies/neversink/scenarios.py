@@ -47,7 +47,11 @@ cells, ensemble_run.read_mask) and writes it to studies/neversink/output/scenari
   estimated maxrange f per mask, its spread against the candidate draws, its correlation
   between regions, and the masks whose maxrange area exceeds their maxrat area;
 - region_multipliers.csv, multiplier_correlations.csv: each region's multiplier m per mask
-  (masks paired with their realisations) and its correlation with the areas.
+  (masks paired with their realisations) and its correlation with the areas;
+- mask_shift.csv: the median area ratios from the corrected masks against those from the masks
+  as stored (no row shift, counted on the same start cells), their difference per region and
+  scenario, and the largest absolute difference (row region = "all"). It checks that the
+  inferred rule does not depend on the row correction.
 The overlap of the reproduced masks with the published ones is in the mc_masks output
 (pairing_check.csv, multiplier_test.csv).
 
@@ -57,6 +61,7 @@ the base realisation in every scenario and write the evidence:
     python studies/neversink/scenarios.py
 """
 
+from functools import partial
 from pathlib import Path
 
 import numpy as np
@@ -248,6 +253,24 @@ def hypothesis_fits(table: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def mask_shift_sensitivity(
+    corrected: pd.DataFrame, as_stored: pd.DataFrame, wells: pd.DataFrame
+) -> pd.DataFrame:
+    """Return per region and scenario the median area ratio from corrected and as-stored areas.
+
+    corrected and as_stored are region_areas tables; the last row (region "all") holds the
+    largest absolute difference.
+    """
+    keys = ["region", "qrat"]
+    a = hypothesis_table(corrected, wells)[[*keys, "area_ratio_median"]]
+    b = hypothesis_table(as_stored, wells)[[*keys, "area_ratio_median"]]
+    table = a.merge(b, on=keys, suffixes=("_corrected", "_as_stored"))
+    diff = table["area_ratio_median_as_stored"] - table["area_ratio_median_corrected"]
+    table["difference"] = diff
+    summary = {"region": "all", "qrat": "all", "difference": table["difference"].abs().max()}
+    return pd.concat([table, pd.DataFrame([summary])], ignore_index=True)
+
+
 def growth_checks(areas: pd.DataFrame) -> pd.DataFrame:
     """Return per region the masks whose area grows strictly from baserat to maxrat.
 
@@ -401,8 +424,11 @@ def write_rule_evidence(out: Path = EVIDENCE_DIR, pest_dir: Path = pr.PEST_DIR) 
 
     out.mkdir(parents=True, exist_ok=True)
     wells = priority_well_table()
-    areas = region_areas(er.read_mask, wf.read_endpoints())
+    endpoints = wf.read_endpoints()
+    areas = region_areas(er.read_mask, endpoints)
     areas.to_csv(out / "region_areas.csv", index=False)
+    as_stored = region_areas(partial(er.read_mask, corrected=False), endpoints)
+    mask_shift_sensitivity(areas, as_stored, wells).to_csv(out / "mask_shift.csv", index=False)
     table = hypothesis_table(areas, wells)
     table.to_csv(out / "hypothesis_ratios.csv", index=False)
     hypothesis_fits(table).to_csv(out / "hypothesis_fits.csv", index=False)
