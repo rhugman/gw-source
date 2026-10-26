@@ -17,13 +17,14 @@ the correlation exp(-(r / 2s)^2). With L = 2s the truth and the prior share thei
 """
 
 import inspect
+import logging
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
 from concurrent.futures import ProcessPoolExecutor
-from contextlib import contextmanager
+from contextlib import contextmanager, redirect_stdout
 from pathlib import Path
 
 import numpy as np
@@ -362,7 +363,9 @@ def run_ies(
     """Run pestpp-ies with n_workers local workers (pyemu.os_utils.start_workers); return master_ws.
 
     The workers talk to the master over local TCP ports. n_workers=0 runs PEST++ serially in
-    master_ws instead, without workers or ports (much slower).
+    master_ws instead, without workers or ports (much slower). pyemu's progress messages (the
+    reserved port, "still running" every 5 s) go to start_workers.log next to master_ws, not to
+    the notebook. PEST++ errors still reach stderr.
     """
     import pyemu
 
@@ -374,11 +377,14 @@ def run_ies(
             subprocess.run([f"./{pestpp.name}", pst_name], cwd=master_ws, check=True,
                            capture_output=True)
         else:
-            pyemu.os_utils.start_workers(
-                str(template_ws), pestpp.name, pst_name, num_workers=n_workers,
-                worker_root=str(Path(master_ws).parent), master_dir=str(master_ws),
-                silent_master=True,
-            )
+            port = pyemu.os_utils.PortManager(log_level=logging.WARNING).get_available_port()
+            log_file = Path(master_ws).parent / "start_workers.log"
+            with open(log_file, "w") as log, redirect_stdout(log):
+                pyemu.os_utils.start_workers(
+                    str(template_ws), pestpp.name, pst_name, num_workers=n_workers,
+                    worker_root=str(Path(master_ws).parent), master_dir=str(master_ws),
+                    port=port, silent_master=True,
+                )
     return Path(master_ws)
 
 
