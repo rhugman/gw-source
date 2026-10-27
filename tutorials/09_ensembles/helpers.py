@@ -88,13 +88,13 @@ def max_quantile_difference(
 
 
 def capture_summary(step: gs.FlowStep, result, group: str) -> dict[str, float]:
-    """Return the area F > 0.5, the band 0.1 < F < 0.9 [km2] and the river share of one trace."""
+    """Return the area F > 0.5, the band 0.1 < F < 0.9 [km2] and the stream share of one trace."""
     fraction = result.fraction_through[group]
     by_term = {name: float(v.sum()) for name, v in result.volume_from_by_term[group].items()}
     return {
         "area F > 0.5 (km2)": float(step.area[fraction > 0.5].sum()) / 1e6,
         "band 0.1 < F < 0.9 (km2)": float(step.area[(fraction > 0.1) & (fraction < 0.9)].sum()) / 1e6,
-        "river share": by_term.get("RIV", 0.0) / sum(by_term.values()),
+        "stream share": by_term.get("SFR", 0.0) / sum(by_term.values()),
     }
 
 
@@ -128,8 +128,8 @@ def pestpp_exe(bin_dir: Path, name: str = "pestpp-ies") -> Path:
 
 
 def observation_cells(spec, n_obs: int, seed: int) -> list[tuple[int, int]]:
-    """Return n_obs random (row, col) cells, away from the constant heads, river and wells."""
-    blocked = {(r, 0) for r in range(spec.nrow)} | {(r, spec.riv_col) for r in range(spec.nrow)}
+    """Return n_obs random (row, col) cells, away from the constant heads, stream and wells."""
+    blocked = {(r, 0) for r in range(spec.nrow)} | {(r, spec.stream_col) for r in range(spec.nrow)}
     blocked |= {rc for _, rc, _ in spec.wells}
     cells = [(r, c) for r in range(spec.nrow) for c in range(spec.ncol) if (r, c) not in blocked]
     picks = np.random.default_rng(seed).choice(len(cells), size=n_obs, replace=False)
@@ -444,19 +444,19 @@ def run_parameter_ensemble(
 def capture_probability_summary(
     ens: gs.EnsembleResult, table: pd.DataFrame, area: np.ndarray, group: str
 ) -> dict[str, float]:
-    """Return the areas of P(F > 0.5) classes [km2] and the spread of the river share."""
+    """Return the areas of P(F > 0.5) classes [km2] and the spread of the stream share."""
     prob = ens.exceedance[0.5]["fraction_through"][group]
-    river = table["share RIV"] if "share RIV" in table else pd.Series(0.0, index=table.index)
+    stream = table["share SFR"] if "share SFR" in table else pd.Series(0.0, index=table.index)
     return {
         "realisations": len(table),
         "area P >= 0.5 (km2)": float(area[prob >= 0.5].sum()) / 1e6,
         "area P >= 0.9 (km2)": float(area[prob >= 0.9].sum()) / 1e6,
         "band 0.1 < P < 0.9 (km2)": float(area[(prob > 0.1) & (prob < 0.9)].sum()) / 1e6,
-        "river share 5 %": river.quantile(0.05),
-        "river share median": river.median(),
-        "river share 95 %": river.quantile(0.95),
-        "river share min": river.min(),
-        "river share max": river.max(),
+        "stream share 5 %": stream.quantile(0.05),
+        "stream share median": stream.median(),
+        "stream share 95 %": stream.quantile(0.95),
+        "stream share min": stream.min(),
+        "stream share max": stream.max(),
     }
 
 

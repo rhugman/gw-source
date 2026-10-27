@@ -26,14 +26,15 @@ import gwsource as gs
 
 DAYS_PER_YEAR = 365.25
 WELL = "pumping_well"
-# Plan geometry and stresses of the published model. riv_rbot is not used: east_stream() puts
-# the bottom of each RIV bound at the bottom of its cell.
+# Plan geometry and stresses of the published model. The stream is a RIV bound in every cell
+# of the east column (stage, conductance per cell); east_stream() puts its bottom at the bottom
+# of its cell.
 SPEC = hbd.AquiferSpec(
     nrow=101, ncol=101, delr=10.0, delc=10.0, top=30.0, botm=0.0, k=10.0, strt=30.0,
-    rech=3.0e-4, riv_col=100, riv_stage=30.0, riv_cond=1000.0, riv_rbot=0.0,
-    wells=((WELL, (50, 85), -700.0),),
+    rech=3.0e-4, wells=((WELL, (50, 85), -700.0),),
 )
 LAYER_BOTM = (20.0, 10.0, 0.0)
+STREAM_COL, STREAM_STAGE, STREAM_COND = 100, 30.0, 1000.0  # -, m, m2/d
 
 
 @dataclass
@@ -69,10 +70,16 @@ def west_inflow(spec: hbd.AquiferSpec, nlay: int, rate: float) -> list:
     return [((lay, row, 0), rate) for lay in range(nlay) for row in range(spec.nrow)]
 
 
-def east_stream(spec: hbd.AquiferSpec, botm: tuple[float, ...]) -> list:
+def east_stream(
+    spec: hbd.AquiferSpec,
+    botm: tuple[float, ...],
+    col: int = STREAM_COL,
+    stage: float = STREAM_STAGE,
+    cond: float = STREAM_COND,
+) -> list:
     """Return RIV records along the east column of every layer (bottom = cell bottom)."""
     return [
-        ((lay, row, spec.riv_col), spec.riv_stage, spec.riv_cond, botm[lay], "stream")
+        ((lay, row, col), stage, cond, botm[lay], "stream")
         for lay in range(len(botm)) for row in range(spec.nrow)
     ]
 
