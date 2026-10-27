@@ -208,6 +208,7 @@ def travel_time(
     a gross-accounting trace of this step; its factorisation is reused when it has one.
     """
     assert result.accounting == "gross", "travel times are defined for gross accounting only"
+    assert getattr(result, "absorbing", None) is None, "travel times do not support strong sinks"
     mode = "backward" if isinstance(result, BackwardResult) else "forward"
     volume = water_volume(step, porosity)
     budget = cell_budget(step, flow_edges(step))

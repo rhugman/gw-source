@@ -752,6 +752,7 @@ def track_particles(
     The GWF model must have a single steady stress period, and every particle must terminate.
     """
     assert result.accounting == "gross", "use a gross-accounting backward result"
+    assert result.absorbing is None, "PRT comparison does not support strong sinks"
     assert step.kstpkper is None or step.kstpkper[1] == 0, (
         f"step {step.kstpkper} is not in the first stress period; PRT tracking here needs a "
         "GWF model with a single steady stress period"

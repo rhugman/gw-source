@@ -27,6 +27,17 @@ exactly the sum of the un-normalised row residuals over the cells outside the gr
 sum_{i not in D} (T_i f_i - sum_j q_ij f_j) backward and sum_{i not in S} (T_i g_i - sum_j q_ji
 g_j) forward, so the check tests the solve in sum.
 
+Strong sinks (TraceConfig.strong_sinks). An absorbing cell a passes no water on, so its row
+lacks the terms of its out-edges. Summing the rows as above leaves, in both accountings, the
+strong-sink term A = sum_{a->j} q_aj (F_a - F_j) over the edges that leave absorbing cells: the
+water they hand on physically but count with their own share F_a. The backward closure becomes
+
+    sum_i F_i Src_i - sum_i F_i r_i - A = sum_{k in D} |q_k|      (gross)
+    sum_i f_i max(s_i, 0) - A = destination inflow                 (net)
+
+so the volume from no longer equals the destination's own inflow. With one group per sink term,
+the fractions of every draining cell still sum to 1 (boundary control).
+
 Cycle report: cycle_report() lists every strongly connected set of the flow graph with the flow
 that goes round it (by cycle cancelling) and its share of the model throughflow; cycle_table()
 and cycle_ids() turn it into rows and a per-cell array for export.
@@ -49,16 +60,17 @@ class Check:
     lhs: float
     rhs: float
     residual_term: float
+    strong_sink_term: float = 0.0
 
     @property
     def error(self) -> float:
-        """lhs - residual_term - rhs (zero to round-off)."""
-        return self.lhs - self.residual_term - self.rhs
+        """lhs - residual_term - strong_sink_term - rhs (zero to round-off)."""
+        return self.lhs - self.residual_term - self.strong_sink_term - self.rhs
 
     @property
     def error_without_residual(self) -> float:
-        """lhs - rhs, i.e. the error if the budget residual is ignored."""
-        return self.lhs - self.rhs
+        """lhs - strong_sink_term - rhs, i.e. the error if the budget residual is ignored."""
+        return self.lhs - self.strong_sink_term - self.rhs
 
     @property
     def relative_error(self) -> float:
@@ -83,11 +95,22 @@ def budget_error(step: FlowStep) -> dict[str, float]:
     }
 
 
+def strong_sink_term(step: FlowStep, result: BackwardResult, group: str) -> float:
+    """Return A = sum q (F_a - F_j) over the edges leaving the group's absorbing cells (or 0)."""
+    if result.absorbing is None:
+        return 0.0
+    absorbing = result.absorbing[:, result.groups.index(group)]
+    edges = flow_edges(step)
+    f = result.fraction_through[group]
+    out = absorbing[edges.src]
+    return float(np.sum(edges.q[out] * (f[edges.src[out]] - f[edges.dst[out]])))
+
+
 def backward_closure(step: FlowStep, result: BackwardResult, group: str) -> Check:
-    """Return the closure check sum(volume from) - sum(F r) = destination inflow.
+    """Return the closure check sum(volume from) - sum(F r) - A = destination inflow.
 
     Net accounting uses intercell flows only, so its residual term is zero and the check is
-    sum(volume from) = destination inflow (module docstring).
+    sum(volume from) - A = destination inflow; A is zero without strong sinks (module docstring).
     """
     assert result.accounting in ("gross", "net"), f"unknown accounting {result.accounting}"
     if result.accounting == "net":
@@ -98,6 +121,7 @@ def backward_closure(step: FlowStep, result: BackwardResult, group: str) -> Chec
         lhs=float(result.volume_from[group].sum()),
         rhs=result.destination_inflow[group],
         residual_term=residual_term,
+        strong_sink_term=strong_sink_term(step, result, group),
     )
 
 

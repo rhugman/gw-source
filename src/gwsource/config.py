@@ -1,4 +1,4 @@
-"""Configuration of a trace: accounting mode, solver choice and net-mode cycle handling."""
+"""Configuration of a trace: accounting mode, solver choice, strong sinks and cycle handling."""
 
 from dataclasses import dataclass
 
@@ -22,12 +22,20 @@ class TraceConfig:
         loop; its fractions are set to 0 and it is reported (result.closed_loops).
     remove_cycles: net mode only; delete the smallest edge of each flow cycle until the graph is
         acyclic, as the reference method does.
+    strong_sinks: backward traces only; package selectors (names, budget texts or types, any
+        case, as select(package=)) whose sink cells are absorbing, or "all" for every cell with
+        a sink term. A strong-sink cell passes no water on to its neighbours, as a cell that
+        stops particles (MODPATH 7 weak sink option "stop"). Gross: its F is its destination
+        share of its sink outflow, d_i / Snk_i, so water in a cell with sinks of several groups
+        is split by their flows. Net: destination cells stay fixed at 1 and the other
+        strong-sink cells absorb with f = 0. Default () keeps every cell mixing.
     """
 
     accounting: str = "gross"
     solver: str = "auto"
     remove_cycles: bool = False
     closed_loop_tol: float = 1e-12
+    strong_sinks: str | tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         """Validate option values."""
@@ -36,3 +44,8 @@ class TraceConfig:
         assert not (self.remove_cycles and self.accounting != "net"), (
             "remove_cycles is only available in net mode"
         )
+        if self.strong_sinks != "all":
+            assert not isinstance(self.strong_sinks, str), (
+                'strong_sinks must be "all" or a collection of package names, e.g. ("WEL",)'
+            )
+            self.strong_sinks = tuple(self.strong_sinks)
