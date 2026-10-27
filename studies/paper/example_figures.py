@@ -379,7 +379,7 @@ def compute_grids(hbd, work: Path, mf6_exe: Path) -> dict:
     runs = {
         "DIS": hbd.build_quickstart(work / "grids_dis", mf6_exe),
         "DISV": hbd.build_voronoi(work / "grids_disv", mf6_exe),
-        "DISU": hbd.build_disu(work / "grids_disu", mf6_exe, with_vertices=True),
+        "DISU": hbd.build_disu(work / "grids_disu", mf6_exe),
         "XT3D": hbd.build_xt3d(work / "grids_xt3d", mf6_exe),
     }
     traced = {label: trace_well(run) for label, run in runs.items()}
