@@ -29,6 +29,12 @@ class TraceConfig:
         share of its sink outflow, d_i / Snk_i, so water in a cell with sinks of several groups
         is split by their flows. Net: destination cells stay fixed at 1 and the other
         strong-sink cells absorb with f = 0. Default () keeps every cell mixing.
+        Any outflowing sink term (q < 0), however small, makes its cell absorbing, as the
+        MODPATH 7 stop option does. A package's *-TO-MVR record matches the package and is
+        one of its sink terms: MF6 splits a provider's outflow between the package record and
+        its -TO-MVR record, so Snk counts that outflow once, as their sum. trace_transient and
+        the ensembles pass this config to every step or realisation, so strong sinks apply to
+        each steady backward snapshot.
     """
 
     accounting: str = "gross"

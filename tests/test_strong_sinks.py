@@ -139,3 +139,72 @@ def test_unsupported_combinations():
         gs.backward(step, res.selections, gs.TraceConfig(strong_sinks=["MAW"]))
     with pytest.raises(AssertionError, match="strong_sinks must be"):
         gs.TraceConfig(strong_sinks="WEL")
+
+
+def test_tiny_sink_term_makes_cell_absorbing():
+    """Any outflowing sink term, however small, makes the cell absorbing (strict q < 0)."""
+    terms = [(0, 10.0, 0), (1, -1e-9, 1), (2, -10.0, 3)]
+    step = graph(3, [(0, 1, 10.0), (1, 2, 10.0)], terms, (SRC, WEL, DRN, CHD))
+    groups = {"well": gs.select(step, package="WEL")}
+    mixed = gs.backward(step, groups)
+    np.testing.assert_allclose(mixed.fraction_through["well"], [1e-10, 1e-10, 0.0], rtol=1e-6)
+    strong = gs.backward(step, groups, gs.TraceConfig(strong_sinks=("WEL",)))
+    np.testing.assert_allclose(strong.fraction_through["well"], [1.0, 1.0, 0.0])
+
+
+def test_mover_records_share_the_cell_sink(model_run):
+    """DRN and DRN-TO-MVR split one drain outflow: Snk counts it once, as their sum.
+
+    With strong drains the moved part gets F = DRN-TO-MVR / (DRN + DRN-TO-MVR), the mover
+    FACTOR (0.7, 1.0), and 'DRN' (both records) gets F = 1 in the drain cells.
+    """
+    step = gs.read_step(model_run("m7_mover").ws)
+    groups = {
+        "drn": gs.select(step, package="DRN"),
+        "moved": gs.select(step, package="DRN-TO-MVR"),
+    }
+    res = gs.backward(step, groups, gs.TraceConfig(strong_sinks=("DRN",)))
+    drn = groups["drn"].terms
+    cells = np.unique(step.term_cell[drn])
+    drain_out = np.bincount(step.term_cell[drn], -step.term_flow[drn], step.n_cells)
+    np.testing.assert_allclose(gs.cell_budget(step).sink[cells], drain_out[cells], rtol=1e-12)
+    np.testing.assert_allclose(res.fraction_through["drn"][cells], 1.0, rtol=1e-12)
+    order = np.argsort(step.term_bound[groups["moved"].terms])
+    moved_cells = step.term_cell[groups["moved"].terms][order]
+    np.testing.assert_allclose(res.fraction_through["moved"][moved_cells], [0.7, 1.0], rtol=1e-6)
+    assert res.absorbing[cells].all()
+
+
+def test_transient_snapshots_apply_strong_sinks_per_step(model_run):
+    """trace_transient with strong sinks gives each step's backward() fractions."""
+    run = model_run("m6_transient")
+    reader = gs.open_model(run.ws)
+    config = gs.TransientConfig(outputs=("fraction_through",), keep_series=True)
+    trace_config = gs.TraceConfig(strong_sinks=("WEL",))
+    res = gs.trace_transient(reader, {"wel": {"package": "WEL"}}, config=config,
+                             trace_config=trace_config)
+    series = res.series["fraction_through"]["wel"]
+    for index, kstpkper in enumerate(res.steps):
+        step = gs.read_step(run.ws, kstpkper=kstpkper)
+        back = gs.backward(step, {"wel": gs.select(step, package="WEL")}, trace_config)
+        np.testing.assert_array_equal(series[index], back.fraction_through["wel"])
+
+
+def test_net_remove_cycles_strong_fixed_in_one_group_absorbing_in_other():
+    """Net mode, cycle removal, two groups: each strong cell is fixed in its group, 0 in the other.
+
+    Source 10 at cell 0, which swaps 5 / 2 with cell 3 (a cycle; 3 -> 0 is removed) and feeds
+    the well cell 1 and the drain cell 2, which swap 6 / 1. The kept edges give T = (12, 5) in
+    cells 0 and 3, so f_well = (2/3, 1, 0, 3/5) and f_drn = (1/6, 0, 1, 0).
+    """
+    edges = [
+        (0, 3, 5.0), (3, 0, 2.0), (0, 1, 5.0), (3, 1, 3.0), (0, 2, 2.0), (1, 2, 6.0), (2, 1, 1.0)
+    ]
+    terms = [(0, 10.0, 0), (1, -3.0, 1), (2, -7.0, 2)]
+    step = graph(4, edges, terms, (SRC, WEL, DRN))
+    groups = {"well": gs.select(step, package="WEL"), "drn": gs.select(step, package="DRN")}
+    config = gs.TraceConfig(accounting="net", remove_cycles=True, strong_sinks="all")
+    res = gs.backward(step, groups, config)
+    np.testing.assert_allclose(res.fraction_through["well"], [2 / 3, 1.0, 0.0, 0.6], rtol=1e-14)
+    np.testing.assert_allclose(res.fraction_through["drn"], [1 / 6, 0.0, 1.0, 0.0], rtol=1e-14)
+    np.testing.assert_array_equal(res.absorbing, [[0, 0], [0, 1], [1, 0], [0, 0]])
