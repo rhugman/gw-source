@@ -201,7 +201,7 @@ def run_mf6(ws: str = ".", exe: str = "./mf6") -> None:
     import subprocess
 
     subprocess.run([exe], cwd=ws, check=True, capture_output=True)
-    with open(os.path.join(ws, "mfsim.lst")) as handle:
+    with open(os.path.join(ws, "mfsim.lst"), encoding="utf-8") as handle:
         assert "Normal termination" in handle.read(), "MF6 did not terminate normally"
 
 
@@ -225,7 +225,7 @@ def write_head_observations(ws: str = ".", head_file: str = "quickstart.hds") ->
                        usecols=0, dtype=str, ndmin=1)
     nodes = np.loadtxt(os.path.join(ws, "obs_cells.csv"), delimiter=",", skiprows=1,
                        usecols=1, dtype=int, ndmin=1)
-    with open(os.path.join(ws, "heads.csv"), "w") as handle:
+    with open(os.path.join(ws, "heads.csv"), "w", encoding="utf-8") as handle:
         handle.write("name,head\n")
         for name, node in zip(names, nodes):
             handle.write(f"{name},{heads[node]:.10e}\n")
@@ -243,7 +243,7 @@ def write_forward_run(template_ws: Path, mean_k: float) -> None:
         '    run_mf6(".", "./mf6")\n'
         '    write_head_observations(".", "quickstart.hds")\n'
     )
-    (Path(template_ws) / "forward_run.py").write_text(f"{source}\n\n{main}")
+    (Path(template_ws) / "forward_run.py").write_text(f"{source}\n\n{main}", encoding="utf-8")
 
 
 def par_name(i: int) -> str:
@@ -259,15 +259,15 @@ def obs_name(i: int) -> str:
 def write_pilot_points(ws: Path, values: np.ndarray) -> None:
     """Write pilot_points.dat (name, K) as the PEST template would."""
     lines = [f"{par_name(i)} {v:.10e}" for i, v in enumerate(values)]
-    (Path(ws) / "pilot_points.dat").write_text("\n".join(lines) + "\n")
+    (Path(ws) / "pilot_points.dat").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def write_pest_io_files(template_ws: Path, n_pp: int, n_obs: int) -> None:
     """Write the PEST template (pilot_points.dat.tpl) and instruction (heads.csv.ins) files."""
     tpl = ["ptf ~"] + [f"{par_name(i)} ~ {par_name(i):^14} ~" for i in range(n_pp)]
-    (Path(template_ws) / "pilot_points.dat.tpl").write_text("\n".join(tpl) + "\n")
+    (Path(template_ws) / "pilot_points.dat.tpl").write_text("\n".join(tpl) + "\n", encoding="utf-8")
     ins = ["pif ~", "l1"] + [f"l1 ~,~ !{obs_name(i)}!" for i in range(n_obs)]
-    (Path(template_ws) / "heads.csv.ins").write_text("\n".join(ins) + "\n")
+    (Path(template_ws) / "heads.csv.ins").write_text("\n".join(ins) + "\n", encoding="utf-8")
 
 
 def build_kriged_model(
@@ -303,7 +303,7 @@ def build_pest_template(
     """Build the kriged model and add the PEST files (template, instructions, forward run)."""
     build_kriged_model(template_ws, mf6, spec, weights, mean_k)
     lines = ["name,node"] + [f"{obs_name(i)},{spec.node(rc)}" for i, rc in enumerate(obs_cells)]
-    (template_ws / "obs_cells.csv").write_text("\n".join(lines) + "\n")
+    (template_ws / "obs_cells.csv").write_text("\n".join(lines) + "\n", encoding="utf-8")
     write_pest_io_files(template_ws, len(pp_cells), len(obs_cells))
     write_forward_run(template_ws, mean_k)
     write_head_observations(str(template_ws))
@@ -379,7 +379,7 @@ def run_ies(
         else:
             port = pyemu.os_utils.PortManager(log_level=logging.WARNING).get_available_port()
             log_file = Path(master_ws).parent / "start_workers.log"
-            with open(log_file, "w") as log, redirect_stdout(log):
+            with open(log_file, "w", encoding="utf-8") as log, redirect_stdout(log):
                 pyemu.os_utils.start_workers(
                     str(template_ws), pestpp.name, pst_name, num_workers=n_workers,
                     worker_root=str(Path(master_ws).parent), master_dir=str(master_ws),

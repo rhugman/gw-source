@@ -234,7 +234,7 @@ def test_sto_period_one_transient(tmp_path):
     }
     for i, (text, transient) in enumerate(texts.items()):
         sto_file = tmp_path / f"m{i}.sto"
-        sto_file.write_text(text)
+        sto_file.write_text(text, encoding="utf-8")
         assert _sto_period_one_transient(sto_file) is transient, text
 
 
@@ -260,14 +260,14 @@ def test_write_prt_options(model_run, mf6_exe, tmp_path):
     release = release_points(step, grid, np.ones(step.n_cells, bool), None, 1, np.array([0.5]))
     prt_ws = tmp_path / "prt"
     prt_ws.mkdir()
-    (prt_ws / "stale.txt").write_text("left over")
+    (prt_ws / "stale.txt").write_text("left over", encoding="utf-8")
     config = PrtConfig(porosity=POROSITY)
     write_prt(prt_ws, run.ws, grid, release, config, mf6_exe, budget_file=run.budget_file,
               stop_at_weak_sink=True, track_release=False, track_exit=False, clear_ws=True)
     assert not (prt_ws / "stale.txt").exists()
-    prp = (prt_ws / "prt.prp").read_text().upper()
-    oc = (prt_ws / "prt.oc").read_text().upper()
-    mip = (prt_ws / "prt.mip").read_text().upper()
+    prp = (prt_ws / "prt.prp").read_text(encoding="utf-8").upper()
+    oc = (prt_ws / "prt.oc").read_text(encoding="utf-8").upper()
+    mip = (prt_ws / "prt.mip").read_text(encoding="utf-8").upper()
     assert "STOP_AT_WEAK_SINK" in prp and "EXTEND_TRACKING" in prp
     assert "TRACK_TERMINATE" in oc and "TRACK_RELEASE" not in oc and "TRACK_EXIT" not in oc
     assert "CONSTANT" in mip

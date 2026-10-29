@@ -325,7 +325,7 @@ def run_model(
     sim.write_simulation(silent=True)
     success, buff = sim.run_simulation(silent=True, report=True)
     assert success, f"MF6 run of {name} failed:\n" + "\n".join(buff[-20:])
-    assert "Normal termination" in (ws / "mfsim.lst").read_text(), f"{name}: no normal termination"
+    assert "Normal termination" in (ws / "mfsim.lst").read_text(encoding="utf-8"), f"{name}: no normal termination"
     return ModelRun(
         name=name, ws=ws, sim=sim, gwf=gwf, grb_file=ws / f"{dis_filename}.grb",
         budget_file=ws / f"{name}.cbc", head_file=ws / f"{name}.hds", spec=spec, info=info,

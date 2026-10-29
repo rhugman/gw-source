@@ -104,7 +104,7 @@ class GridData:
 def _block_lines(path: Path, block: str) -> list[list[str]]:
     """Return the tokenised lines inside 'BEGIN block' ... 'END block' of an MF6 input file."""
     lines, inside = [], False
-    for raw in Path(path).read_text().splitlines():
+    for raw in Path(path).read_text(encoding="utf-8").splitlines():
         tokens = raw.split()
         if not tokens or tokens[0].startswith(COMMENT_CHARS):
             continue
@@ -477,6 +477,8 @@ class StepReader:
     """Grid and budget file opened once; reads a FlowStep for any saved time step.
 
     The grid (IA/JA, IDOMAIN, areas) is read once and shared by every FlowStep it returns.
+    The budget and head files stay open until close() (or the end of a with block); open
+    handles stop Windows from deleting the model folder.
     """
 
     grid: GridData
@@ -485,6 +487,18 @@ class StepReader:
     boundnames: BoundnameTable | None = None
     notes: dict | None = None
     heads: flopy.utils.HeadFile | None = None
+
+    def close(self) -> None:
+        """Close the budget file and the head file."""
+        self.cbc.close()
+        if self.heads is not None:
+            self.heads.close()
+
+    def __enter__(self) -> "StepReader":
+        return self
+
+    def __exit__(self, *exc) -> None:
+        self.close()
 
     @property
     def steps(self) -> list[tuple[int, int]]:
@@ -601,7 +615,8 @@ def read_step_files(
     area: np.ndarray | None = None,
 ) -> FlowStep:
     """Read one time step from a binary grid file and a budget file into a FlowStep."""
-    return open_files(grb_file, budget_file, area=area).read(kstpkper)
+    with open_files(grb_file, budget_file, area=area) as reader:
+        return reader.read(kstpkper)
 
 
 def read_step(
@@ -616,4 +631,5 @@ def read_step(
     For DISU grids without vertices the cell area is read from the DISU input (AREA).
     boundnames=True also fills FlowStep.term_boundname from the package input (FloPy).
     """
-    return open_model(ws, model, area=area, boundnames=boundnames).read(kstpkper)
+    with open_model(ws, model, area=area, boundnames=boundnames) as reader:
+        return reader.read(kstpkper)
