@@ -13,36 +13,21 @@ Open an [issue](https://github.com/rhugman/gw-source/issues). For a bug, please 
 
 ## Development environment
 
-The tests and tutorials run against FloPy's `develop` branch and the MODFLOW 6 nightly build. The set-up script needs [mamba](https://mamba.readthedocs.io/) (or micromamba or conda) and network access:
+The tests and tutorials run against FloPy's `develop` branch and the MODFLOW 6 nightly build. You need [Miniforge](https://conda-forge.org/download/) (mamba and conda) or micromamba, and network access. The commands are the same on Linux, macOS and Windows (on Windows, use the Miniforge Prompt). Run them from the repository root:
 
 ```bash
-scripts/setup_env.sh
+mamba env create -f environment.yml
+mamba activate gw-source
+python scripts/setup_env.py
 ```
 
-This script:
+`environment.yml` holds the conda-forge packages, FloPy from its `develop` branch, and `gwsource` installed editable. `scripts/setup_env.py` then:
 
-1. creates or updates the `gw-source` environment from `environment.yml` (conda-forge packages, FloPy from its `develop` branch, and `gwsource` installed editable);
-2. reinstalls FloPy `develop` and regenerates its MF6 classes from the MODFLOW 6 `develop` definition files;
-3. downloads the MODFLOW 6 nightly build, `triangle` (used by a test model) and PEST++ (used by tutorial 09) into `bin/`;
-4. prints the FloPy version and commit and `mf6 --version`.
+1. reinstalls FloPy `develop` and regenerates its MF6 classes from the MODFLOW 6 `develop` definition files;
+2. downloads the MODFLOW 6 nightly build, `triangle` (used by the Voronoi grids) and PEST++ (used by tutorial 09) into `bin/`;
+3. prints the FloPy version and commit and `mf6 --version`.
 
-Rerun it whenever you want to pick up new FloPy or MODFLOW 6 changes.
-
-On Windows, run the script from Git Bash, or run the same steps in PowerShell from the repository root:
-
-```powershell
-micromamba env create -y -n gw-source -f environment.yml  # or: micromamba env update -n gw-source -f environment.yml
-micromamba run -n gw-source python -m pip install --upgrade --force-reinstall --no-deps "flopy[codegen] @ git+https://github.com/modflowpy/flopy.git@develop"
-micromamba run -n gw-source python -m pip install "flopy[codegen] @ git+https://github.com/modflowpy/flopy.git@develop"
-micromamba run -n gw-source python -m flopy.mf6.utils.generate_classes --ref develop
-New-Item -ItemType Directory -Force bin, $env:TEMP\gw-source-downloads | Out-Null
-micromamba run -n gw-source get-modflow --repo modflow6-nightly-build --downloads-dir $env:TEMP\gw-source-downloads bin
-micromamba run -n gw-source get-modflow --repo executables --subset triangle --downloads-dir $env:TEMP\gw-source-downloads bin
-micromamba run -n gw-source get-pestpp --downloads-dir $env:TEMP\gw-source-downloads bin
-bin\mf6.exe --version
-```
-
-Use `mamba` or `conda` in place of `micromamba` if that is what you have.
+Rerun `python scripts/setup_env.py` whenever you want to pick up new FloPy or MODFLOW 6 changes. To update the packages of an existing environment, run `mamba env update -n gw-source -f environment.yml`.
 
 ## Running the tests
 

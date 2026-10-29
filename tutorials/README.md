@@ -4,17 +4,21 @@ Jupyter notebooks that teach cell-mixing flow tracing with `gwsource`, from a fi
 
 ## Setup and launch
 
-1. Create the environment and download MODFLOW 6 into `bin/` (once; see the [main README](../README.md)):
+1. Create the `gw-source` environment and download MODFLOW 6 into `bin/` (once). You need [Miniforge](https://conda-forge.org/download/) (mamba and conda) or micromamba. The commands are the same on Linux, macOS and Windows. On Windows, run them in the Miniforge Prompt. Run them from the repository root, because `environment.yml` installs `gwsource` from this folder:
 
    ```bash
-   scripts/setup_env.sh
+   mamba env create -f environment.yml
+   mamba activate gw-source
+   python scripts/setup_env.py
    ```
+
+   `scripts/setup_env.py` installs FloPy from its `develop` branch and downloads MODFLOW 6, `triangle` and PEST++ into `bin/`. With conda or micromamba, write `conda` or `micromamba` in place of `mamba`. To update an existing environment, run `mamba env update -n gw-source -f environment.yml` instead of `mamba env create`.
 
    The `gw-source` environment includes JupyterLab and the notebook tools (`environment.yml`). To add them to an existing environment: `mamba install -n gw-source -c conda-forge jupyterlab ipykernel nbclient nbformat nbconvert`.
 
    Tutorial 04 and section 5 of tutorial 11 also need [vorflow](https://github.com/rhugman/vorflow) (Hugman and Sanchez 2026), which builds their Voronoi grid of the tutorial aquifer. It is an optional dependency of the tutorials only, not of `gwsource`. `environment.yml` installs it. To add it to an existing environment: `pip install vorflow`.
 
-   Tutorial 09 also needs PEST++ (`bin/pestpp-ies`) for its history-matching section. `scripts/setup_env.sh` downloads it into `bin/` with pyemu's `get-pestpp` command. If it is missing, the notebook downloads it the same way.
+   Tutorial 09 also needs PEST++ (`bin/pestpp-ies`) for its history-matching section. `scripts/setup_env.py` downloads it into `bin/` with pyemu's `get-pestpp` command. If it is missing, the notebook downloads it the same way.
 
 2. Launch JupyterLab from the repository root:
 
