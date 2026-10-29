@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use gwsource, please cite it as below."
+type: software
+title: "gwsource: cell-mixing flow tracing for MODFLOW 6"
+abstract: >-
+  gwsource post-processes MODFLOW 6 groundwater-flow output. For every cell it computes the
+  fraction and volume of water that reaches chosen destinations (capture) or came from chosen
+  sources (fate), under full mixing, by solving the trace as one sparse system of linear
+  equations. It handles steady and transient flow, every MODFLOW 6 grid type, multi-model
+  simulations and advanced-package networks, and computes Eulerian mean travel times.
+authors:
+  - family-names: Hugman
+    given-names: Rui
+    affiliation: INTERA Inc.
+version: 0.1.0
+date-released: "2026-10-29"
+license: MIT
+repository-code: "https://github.com/rhugman/gw-source"
+url: "https://rhugman.github.io/gw-source/"
+keywords:
+  - MODFLOW 6
+  - groundwater
+  - flow tracing
+  - full mixing
+  - capture zone
+  - source water
+  - travel time
