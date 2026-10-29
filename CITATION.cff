@@ -12,6 +12,14 @@ authors:
   - family-names: Hugman
     given-names: Rui
     affiliation: INTERA Inc.
+doi: 10.5281/zenodo.23782547
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.23782547
+    description: All versions (concept DOI); resolves to the latest release.
+  - type: doi
+    value: 10.5281/zenodo.23782548
+    description: Version 0.1.0.
 version: 0.1.0
 date-released: "2026-10-29"
 license: MIT
