@@ -4,7 +4,7 @@
 # MF6 nightly build (plus triangle, used by the Voronoi test model) and PEST++
 # (used by tutorial 09) into bin/.
 #
-# Usage: scripts/setup_env.sh
+# Usage: scripts/setup_env.sh (bash, incl. Git Bash on Windows; README.md lists the PowerShell steps)
 # Environment overrides: MAMBA (mamba/micromamba/conda executable), ENV_NAME.
 set -euo pipefail
 
@@ -67,4 +67,6 @@ direct_url = distribution("flopy").read_text("direct_url.json") or "{}"
 commit = json.loads(direct_url).get("vcs_info", {}).get("commit_id", "unknown")
 print(f"FloPy {flopy.__version__} (commit {commit})")
 EOF
-"${BIN_DIR}/mf6" --version
+MF6="${BIN_DIR}/mf6"
+[[ -f "${MF6}.exe" ]] && MF6="${MF6}.exe"  # Windows (Git Bash)
+"${MF6}" --version

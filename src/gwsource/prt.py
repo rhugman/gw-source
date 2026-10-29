@@ -446,7 +446,7 @@ def _sto_period_one_transient(sto_file: Path) -> bool:
     MF6 6.9 dev with STO and no PERIOD block); the setting carries over to later periods.
     """
     transient, inside = True, False
-    for raw in Path(sto_file).read_text().splitlines():
+    for raw in Path(sto_file).read_text(encoding="utf-8").splitlines():
         tokens = [t.upper() for t in raw.split()]
         if not tokens or tokens[0].startswith(COMMENT_CHARS):
             continue
