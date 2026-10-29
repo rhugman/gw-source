@@ -141,5 +141,4 @@ def main(
 
 
 if __name__ == "__main__":
-    main(run_analytic=False, run_model1=False, run_transient=False, make_figures=False,
-         rerun_disv_a=True)
+    main()

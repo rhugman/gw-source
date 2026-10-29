@@ -15,9 +15,10 @@ storage), for the time-stepping part of the study.
 
 Coordinates: model x, y with the origin at the lower-left corner of the domain (DIS rows count
 from the top). Grids are built by cell size h: DIS with h x h cells, DISV with a smooth,
-quasi-uniform Voronoi grid from vorflow (CGAL refinement and Lloyd relaxation) whose mean cell
-size is brought to h (it is reported, not assumed). Voronoi seeds on the domain edge give half
-cells there, as in any bounded Voronoi grid.
+quasi-uniform Voronoi grid from vorflow (a Gmsh triangle mesh of uniform target size, its dual
+Voronoi grid and Lloyd relaxation of the interior generators) whose mean cell size is brought to
+h (it is reported, not assumed). Voronoi generators on the domain edge give half cells there, as
+in any bounded Voronoi grid.
 """
 
 from dataclasses import dataclass, field
@@ -25,15 +26,16 @@ from pathlib import Path
 
 import flopy
 import numpy as np
-import vorflow.vorflowpp as vfp
+import vorflow
 from flopy.utils.gridintersect import GridIntersect
-from shapely.geometry import LineString, Point
+from shapely.geometry import LineString, Point, box
 
 GRID_KINDS = ("DIS", "DISV")
 EDGE_TOL = 1e-6
-VORONOI_ITERS = 30  # Lloyd relaxation iterations of vorflow
-VORONOI_GRADATION = 1.2  # vorflow size gradation (uniform target size: no effect)
-VORONOI_SIZE_RATIO = 0.6  # first guess of mean cell size over vorflow's background size
+VORONOI_ITERS = 30  # Lloyd relaxation passes of vorflow
+VORONOI_SIZE_RATIO = 0.9  # first guess of mean cell size over vorflow's target mesh size
+VORONOI_SIZE_TOL = 0.015  # accepted relative difference of the mean cell size from h
+VORONOI_SIZE_TRIES = 8  # most grids built per cell size to reach that
 
 
 @dataclass
@@ -114,13 +116,15 @@ class GridModel:
 # ---------------------------------------------------------------- grids
 
 
-def vorflow_cells(lx: float, ly: float, size: float, iters: int = VORONOI_ITERS,
-                  gradation: float = VORONOI_GRADATION) -> list:
-    """Return vorflow's (seed, polygon) Voronoi cells over [0, lx] x [0, ly] for one size."""
-    mesher = vfp.HydroMesher()
-    mesher.add_domain([(0.0, 0.0), (lx, 0.0), (lx, ly), (0.0, ly)], edge_resolution=size)
-    mesher.generate(size, gradation, iters, method=vfp.GenerationMethod.CGAL_DEFAULT)
-    return mesher.get_voronoi_cells()
+def vorflow_grid(lx: float, ly: float, size: float, iters: int = VORONOI_ITERS):
+    """Return vorflow's Voronoi grid (a GeoDataFrame) over [0, lx] x [0, ly] for one mesh size."""
+    vorflow.set_verbosity(0)
+    cm = vorflow.ConceptualMesh()
+    cm.add_polygon(box(0.0, 0.0, lx, ly), zone_id=1, resolution=size)
+    cm.generate()
+    mesher = vorflow.MeshGenerator(background_lc=size)
+    mesher.generate(cm.clean_polygons, cm.clean_lines, cm.clean_points)
+    return vorflow.VoronoiTessellator(mesher, cm, lloyd_iterations=iters).generate()
 
 
 def polygon_area(xy: np.ndarray) -> float:
@@ -129,35 +133,46 @@ def polygon_area(xy: np.ndarray) -> float:
     return 0.5 * float(np.dot(x, np.roll(y, -1)) - np.dot(y, np.roll(x, -1)))
 
 
-def voronoi_cells(lx: float, ly: float, h: float, ratio: float = VORONOI_SIZE_RATIO) -> list:
-    """Return Voronoi cells over the domain whose mean cell size is close to h.
+def voronoi_grid(lx: float, ly: float, h: float, ratio: float = VORONOI_SIZE_RATIO,
+                 tol: float = VORONOI_SIZE_TOL, max_tries: int = VORONOI_SIZE_TRIES):
+    """Return a Voronoi grid over the domain whose mean cell size is close to h.
 
-    vorflow's background size is the target edge length of its triangles, so the first guess
-    is h / ratio; one rescaling by the mean cell size reached then brings it to h.
+    vorflow's mesh size is the target edge length of its triangles, so the first guess is
+    h / ratio. The size is then rescaled by h over the mean cell size reached, or, once two
+    sizes bracket h, bisected (the cell count changes in steps on coarse grids), until the
+    mean cell size is within tol of h; after max_tries the closest grid is kept.
     """
-    size = h / ratio
-    cells = vorflow_cells(lx, ly, size)
-    mean_h = np.sqrt(lx * ly / len(cells))
-    cells = vorflow_cells(lx, ly, size * h / mean_h)
-    areas = [abs(polygon_area(np.asarray(poly))) for _, poly in cells]
-    assert abs(sum(areas) / (lx * ly) - 1.0) < 1e-9, "the Voronoi cells must tile the domain"
-    return cells
+    size, bracket, best = h / ratio, [0.0, np.inf], None
+    for _ in range(max_tries):
+        grid = vorflow_grid(lx, ly, size)
+        mean_h = np.sqrt(lx * ly / len(grid))
+        if best is None or abs(mean_h / h - 1.0) < abs(best[0] / h - 1.0):
+            best = (mean_h, grid)
+        if abs(mean_h / h - 1.0) < tol:
+            break
+        bracket[int(mean_h > h)] = size  # [largest size too fine, smallest size too coarse]
+        bracketed = bracket[0] > 0 and np.isfinite(bracket[1])
+        size = np.sqrt(bracket[0] * bracket[1]) if bracketed else size * h / mean_h
+    grid = best[1]
+    assert abs(grid.geometry.area.sum() / (lx * ly) - 1.0) < 1e-9, "the cells must tile the domain"
+    return grid
 
 
 def voronoi_gridprops(lx: float, ly: float, h: float, digits: int = 6) -> dict:
     """Return DISV grid properties of a vorflow Voronoi grid of mean cell size about h.
 
-    The cell centres are the Voronoi seeds; shared vertices are merged after rounding to digits
-    decimals, and every cell is written clockwise as MF6 requires.
+    The cell centres are the Voronoi generators; shared vertices are merged after rounding to
+    digits decimals, and every cell is written clockwise as MF6 requires.
     """
     vertex_ids, cell2d = {}, []
-    for icell, (seed, poly) in enumerate(voronoi_cells(lx, ly, h)):
-        xy = np.round(np.asarray(poly, dtype=float), digits) + 0.0  # + 0.0 drops -0.0
+    grid = voronoi_grid(lx, ly, h)
+    for icell, (x0, y0, poly) in enumerate(zip(grid.x, grid.y, grid.geometry)):
+        xy = np.round(np.asarray(poly.exterior.coords)[:-1], digits) + 0.0  # + 0.0 drops -0.0
         if polygon_area(xy) > 0:
             xy = xy[::-1]
         ids = [vertex_ids.setdefault((x, y), len(vertex_ids)) for x, y in map(tuple, xy)]
         ids = [v for n, v in enumerate(ids) if v != ids[n - 1]]  # drop repeated vertices
-        cell2d.append([icell, float(seed[0]), float(seed[1]), len(ids), *ids])
+        cell2d.append([icell, float(x0), float(y0), len(ids), *ids])
     vertices = [[i, x, y] for (x, y), i in vertex_ids.items()]
     return {"ncpl": len(cell2d), "nvert": len(vertices), "vertices": vertices, "cell2d": cell2d}
 
