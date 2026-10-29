@@ -27,5 +27,10 @@ studies/*/external/
 .claude/
 PLAN.md
 references/
-docs/
+notes/
 studies/neversink/prt_film_repro/
+
+# Sphinx build output and the tutorial copies made by docs/conf.py
+docs/_build/
+docs/tutorials/
+docs/api/generated/

@@ -58,7 +58,7 @@ from .tracking import (
 from .transient import TransientConfig, TransientResult, trace_transient
 from .traveltime import TravelTimeResult, travel_time, water_volume
 
-__version__ = "0.0.1"
+__version__ = "0.1.0"
 
 __all__ = [
     "BackwardResult",
