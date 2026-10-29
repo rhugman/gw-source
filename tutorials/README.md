@@ -33,10 +33,10 @@ Start with 01 and 02: they introduce the outputs and the accounting that every l
 
 | # | Tutorial | What it answers | What you learn | Runtime |
 |---|---|---|---|---|
-| 01 | [Quickstart](01_quickstart/01_quickstart.ipynb) | Where does the water pumped by a well come from? | Build and run a model, read a step, select a well, backward trace; fraction through and the F > 0.1 and F > 0.5 capture zones; volume through and volume from; the split by source (recharge, river, boundary); the closure check; F against flow-weighted MF6 PRT particles (zone areas, mean \|P − F\|); npz and netCDF export | ~5 s |
+| 01 | [Quickstart](01_quickstart/01_quickstart.ipynb) | Where does the water pumped by a well come from? | Build and run a model, read a step, select a well, backward trace; fraction through and the F > 0.1 and F > 0.5 capture zones; volume through and volume from; the split by source (recharge, stream, boundary); the closure check; F against flow-weighted MF6 PRT particles (zone areas, mean \|P − F\|); npz and netCDF export | ~5 s |
 | 02 | [Accounting](02_accounting/02_accounting.ipynb) | What exactly is being computed? | Full mixing and the linear system; the Foley & Black (2013) 3×3 worked example rebuilt by hand (net accounting, exact match); gross vs net accounting on a weak-sink well (net attributes 6.7× the pumping); residual, closure and duality diagnostics; boundary-control and dominant-sink maps | ~5 s |
-| 03 | [Forward mode](03_forward/03_forward.ipynb) | Where does the water in each cell, and in the well, come from? | Source fractions of river water, regional inflow and recharge; the well's water by source; source fraction as dilution ratio C/C0 and mixing of source concentrations; volume to by sink; a recharge zone (hypothetical fertilised field) reaching the well; forward/backward duality; agreement with MF6 GWT at equilibrium (≤ 4.2e-13) | ~5 s |
-| 04 | [Grids](04_grids/04_grids.ipynb) | Does it work on my grid? | The same trace code on DIS, a Voronoi DISV grid refined around the well and the river (built with vorflow, an optional dependency) and DISU; DIS = DISU exactly, DISV close; boundary placement when comparing grids; why the zone edge is wider on the Voronoi grid (squares rotated 45° to the flow and a finer Voronoi grid); which outputs work on which grid type; XT3D flow loops, the loop report and the exact block solver; boundname and zone-array selectors; GeoPackage and netCDF export | ~10 s |
+| 03 | [Forward mode](03_forward/03_forward.ipynb) | Where does the water in each cell, and in the well, come from? | Source fractions of stream water, regional inflow and recharge; the well's water by source; source fraction as dilution ratio C/C0 and mixing of source concentrations; volume to by sink; a recharge zone (hypothetical fertilised field) reaching the well; forward/backward duality; agreement with MF6 GWT at equilibrium (≤ 4.2e-13) | ~5 s |
+| 04 | [Grids](04_grids/04_grids.ipynb) | Does it work on my grid? | The same trace code on DIS, a Voronoi DISV grid refined around the well and the stream (built with vorflow, an optional dependency) and DISU; DIS = DISU exactly, DISV close; boundary placement when comparing grids; why the zone edge is wider on the Voronoi grid (squares rotated 45° to the flow and a finer Voronoi grid); which outputs work on which grid type; XT3D flow loops, the loop report and the exact block solver; boundname and zone-array selectors; GeoPackage and netCDF export | ~10 s |
 | 05 | [Transient snapshots](05_transient_snapshots/05_transient_snapshots.ipynb) | How does the capture zone change through the seasons? | Time steps as snapshots and their limits (no travel lag, storage as source/sink); the well's water by source per step; min/max/mean F, always/sometimes/never, exceedance count, probability of volume through > 1 m³/d; time vs equal weighting; one way to combine the maps into nested zones | ~10 s |
 | 06 | [Travel time](06_travel_time/06_travel_time.ipynb) | How old is the water reaching the well? | Porosity as an explicit input; Eulerian mean travel time and time-of-travel zones; the exact volume identity ΣVF/Q; weight-losing, flow-weighted MF6 PRT particles: overall agreement (largely the volume identity), per-cell differences and why; when to use particles vs Eulerian times | ~10 s |
 | 07 | [Networks and multi-model](07_networks_multimodel/07_networks_multimodel.ipynb) | What if water moves through streams, drains or wells between layers, or across models? | Cells-only vs package-node traces; SFR reaches and MVR transfers as nodes and edges (drain → mover → stream → aquifer → well); MAW borehole across layers; a split simulation matches the single model; required save options and limitations | ~3 s |
@@ -49,16 +49,16 @@ Thresholds on the fraction through, and the numerical dispersion of full mixing,
 
 ## The tutorial models
 
-All models share one plan: a 2 km × 2 km unconfined aquifer in 50 m cells with recharge, a constant-head west edge that brings in regional inflow (in the stream variant of tutorial 07 it is an outlet instead), a north–south river and a supply well next to it. `herebedragons.py` builds variants of it:
+All models share one plan: a 2 km × 2 km unconfined aquifer in 50 m cells with recharge, a constant-head west edge that brings in regional inflow, a stream (SFR) flowing north to south, its reaches traced as source/sink terms of their cells unless a trace reads them as nodes, and a supply well next to it. `herebedragons.py` builds variants of it:
 
 | Builder | Model |
 |---|---|
 | `build_quickstart` | steady, one layer (tutorial 01) |
 | `build_layered` | three layers, partially penetrating supply well and a weak-sink well |
-| `build_voronoi`, `build_disu` | DISV Voronoi grid from vorflow, refined around the well and the river; DISU copy of the DIS model |
+| `build_voronoi`, `build_disu` | DISV Voronoi grid from vorflow, refined around the well and the stream; DISU copy of the DIS model |
 | `build_xt3d` | heterogeneous anisotropic K with XT3D (flow cycles) |
 | `build_transient` | storage, seasonal recharge and pumping |
-| `build_stream_mover` | SFR stream fed by drains through the water mover, leaking back to the aquifer |
+| `build_stream_mover` | the quickstart model plus two drains that feed the stream through the water mover; the stream leaks part of that water back to the aquifer near the well |
 | `build_maw` | three layers with a multi-aquifer well that moves water between layers |
 | `build_realisation` | a seeded random log-K realisation (the synthetic truth of tutorial 09) |
 

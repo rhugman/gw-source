@@ -53,7 +53,7 @@ def test_save_network_package_nodes(model_run, tmp_path):
     res = gs.backward(net, {"well": gs.select(net, boundnames=["well_east"])})
     written = save_network(tmp_path, net, res, geopackage=True)
     assert {p.name for p in written} == {"trace_m7_mover.npz", "trace_packages.csv", "trace.gpkg"}
-    with (tmp_path / "trace_packages.csv").open() as f:
+    with (tmp_path / "trace_packages.csv").open(encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
     assert len(rows) == 20 and rows[0]["package"] == "SFR" and rows[0]["id"] == "1"
     reaches = net.block("SFR").nodes

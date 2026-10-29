@@ -28,19 +28,35 @@ This script:
 
 Rerun it whenever you want to pick up new FloPy or MODFLOW 6 changes.
 
+On Windows, run the script from Git Bash, or run the same steps in PowerShell from the repository root:
+
+```powershell
+micromamba env create -y -n gw-source -f environment.yml  # or: micromamba env update -n gw-source -f environment.yml
+micromamba run -n gw-source python -m pip install --upgrade --force-reinstall --no-deps "flopy[codegen] @ git+https://github.com/modflowpy/flopy.git@develop"
+micromamba run -n gw-source python -m pip install "flopy[codegen] @ git+https://github.com/modflowpy/flopy.git@develop"
+micromamba run -n gw-source python -m flopy.mf6.utils.generate_classes --ref develop
+New-Item -ItemType Directory -Force bin, $env:TEMP\gw-source-downloads | Out-Null
+micromamba run -n gw-source get-modflow --repo modflow6-nightly-build --downloads-dir $env:TEMP\gw-source-downloads bin
+micromamba run -n gw-source get-modflow --repo executables --subset triangle --downloads-dir $env:TEMP\gw-source-downloads bin
+micromamba run -n gw-source get-pestpp --downloads-dir $env:TEMP\gw-source-downloads bin
+bin\mf6.exe --version
+```
+
+Use `mamba` or `conda` in place of `micromamba` if that is what you have.
+
 ## Running the tests
 
 ```bash
 mamba run -n gw-source pytest
 ```
 
-The tests build and run small MODFLOW 6 models in temporary folders, so `bin/mf6` must exist. The pytest header records the FloPy commit and MF6 version used. Large checks are marked `slow` and the execution of the tutorial notebooks is marked `tutorials`. Both are skipped by default:
+The tests build and run small MODFLOW 6 models in temporary folders, so `bin/mf6` (`bin\mf6.exe` on Windows) must exist. The pytest header records the FloPy commit and MF6 version used. Large checks are marked `slow` and the execution of the tutorial notebooks is marked `tutorials`. Both are skipped by default:
 
 ```bash
 mamba run -n gw-source pytest -m "slow or tutorials"
 ```
 
-CI runs the default tests on every push and pull request (Linux and macOS), and the slow and tutorial tests weekly.
+CI runs the default tests on every push and pull request (Linux, macOS and Windows), and the slow and tutorial tests weekly.
 
 ## Benchmarks
 

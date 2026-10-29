@@ -567,6 +567,7 @@ class NetworkReader:
     read() returns the global FlowStep of one time step; steps and step_length() follow the first
     model, so trace_transient() works on a NetworkReader as on a StepReader. aquifer_rtol is the
     tolerance of the GWF and package budgets' aquifer exchange (see aquifer_links).
+    The budget files stay open until close() (or the end of a with block).
     """
 
     models: dict[str, StepReader]
@@ -574,6 +575,21 @@ class NetworkReader:
     movers: dict[str, flopy.utils.CellBudgetFile]
     notes: dict = field(default_factory=dict)
     aquifer_rtol: float = AQUIFER_RTOL
+
+    def close(self) -> None:
+        """Close every model's files and the package and MVR budget files."""
+        for reader in self.models.values():
+            reader.close()
+        for _, cbc in self.packages:
+            cbc.close()
+        for cbc in self.movers.values():
+            cbc.close()
+
+    def __enter__(self) -> "NetworkReader":
+        return self
+
+    def __exit__(self, *exc) -> None:
+        self.close()
 
     @property
     def steps(self) -> list[tuple[int, int]]:
@@ -657,7 +673,8 @@ def read_network(
 
     aquifer_rtol: tolerance of the aquifer exchange check (see open_simulation).
     """
-    return open_simulation(ws, models, package_nodes, boundnames, aquifer_rtol).read(kstpkper)
+    with open_simulation(ws, models, package_nodes, boundnames, aquifer_rtol) as reader:
+        return reader.read(kstpkper)
 
 
 # ---------------------------------------------------------------- per-model views

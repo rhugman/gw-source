@@ -47,7 +47,7 @@ def test_tutorials_found():
 
 
 def test_quickstart_builder(tmp_path, mf6_exe):
-    """The quickstart model runs; the well's water comes from recharge, the west edge and river."""
+    """The quickstart model runs; the well's water comes from recharge, the west edge and stream."""
     import herebedragons as hbd
 
     run = hbd.build_quickstart(tmp_path, mf6_exe)
@@ -58,15 +58,16 @@ def test_quickstart_builder(tmp_path, mf6_exe):
     rate = -sum(rate for _, _, rate in run.spec.wells)
     assert res.volume_from["well"].sum() == pytest.approx(rate, rel=1e-8)
     table = hbd.volume_from_table(res, "well")
-    assert set(table.index) == {"RCH", "RIV", "CHD"}
+    assert set(table.index) == {"RCH", "SFR", "CHD"}
     assert np.all(table["share"] > 0.05)
-    assert hbd.feature_cells(step, "RIV").size == run.spec.nrow
+    assert hbd.feature_cells(step, "SFR").size == run.spec.nrow
+    assert run.info["sfr_budget_file"].is_file()
 
 
 def test_voronoi_builder(tmp_path, mf6_exe):
-    """The vorflow DISV model centres the well cell on the well and the river cells on the river.
+    """The vorflow DISV model centres the well cell on the well and the stream cells on the stream.
 
-    Its river conductance adds up to the DIS total, and the well's water closes on the pumping.
+    Its stream reaches add up to the stream's length, and the well's water closes on the pumping.
     """
     pytest.importorskip("vorflow")
     import herebedragons as hbd
@@ -77,10 +78,9 @@ def test_voronoi_builder(tmp_path, mf6_exe):
     centres = gs.export.cell_centres(run.grb_file)
     well_node = run.info["well_nodes"]["supply_well"]
     assert np.allclose(centres[well_node], spec.xy(spec.wells[0][1]))
-    riv_x = (spec.riv_col + 0.5) * spec.delr
-    assert np.allclose(centres[run.info["riv_cells"], 0], riv_x)
-    riv = run.gwf.get_package("riv").stress_period_data.get_data(0)
-    assert riv["cond"].sum() == pytest.approx(spec.riv_cond * spec.nrow, rel=1e-12)
+    assert np.allclose(centres[run.info["stream_cells"], 0], hbd.stream_x(spec))
+    reaches = run.gwf.get_package("sfr").packagedata.get_data()
+    assert reaches["rlen"].sum() == pytest.approx(spec.ly, rel=1e-12)
     res = gs.backward(step, {"well": gs.select(step, boundnames=["supply_well"])})
     assert res.volume_from["well"].sum() == pytest.approx(800.0, rel=1e-8)
 

@@ -251,7 +251,8 @@ def test_package_type_selects_default_named_package(model_run, mf6_exe, tmp_path
     """With no package name in the name file (MF6 names it 'MAW-1'), package='MAW' still selects."""
     shutil.copytree(model_run("m8_maw").ws, tmp_path, dirs_exist_ok=True)
     nam_file = tmp_path / "m8_maw.nam"
-    nam_file.write_text(nam_file.read_text().replace("m8_maw.maw  maw", "m8_maw.maw"))
+    text = nam_file.read_text(encoding="utf-8")
+    nam_file.write_text(text.replace("m8_maw.maw  maw", "m8_maw.maw"), encoding="utf-8")
     subprocess.run([str(mf6_exe)], cwd=tmp_path, capture_output=True, check=True)
     net = gs.read_network(tmp_path, package_nodes=("MAW",))
     assert net.block("MAW-1").package_type == "MAW"
@@ -286,3 +287,12 @@ def test_aquifer_rtol_admits_a_loose_solve(loose_mover_run):
         # the budgets' difference stays in the reach residuals, which closure includes
         assert np.abs(budget.residual - mf6_diagonal(step))[reaches].max() > 1e-4 * scale
         check_identities(step)
+
+
+def test_network_reader_closes_its_files(model_run):
+    """A NetworkReader closes every model and package budget file at the end of a with block."""
+    with gs.open_simulation(model_run("m8_maw").ws, package_nodes=("MAW",)) as reader:
+        reader.read()
+    files = [r.cbc.file for r in reader.models.values()]
+    files += [cbc.file for _, cbc in reader.packages] + [cbc.file for cbc in reader.movers.values()]
+    assert len(files) >= 2 and all(f.closed for f in files)
