@@ -8,7 +8,7 @@
 
 Where does the water pumped by a well come from? Where does recharge under a polluted site end up? `gwsource` answers such questions from the output of a MODFLOW 6 groundwater-flow model. It reads the binary grid file and the cell-by-cell budget file that the model saves. For every cell it then works out what fraction and volume of the cell's water reaches a chosen destination (backward tracing, or capture) and what fraction came from a chosen source (forward tracing, or fate).
 
-The water in each cell is treated as fully mixed. This is the cell-mixing flow-tracing method of Foley & Black (2013) and Black & Foley (2013). `gwsource` writes the trace as one sparse system of linear equations and solves it for many destinations or sources at once. Flow loops, weak sinks and package networks are therefore handled exactly, and every result is checked against the model's water budget.
+`gwsource` builds upon the cell-mixing flow-tracing method of Foley & Black (2013) and Black & Foley (2013). The code writes the trace as one sparse system of linear equations and solves it for many destinations or sources at once. Flow loops, weak sinks and package networks are therefore handled exactly, and every result is checked against the model's water budget.
 
 ## What it does
 
@@ -50,9 +50,7 @@ The documentation, with the API reference and the tutorials, is at <https://rhug
 
 ## Citing
 
-If you use `gwsource`, please cite it. The citation details are in [CITATION.cff](CITATION.cff), and GitHub's "Cite this repository" button formats them. Each release is archived on Zenodo; [doi:10.5281/zenodo.23782547](https://doi.org/10.5281/zenodo.23782547) always resolves to the latest version. Please also cite the method:
-
-- Foley, C., and Black, A. (2013). [Efficiently delineating volumetric capture areas and flow pathways using directed acyclic graphs and MODFLOW](https://groundwater-science.co.uk/wp-content/uploads/2013_FSv6_DAGPaper.pdf). In *Proceedings of MODFLOW and More 2013: Translating Science into Practice*, Golden, Colorado, 571–581.
+If you use `gwsource`, please cite it. The citation details are in [CITATION.cff](CITATION.cff), and GitHub's "Cite this repository" button formats them. Each release is archived on Zenodo, and [doi:10.5281/zenodo.23782547](https://doi.org/10.5281/zenodo.23782547) always resolves to the latest version.
 
 ## Contributing
 
