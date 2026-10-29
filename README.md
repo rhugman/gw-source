@@ -4,6 +4,7 @@
 [![PyPI](https://img.shields.io/pypi/v/gwsource)](https://pypi.org/project/gwsource/)
 [![docs](https://github.com/rhugman/gw-source/actions/workflows/docs.yml/badge.svg)](https://rhugman.github.io/gw-source/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23782547.svg)](https://doi.org/10.5281/zenodo.23782547)
 
 Where does the water pumped by a well come from? Where does recharge under a polluted site end up? `gwsource` answers such questions from the output of a MODFLOW 6 groundwater-flow model. It reads the binary grid file and the cell-by-cell budget file that the model saves. For every cell it then works out what fraction and volume of the cell's water reaches a chosen destination (backward tracing, or capture) and what fraction came from a chosen source (forward tracing, or fate).
 
@@ -49,7 +50,7 @@ The documentation, with the API reference and the tutorials, is at <https://rhug
 
 ## Citing
 
-If you use `gwsource`, please cite it. The citation details are in [CITATION.cff](CITATION.cff), and GitHub's "Cite this repository" button formats them. 
+If you use `gwsource`, please cite it. The citation details are in [CITATION.cff](CITATION.cff), and GitHub's "Cite this repository" button formats them. Each release is archived on Zenodo, and [doi:10.5281/zenodo.23782547](https://doi.org/10.5281/zenodo.23782547) always resolves to the latest version.
 
 ## Contributing
 
