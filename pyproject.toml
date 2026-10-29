@@ -3,7 +3,7 @@ requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "gw-source"
+name = "gwsource"
 dynamic = ["version"]
 description = "Cell-mixing flow tracing (capture and source fractions) for MODFLOW 6 output."
 readme = "README.md"
@@ -11,16 +11,30 @@ license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.11"
 authors = [{ name = "Rui Hugman" }]
+keywords = ["MODFLOW 6", "groundwater", "flow tracing", "capture zone", "source water", "full mixing"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Hydrology",
+]
 dependencies = [
     "numpy",
     "scipy",
-    "flopy",
+    "flopy>=3.11",
 ]
 
 [project.optional-dependencies]
 export = ["xarray", "netcdf4", "geopandas"]
 dev = ["pytest"]
+docs = ["sphinx", "pydata-sphinx-theme", "myst-nb", "sphinx-copybutton"]
 notebooks = ["jupyterlab", "ipykernel", "nbclient", "nbformat", "nbconvert", "matplotlib", "pandas"]
+
+[project.urls]
+Homepage = "https://github.com/rhugman/gw-source"
+Documentation = "https://rhugman.github.io/gw-source/"
+Issues = "https://github.com/rhugman/gw-source/issues"
 
 [tool.setuptools.dynamic]
 version = { attr = "gwsource.__version__" }

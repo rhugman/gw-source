@@ -1,0 +1,28 @@
+{
+  "upload_type": "software",
+  "title": "gwsource: code and analysis scripts for \"Where does it come from and where does it go? Open-source flow tracing for MODFLOW 6 models\"",
+  "description": "<p>Archive of the <code>paper</code> branch of <a href=\"https://github.com/rhugman/gw-source\">gwsource</a>, cell-mixing flow tracing for MODFLOW 6. It holds the <code>gwsource</code> package and the scripts in <code>studies/</code> that rerun every study of the paper and draw every figure. <code>studies/README.md</code> explains how: create the pinned environment of <code>studies/environment.yml</code>, then run <code>python studies/setup_tools.py</code> and <code>python studies/reproduce.py</code>.</p>",
+  "creators": [
+    {
+      "name": "Hugman, Rui",
+      "affiliation": "INTERA Inc."
+    }
+  ],
+  "license": "MIT",
+  "keywords": [
+    "MODFLOW 6",
+    "groundwater",
+    "flow tracing",
+    "full mixing",
+    "contributing area",
+    "sources of water",
+    "travel time"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/rhugman/gw-source",
+      "relation": "isSupplementTo",
+      "resource_type": "software"
+    }
+  ]
+}
