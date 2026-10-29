@@ -12,15 +12,16 @@ package; BUDGET FILEOUT on SFR, MAW and MVR), heads, DATA-SAT (SAVE_SATURATION) 
 
 The tutorial aquifer (AquiferSpec) is a single unconfined layer, 2 km x 2 km in 50 m cells.
 Recharge falls everywhere; a constant head on the west edge (10 m) brings regional inflow from
-upland, and a river along a north-south column (stage 6 m) drains the aquifer. A supply well
-just west of the river draws it down, so the well captures recharge, regional inflow from the
-west edge and some river water. The variants keep this plan so results compare across
-tutorials: three layers (with a weak-sink well), Voronoi DISV, DISU, XT3D anisotropy, transient
-seasons, an SFR stream fed by drains through the water mover, a multi-aquifer well, and random
-log-K realisations.
+upland, and a stream (SFR) flowing north to south along one column, its stage close to 6 m,
+drains the aquifer. A supply well just west of the stream draws it down, so the well captures
+recharge, regional inflow from the west edge and some stream water. The stream reaches are
+source/sink terms of their aquifer cells unless a trace reads them as nodes. The variants keep
+this plan so results compare across tutorials: three layers (with a weak-sink well), Voronoi
+DISV, DISU, XT3D anisotropy, transient seasons, drains feeding the stream through the water
+mover, a multi-aquifer well, and random log-K realisations.
 
-Stresses are given on (row, col) of the tutorial grid; the river reaches carry the boundnames
-'river_north' and 'river_south', and wells carry their own names.
+Stresses are given on (row, col) of the tutorial grid; the stream reaches carry the boundnames
+'stream_north' and 'stream_south', and wells carry their own names.
 """
 
 import importlib.util
@@ -48,7 +49,7 @@ IMS_SETTINGS = {
 }
 VORONOI_BACKGROUND = 50.0  # m: vorflow mesh size away from the features (as the DIS cells)
 VORONOI_WELL_SIZE = 10.0  # m: vorflow mesh size at the wells
-VORONOI_RIVER_SIZE = 12.5  # m: vorflow mesh size along the river
+VORONOI_RIVER_SIZE = 12.5  # m: vorflow mesh size along the stream
 SEASONS = ("wet", "wet-to-dry", "dry", "dry-to-wet")  # named by recharge (SEASON_RECHARGE)
 SEASON_RECHARGE = (1.8, 1.0, 0.1, 1.1)  # multipliers of AquiferSpec.rech
 SEASON_PUMPING = (0.8, 1.0, 1.4, 0.8)  # multipliers of the well rates
@@ -101,6 +102,8 @@ class AquiferSpec:
     """Plan geometry, properties and stresses of the tutorial aquifer (stresses on (row, col)).
 
     k may be a scalar or a (nrow, ncol) array. wells: (boundname, (row, col), rate [m3/d]).
+    The stream bed top falls from stream_top at the north edge by stream_slope per metre; its
+    conductance per metre of stream is stream_bed_k x stream_width / stream_bed_thick.
     """
 
     nrow: int = 40
@@ -113,10 +116,13 @@ class AquiferSpec:
     strt: float = 10.0
     rech: float = 5.0e-4
     chd_head: float = 10.0
-    riv_col: int = 30
-    riv_stage: float = 6.0
-    riv_cond: float = 500.0
-    riv_rbot: float = 4.0
+    stream_col: int = 30
+    stream_top: float = 6.0  # m, bed top at the north edge
+    stream_slope: float = 1.0e-4  # bed slope (-), also the slope in Manning's equation
+    stream_width: float = 5.0  # m
+    stream_bed_k: float = 2.0  # m/d
+    stream_bed_thick: float = 1.0  # m
+    stream_manning: float = 0.03  # s/m^(1/3)
     wells: tuple[tuple[str, tuple[int, int], float], ...] = (
         ("supply_well", (20, 28), -800.0),
     )
@@ -155,9 +161,9 @@ class ModelRun:
     info: dict = field(default_factory=dict)
 
 
-def riv_boundname(row: int, spec: AquiferSpec) -> str:
-    """Return the boundname of the river reach in a row ('river_north' or 'river_south')."""
-    return "river_north" if row < spec.nrow // 2 else "river_south"
+def stream_boundname(y: float, spec: AquiferSpec) -> str:
+    """Return the boundname of the stream reach at y ('stream_north' or 'stream_south')."""
+    return "stream_north" if y > spec.ly / 2.0 else "stream_south"
 
 
 def chd_cells(spec: AquiferSpec) -> list[tuple[int, int]]:
@@ -165,9 +171,14 @@ def chd_cells(spec: AquiferSpec) -> list[tuple[int, int]]:
     return [(row, 0) for row in range(spec.nrow)]
 
 
-def riv_cells(spec: AquiferSpec) -> list[tuple[int, int]]:
-    """Return the (row, col) of the river column."""
-    return [(row, spec.riv_col) for row in range(spec.nrow)]
+def stream_cells(spec: AquiferSpec) -> list[tuple[int, int]]:
+    """Return the (row, col) of the stream column, north to south."""
+    return [(row, spec.stream_col) for row in range(spec.nrow)]
+
+
+def stream_x(spec: AquiferSpec) -> float:
+    """Return the x of the stream line [m] (the centre of the stream column)."""
+    return (spec.stream_col + 0.5) * spec.delr
 
 
 def all_cells(spec: AquiferSpec) -> list[tuple[int, int]]:
@@ -222,33 +233,70 @@ def add_npf_ic_oc(gwf, name: str, k, icelltype, strt, **npf_kwargs) -> None:
     )
 
 
+def add_sfr(
+    gwf,
+    spec: AquiferSpec,
+    name: str,
+    cellids: list,
+    lengths: list[float],
+    ys: list[float],
+    mover: bool = False,
+) -> None:
+    """Add the stream as SFR: one reach per cell, given north to south, flowing south.
+
+    The stream has no inflow from upstream: its water is groundwater seepage (and moved water).
+
+    lengths are the reach lengths [m] and ys the y of the reach cells [m]; the bed top of a
+    reach is set by its distance from the north edge. SFR writes its own budget file (needed to
+    trace with package nodes: gs.open_simulation(ws, package_nodes=("SFR",))).
+    """
+    n = len(cellids)
+    packagedata, connections = [], []
+    for rno, (cellid, length, y) in enumerate(zip(cellids, lengths, ys)):
+        rtp = spec.stream_top - spec.stream_slope * (spec.ly - y)
+        ncon = int(rno > 0) + int(rno < n - 1)
+        packagedata.append((
+            rno, cellid, length, spec.stream_width, spec.stream_slope, rtp,
+            spec.stream_bed_thick, spec.stream_bed_k, spec.stream_manning, ncon, 1.0, 0,
+            stream_boundname(y, spec),
+        ))
+        upstream = [rno - 1] if rno > 0 else []
+        downstream = [-(rno + 1)] if rno < n - 1 else []
+        connections.append([rno, *upstream, *downstream])
+    flopy.mf6.ModflowGwfsfr(
+        gwf, nreaches=n, packagedata=packagedata, connectiondata=connections,
+        perioddata={0: [(0, "INFLOW", 0.0)]},  # FloPy's model splitter needs a PERIOD block
+        boundnames=True, mover=mover,
+        length_conversion=1.0, time_conversion=86400.0,  # Manning's n in m and s; model in m, d
+        save_flows=True, budget_filerecord=f"{name}.sfr.bud", pname="sfr",
+    )
+
+
 def add_stresses(
     gwf,
     spec: AquiferSpec,
     to_cellid,
+    name: str,
     pumping: tuple[float, ...] = (1.0,),
     recharge: tuple[float, ...] = (1.0,),
-    river: bool = True,
     wells: bool = True,
     nlay: int = 1,
+    stream_mover: bool = False,
 ) -> None:
-    """Add CHD (every layer), RIV, WEL and RCH (top layer); WEL and RCH scaled per period.
+    """Add CHD (every layer), the SFR stream, WEL and RCH (top layer); WEL, RCH scaled per period.
 
-    Layers below the first (nlay > 1) are addressed as DIS (layer, row, col).
+    Layers below the first (nlay > 1) are addressed as DIS (layer, row, col). stream_mover lets
+    the stream take part in a water mover (MVR).
     """
     assert len(pumping) == len(recharge), "one pumping and one recharge factor per period"
     chd = [(to_cellid(rc), spec.chd_head) for rc in chd_cells(spec)]
     chd += [((lay, *rc), spec.chd_head) for lay in range(1, nlay) for rc in chd_cells(spec)]
     flopy.mf6.ModflowGwfchd(gwf, stress_period_data={0: chd}, save_flows=True, pname="chd")
-    if river:
-        riv = [
-            (to_cellid(rc), spec.riv_stage, spec.riv_cond, spec.riv_rbot,
-             riv_boundname(rc[0], spec))
-            for rc in riv_cells(spec)
-        ]
-        flopy.mf6.ModflowGwfriv(
-            gwf, stress_period_data={0: riv}, boundnames=True, save_flows=True, pname="riv"
-        )
+    cells = stream_cells(spec)
+    add_sfr(
+        gwf, spec, name, [to_cellid(rc) for rc in cells], [spec.delc] * len(cells),
+        [spec.xy(rc)[1] for rc in cells], mover=stream_mover,
+    )
     if wells:
         wel = {
             kper: [(to_cellid(rc), rate * factor, bname) for bname, rc, rate in spec.wells]
@@ -267,12 +315,17 @@ def add_stresses(
 def run_model(
     sim, gwf, name: str, ws: Path, dis_filename: str, spec: AquiferSpec, info: dict
 ) -> ModelRun:
-    """Write and run the simulation, assert normal termination, and return a ModelRun."""
+    """Write and run the simulation, assert normal termination, and return a ModelRun.
+
+    info['sfr_budget_file'] is set when the model has the stream.
+    """
     ws = Path(ws)
+    if gwf.get_package("sfr") is not None:
+        info = {**info, "sfr_budget_file": ws / f"{name}.sfr.bud"}
     sim.write_simulation(silent=True)
     success, buff = sim.run_simulation(silent=True, report=True)
     assert success, f"MF6 run of {name} failed:\n" + "\n".join(buff[-20:])
-    assert "Normal termination" in (ws / "mfsim.lst").read_text(), f"{name}: no normal termination"
+    assert "Normal termination" in (ws / "mfsim.lst").read_text(encoding="utf-8"), f"{name}: no normal termination"
     return ModelRun(
         name=name, ws=ws, sim=sim, gwf=gwf, grb_file=ws / f"{dis_filename}.grb",
         budget_file=ws / f"{name}.cbc", head_file=ws / f"{name}.hds", spec=spec, info=info,
@@ -293,13 +346,13 @@ def _well_nodes(spec: AquiferSpec, layer: int = 0) -> dict[str, int]:
 
 
 def build_quickstart(ws: Path, exe: Path, spec: AquiferSpec | None = None) -> ModelRun:
-    """Steady 1-layer DIS model: recharge, a supply well, a river and a constant-head west edge."""
+    """Steady 1-layer DIS model: recharge, a supply well, a stream and a constant-head west edge."""
     spec = AquiferSpec() if spec is None else spec
     name = "quickstart"
     sim, gwf = make_sim(name, ws, exe, STEADY)
     dis_filename = add_dis(gwf, spec, name)
     add_npf_ic_oc(gwf, name, k=k_layer(spec), icelltype=1, strt=spec.strt)
-    add_stresses(gwf, spec, _dis_cellid())
+    add_stresses(gwf, spec, _dis_cellid(), name)
     info = {"well_nodes": _well_nodes(spec)}
     return run_model(sim, gwf, name, ws, dis_filename, spec, info)
 
@@ -325,7 +378,7 @@ def build_layered(
 ) -> ModelRun:
     """Steady 3-layer DIS model; the supply well and a small weak-sink well screen layer 3 only.
 
-    The river and recharge act on layer 1, the constant heads on every layer. spec.wells is
+    The stream and recharge act on layer 1, the constant heads on every layer. spec.wells is
     ignored; wells are (boundname, (layer, row, col), rate). info['weak_well_node'] is the
     0-based node of 'weak_well' when present.
     """
@@ -339,7 +392,7 @@ def build_layered(
     add_npf_ic_oc(
         gwf, name, k=k, icelltype=[1] + [0] * (nlay - 1), strt=spec.strt, k33=k33_ratio * k
     )
-    add_stresses(gwf, spec, _dis_cellid(), wells=False, nlay=nlay)
+    add_stresses(gwf, spec, _dis_cellid(), name, wells=False, nlay=nlay)
     wel = [(cellid, rate, bname) for bname, cellid, rate in wells]
     flopy.mf6.ModflowGwfwel(
         gwf, stress_period_data={0: wel}, boundnames=True, save_flows=True, pname="wel"
@@ -372,18 +425,18 @@ def vorflow_cells(
     """Mesh the tutorial domain with vorflow; return its Voronoi cells as a GeoDataFrame.
 
     background is the mesh size away from the features [m]. The mesh is refined to well_size
-    at each well (a point) and to river_size along the river (a line), and grows back to
+    at each well (a point) and to river_size along the stream (a line), and grows back to
     background with vorflow's default growth factor (1.2 from cell to cell). Each well point
-    is the centre of its cell, and the river cells are centred on the river line.
+    is the centre of its cell, and the stream cells are centred on the stream line.
     """
     from shapely.geometry import LineString, Point, box
 
     vorflow = require_vorflow()
     vorflow.set_verbosity(0)  # no progress messages; warnings and errors still show
-    riv_x = (spec.riv_col + 0.5) * spec.delr
+    x = stream_x(spec)
     blueprint = vorflow.ConceptualMesh()
     blueprint.add_polygon(box(0.0, 0.0, spec.lx, spec.ly), zone_id=1)
-    blueprint.add_line(LineString([(riv_x, 0.0), (riv_x, spec.ly)]), "river", river_size)
+    blueprint.add_line(LineString([(x, 0.0), (x, spec.ly)]), "stream", river_size)
     for bname, rc, _ in spec.wells:
         blueprint.add_point(Point(spec.xy(rc)), bname, well_size)
     polys, lines, points = blueprint.generate()
@@ -415,10 +468,11 @@ def disv_gridprops(cells, decimals: int = 6) -> dict:
     return {"ncpl": len(cell2d), "nvert": len(vertices), "vertices": vertices, "cell2d": cell2d}
 
 
-def voronoi_stress_cells(gridprops: dict, spec: AquiferSpec) -> dict[str, list[int]]:
-    """Place the stresses on Voronoi cells by geometry: west edge, river line, well points.
+def voronoi_stress_cells(gridprops: dict, spec: AquiferSpec) -> dict[str, list]:
+    """Place the stresses on Voronoi cells by geometry: west edge, stream line, well points.
 
-    The river cells are the cells that the river line crosses over a length > 0.
+    The stream cells are the cells that the stream line crosses over a length > 0, north to
+    south; 'stream_lengths' holds the crossed lengths [m].
     """
     from flopy.utils.gridintersect import GridIntersect
     from shapely.geometry import LineString, Point
@@ -429,15 +483,20 @@ def voronoi_stress_cells(gridprops: dict, spec: AquiferSpec) -> dict[str, list[i
         botm=np.full((1, gridprops["ncpl"]), spec.botm),
     )
     gi = GridIntersect(mg)
-    riv_x = (spec.riv_col + 0.5) * spec.delr
-    river = LineString([(riv_x, 0.0), (riv_x, spec.ly)])
-    crossed = gi.intersect(river, geo_dataframe=False)
-    riv = sorted(int(i) for i, length in zip(crossed.cellids, crossed.lengths) if length > 0.0)
+    x = stream_x(spec)
+    crossed = gi.intersect(LineString([(x, 0.0), (x, spec.ly)]), geo_dataframe=False)
+    lengths = {
+        int(i): float(length) for i, length in zip(crossed.cellids, crossed.lengths) if length > 0.0
+    }
+    stream = sorted(lengths, key=lambda i: -mg.ycellcenters[i])
     xv = np.array([v[1] for v in gridprops["vertices"]])
     chd = [i for i, c in enumerate(gridprops["cell2d"]) if xv[np.array(c[4:], int)].min() < 1e-6]
     wells = [int(gi.intersects(Point(spec.xy(rc)), dataframe=False).cellids[0])
              for _, rc, _ in spec.wells]
-    return {"chd": chd, "riv": riv, "wells": wells, "cell_y": list(mg.ycellcenters)}
+    return {
+        "chd": chd, "stream": stream, "stream_lengths": [lengths[i] for i in stream],
+        "wells": wells, "cell_y": list(mg.ycellcenters),
+    }
 
 
 def build_voronoi(
@@ -451,8 +510,8 @@ def build_voronoi(
     """Steady 1-layer DISV Voronoi version of the quickstart model (same physical problem).
 
     The grid comes from vorflow (vorflow_cells): cells about `background` m across, refined
-    to well_size at the wells and to river_size along the river. The river conductance is
-    shared equally among the river cells so that its total matches the DIS model.
+    to well_size at the wells and to river_size along the stream. Each stream reach is as long
+    as the stream line in its cell, so the stream matches the DIS model.
     """
     spec = AquiferSpec() if spec is None else spec
     gridprops = disv_gridprops(vorflow_cells(spec, background, well_size, river_size))
@@ -462,8 +521,8 @@ def build_voronoi(
 def build_disv(ws: Path, exe: Path, gridprops: dict, spec: AquiferSpec, name: str) -> ModelRun:
     """Steady 1-layer DISV quickstart model on any polygon grid (stresses by voronoi_stress_cells).
 
-    gridprops holds DISV ncpl, nvert, vertices and cell2d (disv_gridprops). The river
-    conductance is shared equally among the river cells so that its total matches the DIS model.
+    gridprops holds DISV ncpl, nvert, vertices and cell2d (disv_gridprops). Each stream reach is
+    as long as the stream line in its cell, so the stream matches the DIS model.
     """
     ws = Path(ws)
     cells = voronoi_stress_cells(gridprops, spec)
@@ -476,18 +535,12 @@ def build_disv(ws: Path, exe: Path, gridprops: dict, spec: AquiferSpec, name: st
     )
     add_npf_ic_oc(gwf, name, k=float(np.mean(k_layer(spec))), icelltype=1, strt=spec.strt)
     chd = [((0, i), spec.chd_head) for i in cells["chd"]]
-    cond = spec.riv_cond * spec.nrow / len(cells["riv"])
-    north = spec.ly / 2.0
-    riv = [
-        ((0, i), spec.riv_stage, cond, spec.riv_rbot,
-         "river_north" if cells["cell_y"][i] > north else "river_south")
-        for i in cells["riv"]
-    ]
     wel = [((0, i), rate, bname) for (bname, _, rate), i in zip(spec.wells, cells["wells"])]
     rch = [((0, i), spec.rech) for i in range(ncpl)]
     flopy.mf6.ModflowGwfchd(gwf, stress_period_data={0: chd}, save_flows=True, pname="chd")
-    flopy.mf6.ModflowGwfriv(
-        gwf, stress_period_data={0: riv}, boundnames=True, save_flows=True, pname="riv"
+    add_sfr(
+        gwf, spec, name, [(0, i) for i in cells["stream"]], cells["stream_lengths"],
+        [cells["cell_y"][i] for i in cells["stream"]],
     )
     flopy.mf6.ModflowGwfwel(
         gwf, stress_period_data={0: wel}, boundnames=True, save_flows=True, pname="wel"
@@ -496,7 +549,7 @@ def build_disv(ws: Path, exe: Path, gridprops: dict, spec: AquiferSpec, name: st
     info = {
         "ncpl": ncpl,
         "well_nodes": {b: i for (b, _, _), i in zip(spec.wells, cells["wells"])},
-        "riv_cells": cells["riv"],
+        "stream_cells": cells["stream"],
         "chd_cells": cells["chd"],
     }
     return run_model(sim, gwf, name, ws, dis_filename, spec, info)
@@ -554,7 +607,7 @@ def build_rotated_squares(
 ) -> ModelRun:
     """Steady DISV quickstart model on squares rotated by `angle`, one centred on the first well.
 
-    The river, the west edge and the wells are placed on the cells by the rules of
+    The stream, the west edge and the wells are placed on the cells by the rules of
     build_voronoi (voronoi_stress_cells).
     """
     spec = AquiferSpec() if spec is None else spec
@@ -616,7 +669,7 @@ def build_disu(ws: Path, exe: Path, spec: AquiferSpec | None = None) -> ModelRun
     dis_filename = f"{name}.disu"
     flopy.mf6.ModflowGwfdisu(gwf, length_units="meters", filename=dis_filename, **disu_kwargs)
     add_npf_ic_oc(gwf, name, k=k_layer(spec).ravel(), icelltype=1, strt=spec.strt)
-    add_stresses(gwf, spec, lambda rc: (spec.node(rc),))
+    add_stresses(gwf, spec, lambda rc: (spec.node(rc),), name)
     info = {"well_nodes": _well_nodes(spec)}
     return run_model(sim, gwf, name, ws, dis_filename, spec, info)
 
@@ -648,7 +701,7 @@ def build_xt3d(
     add_npf_ic_oc(
         gwf, name, k=k, icelltype=1, strt=spec.strt, k22=k22, angle1=angle1, xt3doptions=True
     )
-    add_stresses(gwf, spec, _dis_cellid())
+    add_stresses(gwf, spec, _dis_cellid(), name)
     info = {"well_nodes": _well_nodes(spec), "k": k, "k22": k22, "angle1": angle1}
     return run_model(sim, gwf, name, ws, dis_filename, spec, info)
 
@@ -692,7 +745,7 @@ def build_transient(
         gwf, iconvert=1, ss=ss, sy=sy, steady_state={0: True}, transient={1: True},
         save_flows=True,
     )
-    add_stresses(gwf, spec, _dis_cellid(), pumping=wel_factors, recharge=rch_factors)
+    add_stresses(gwf, spec, _dis_cellid(), name, pumping=wel_factors, recharge=rch_factors)
     info = {
         "well_nodes": _well_nodes(spec),
         "periods": periods,
@@ -704,63 +757,34 @@ def build_transient(
     return run_model(sim, gwf, name, ws, dis_filename, spec, info)
 
 
-# ---------------------------------------------------------------- (f) stream, mover, MAW
+# ---------------------------------------------------------------- (f) drains and mover, MAW
 
 STREAM_DRAINS = (("drain_a", (8, 14), 6.2, 50.0), ("drain_b", (22, 14), 6.0, 50.0))
 DRAIN_TO_STREAM = ((0, "FACTOR", 0.8), (1, "FACTOR", 1.0))  # (drain index, type, value)
-
-
-def _sfr_reaches(spec: AquiferSpec, top_drop: float) -> tuple[list, list]:
-    """Return SFR packagedata and connectiondata for a stream down the river column (N to S)."""
-    rwid, rgrd, rbth, rhk, man, ustrf, ndv = 5.0, 1.0e-3, 1.0, 0.5, 0.03, 1.0, 0
-    packagedata, connections = [], []
-    for rno in range(spec.nrow):
-        rtp = spec.riv_rbot + 2.0 - top_drop * rno
-        ncon = int(rno > 0) + int(rno < spec.nrow - 1)
-        row = (rno, (0, rno, spec.riv_col), spec.delc, rwid, rgrd, rtp, rbth, rhk, man, ncon,
-               ustrf, ndv, riv_boundname(rno, spec))
-        packagedata.append(row)
-        conn = [rno]
-        if rno > 0:
-            conn.append(rno - 1)
-        if rno < spec.nrow - 1:
-            conn.append(-(rno + 1))
-        connections.append(conn)
-    return packagedata, connections
 
 
 def build_stream_mover(
     ws: Path,
     exe: Path,
     spec: AquiferSpec | None = None,
-    stream_inflow: float = 300.0,
     drains: tuple = STREAM_DRAINS,
-    top_drop: float = 0.08,
 ) -> ModelRun:
-    """Steady model with an SFR stream for the river and drains feeding it through MVR.
+    """Quickstart model plus two drains that feed the stream through the water mover (MVR).
 
-    The stream flows north to south down the river column; its bed falls by top_drop per reach,
-    so the upper reaches lose water to the aquifer and the lower ones gain. Two drains west of
-    the stream hand their outflow (80 % and 100 %) to the first reach through the water mover;
-    part of that water leaks back into the aquifer and reaches the well. drains: (boundname,
-    (row, col), elevation, conductance). SFR and MVR write their own budget files (needed to
-    trace with package nodes: gs.open_simulation(ws, package_nodes=("SFR",))).
+    The drains west of the stream hand their outflow (80 % and 100 %) to the first reach;
+    the stream carries it south, and the reaches near the well lose part of it back to the
+    aquifer. drains: (boundname, (row, col), elevation, conductance). MVR writes its own budget
+    file, which a trace with package nodes needs (as the SFR one).
     """
     spec = AquiferSpec() if spec is None else spec
     name = "stream"
-    sim, gwf = make_sim(name, ws, exe, STEADY, {"complexity": "moderate", "outer_maximum": 500})
+    sim, gwf = make_sim(name, ws, exe, STEADY)
     dis_filename = add_dis(gwf, spec, name)
     add_npf_ic_oc(gwf, name, k=k_layer(spec), icelltype=1, strt=spec.strt)
-    add_stresses(gwf, spec, _dis_cellid(), river=False)
+    add_stresses(gwf, spec, _dis_cellid(), name, stream_mover=True)
     drn = [((0, *rc), elev, cond, bname) for bname, rc, elev, cond in drains]
     flopy.mf6.ModflowGwfdrn(
         gwf, stress_period_data={0: drn}, boundnames=True, mover=True, save_flows=True, pname="drn"
-    )
-    packagedata, connections = _sfr_reaches(spec, top_drop)
-    flopy.mf6.ModflowGwfsfr(
-        gwf, nreaches=spec.nrow, packagedata=packagedata, connectiondata=connections,
-        perioddata={0: [(0, "INFLOW", stream_inflow)]}, boundnames=True, mover=True,
-        save_flows=True, budget_filerecord=f"{name}.sfr.bud", pname="sfr",
     )
     movers = [
         ("drn", i, "sfr", 0, kind, value) for i, kind, value in DRAIN_TO_STREAM[: len(drains)]
@@ -772,7 +796,6 @@ def build_stream_mover(
     info = {
         "well_nodes": _well_nodes(spec),
         "drain_nodes": {b: spec.node(rc) for b, rc, _, _ in drains},
-        "sfr_budget_file": Path(ws) / f"{name}.sfr.bud",
         "mvr_budget_file": Path(ws) / f"{name}.mvr.bud",
     }
     return run_model(sim, gwf, name, ws, dis_filename, spec, info)
@@ -803,7 +826,7 @@ def build_maw(
     add_npf_ic_oc(
         gwf, name, k=k, icelltype=[1] + [0] * (nlay - 1), strt=spec.strt, k33=k33_ratio * k
     )
-    add_stresses(gwf, spec, _dis_cellid(), wells=False, nlay=nlay)
+    add_stresses(gwf, spec, _dis_cellid(), name, wells=False, nlay=nlay)
     supply = LAYERED_WELLS[0]
     flopy.mf6.ModflowGwfwel(
         gwf, stress_period_data={0: [(supply[1], supply[2], supply[0])]}, boundnames=True,
@@ -904,18 +927,27 @@ GWT_IMS = {
 }
 
 
+def _bound_counts(package) -> dict[int, int]:
+    """Return {period: number of bounds} of a GWF package (list-based stresses, or SFR reaches)."""
+    if package.package_type == "sfr":
+        return {0: int(package.nreaches.get_data())}
+    return {kper: len(rows) for kper, rows in package.stress_period_data.get_data().items()}
+
+
 def _spc_files(gwf, gwt, tagged: tuple[str, ...]) -> list[tuple[str, str]]:
-    """Add one SPC file per tagged package (concentration 1 on every bound and period)."""
+    """Add one SPC file per tagged package (concentration 1 on every bound and period).
+
+    An SFR package without SFT is a plain source/sink of GWT; its bounds are the reaches.
+    """
     fileinput = []
     for pname in tagged:
-        spd = gwf.get_package(pname).stress_period_data.get_data()
+        counts = _bound_counts(gwf.get_package(pname))
         perioddata = {
-            kper: [(i, "CONCENTRATION", 1.0) for i in range(len(rows))]
-            for kper, rows in spd.items()
+            kper: [(i, "CONCENTRATION", 1.0) for i in range(n)] for kper, n in counts.items()
         }
         filename = f"{pname}.spc"
         flopy.mf6.ModflowUtlspc(
-            gwt, maxbound=max(len(r) for r in spd.values()), perioddata=perioddata,
+            gwt, maxbound=max(counts.values()), perioddata=perioddata,
             filename=filename, pname=f"spc_{pname}",
         )
         fileinput.append((pname, filename))

@@ -111,7 +111,7 @@ def test_cycle_report_model5_and_export(model_run, tmp_path):
     assert 0 < sum(shares) < 1
     assert [c.circulation for c in cycles] == sorted((c.circulation for c in cycles), reverse=True)
     path = gs.export.save_cycle_report(tmp_path / "cycles.csv", cycles)
-    with path.open() as f:
+    with path.open(encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
     assert len(rows) == len(cycles)
     assert [int(n) for n in rows[0]["cells"].split()] == cycles[0].cells.tolist()

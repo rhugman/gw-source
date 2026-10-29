@@ -9,10 +9,17 @@ Backward: F_i - sum_j (q_ij/O_i) F_j = sum_{k in D, q_k<0} |q_k| / O_i
 Forward:  G_i - sum_j (q_ji/I_i) G_j = sum_{k in S, q_k>0} q_k / I_i
 Cells with O_i = 0 (backward) or I_i = 0 (forward) get an identity row and zero right-hand side.
 
+Strong sinks (TraceConfig.strong_sinks, backward only). A strong-sink cell is absorbing: its
+water leaves through its sink terms only, none goes on to its neighbours. With Snk_i the sum of
+its sink outflows its row is F_i = sum_{k in D, q_k<0} |q_k| / Snk_i, so its water is split
+among the sink groups by their flows.
+
 Net accounting (the reference method, Foley & Black 2013 [FB13]). Edges only:
     s_i = O^edges_i - I^edges_i,   T_i = I^edges_i + max(s_i, 0)
 Destination cells are absorbing (f = 1, their out-edges ignored); elsewhere
     f_i = sum_j q_ij f_j / T_i.
+Strong-sink cells outside the destination are absorbing with f = 0 (their water goes to their
+own sinks).
 Forward net mode is the same on the reversed graph with source cells fixed at g = 1.
 
 Net group inflow. Summing the row equations T_i f_i = sum_j q_ij f_j over the cells outside the
@@ -140,12 +147,19 @@ def group_term_flows(step: FlowStep, groups: dict[str, Selection], sign: int) ->
 
 
 def gross_backward_system(
-    step: FlowStep, edges: Edges, budget: CellBudget, groups: dict[str, Selection]
+    step: FlowStep,
+    edges: Edges,
+    budget: CellBudget,
+    groups: dict[str, Selection],
+    strong: np.ndarray | None = None,
 ) -> tuple[sp.csr_matrix, np.ndarray]:
-    """Return (I - P, S D) for gross backward tracing; one right-hand-side column per group."""
-    outflow = budget.outflow
-    matrix = system_matrix(step.n_cells, edges.src, edges.dst, edges.q, outflow)
-    rhs = _safe_divide(group_term_flows(step, groups, sign=-1), outflow)
+    """Return (I - P, S D) for gross backward tracing; one right-hand-side column per group.
+
+    strong: optional mask of strong-sink cells; their rows are F_i = d_i / Snk_i (module doc).
+    """
+    norm = budget.outflow if strong is None else np.where(strong, budget.sink, budget.outflow)
+    matrix = system_matrix(step.n_cells, edges.src, edges.dst, edges.q, norm, fixed=strong)
+    rhs = _safe_divide(group_term_flows(step, groups, sign=-1), norm)
     return matrix, rhs
 
 
@@ -171,11 +185,20 @@ def net_balance(n: int, edges: Edges) -> tuple[np.ndarray, np.ndarray]:
 
 
 def net_system(
-    n: int, edges: Edges, fixed: np.ndarray, throughflow: np.ndarray, backward: bool
+    n: int,
+    edges: Edges,
+    fixed: np.ndarray,
+    throughflow: np.ndarray,
+    backward: bool,
+    absorbing: np.ndarray | None = None,
 ) -> tuple[sp.csr_matrix, np.ndarray]:
-    """Return (matrix, rhs) of net-mode tracing with the fixed cells set to 1."""
+    """Return (matrix, rhs) of net-mode tracing with the fixed cells set to 1.
+
+    absorbing: optional mask of further cells set to 0 (strong sinks outside the destination).
+    """
     row, col = (edges.src, edges.dst) if backward else (edges.dst, edges.src)
-    matrix = system_matrix(n, row, col, edges.q, throughflow, fixed=fixed)
+    identity = fixed if absorbing is None else fixed | absorbing
+    matrix = system_matrix(n, row, col, edges.q, throughflow, fixed=identity)
     return matrix, fixed.astype(float)
 
 

@@ -12,6 +12,7 @@ The water in each cell is treated as fully mixed. This is the cell-mixing flow-t
 ## What it does
 
 - Backward (capture) and forward (fate) tracing of steady flow, on DIS, DISV and DISU grids.
+- Optional strong sinks: chosen packages take all the water of their cells, as particles stop in a strong sink.
 - Transient flow: each time step as a snapshot, or true tracking of tagged water through storage, forward and backward in time.
 - Eulerian mean travel time and water age.
 - Multi-model simulations, exchanges and advanced-package networks (SFR, LAK, MAW, UZF and the water mover).

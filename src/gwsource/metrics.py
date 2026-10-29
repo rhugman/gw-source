@@ -21,6 +21,9 @@ Backward (capture) outputs per destination group g:
   accounting it depends on the solved fractions, not on the budget alone (gwsource.assemble).
 - destination_throughflow (net only, empty in gross): sum of the destination cells' throughflow
   T. For a group of several cells it counts water passing between them more than once.
+- absorbing: (cells, groups) mask of the strong-sink cells that absorb in each group's solve
+  (TraceConfig.strong_sinks; net mode leaves out the group's own fixed cells), None without
+  strong sinks. The closure check needs it (gwsource.diagnostics).
 
 Forward (fate) outputs per source group g:
 - source_fraction G: fraction of the water in the cell that came from g (dilution ratio C/C0).
@@ -67,6 +70,7 @@ class BackwardResult:
     cycles: list[Cycle] = field(default_factory=list)
     closed_loops: list[np.ndarray] = field(default_factory=list)
     factor: Factor | None = field(default=None, repr=False, compare=False)
+    absorbing: np.ndarray | None = None
 
     @property
     def groups(self) -> list[str]:

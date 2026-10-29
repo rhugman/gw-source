@@ -1,5 +1,7 @@
 """Reader checks on the MF6 test models: node numbering, sign convention, geometry, file lookup."""
 
+import shutil
+
 import numpy as np
 import pytest
 
@@ -92,6 +94,20 @@ def test_find_model_files(model_run):
     files = gs.find_model_files(run.ws)
     assert files.grb_file == run.grb_file and files.budget_file == run.budget_file
     assert files.dis_type == "DISV" and files.model.lower() == "m3_disv"
+
+
+def test_step_reader_closes_its_files(model_run, tmp_path):
+    """A StepReader closes its budget and head files at the end of a with block.
+
+    Open handles stop Windows from deleting the model folder.
+    """
+    shutil.copytree(model_run("m6_transient").ws, tmp_path, dirs_exist_ok=True)
+    with gs.open_model(tmp_path) as reader:
+        reader.read(reader.steps[-1])
+        assert reader.heads is not None, "the test model saves heads"
+        assert not reader.cbc.file.closed and not reader.heads.file.closed
+    assert reader.cbc.file.closed and reader.heads.file.closed
+    shutil.rmtree(tmp_path)
 
 
 def test_transient_steps_and_storage_terms(model_run):

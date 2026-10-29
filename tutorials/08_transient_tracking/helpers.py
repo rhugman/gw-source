@@ -40,7 +40,7 @@ def step_summary(reader, boundname: str) -> pd.DataFrame:
             "storage release (m3/d)": float(q_sto[q_sto > 0].sum()),
             "storage gain (m3/d)": -float(q_sto[q_sto < 0].sum()),
         }
-        for name in ("RCH", "RIV", "CHD"):
+        for name in ("RCH", "SFR", "CHD"):
             row[f"snapshot {name}"] = by_term.get(name, 0.0) / total
         row["snapshot storage"] = sum(by_term.get(t, 0.0) for t in STORAGE_TERMS) / total
         rows.append(row)
@@ -82,7 +82,7 @@ def map_panels(
     for ax, (values, title) in zip(axes.ravel(), panels):
         hbd.plot_cells(grb_file, step, values, ax=ax, title=title, overlay=False, colorbar=False,
                        **kwargs)
-        hbd.overlay_features(ax, grb_file, step, packages=("RIV", "WEL"), legend=False)
+        hbd.overlay_features(ax, grb_file, step, packages=("SFR", "WEL"), legend=False)
     for ax in axes.ravel()[len(panels):]:
         ax.axis("off")
     fig.colorbar(axes[0, 0].collections[0], ax=axes, shrink=0.8, label=label)

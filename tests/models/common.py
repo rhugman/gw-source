@@ -157,7 +157,7 @@ def run_model(sim, gwf, name: str, ws: Path, dis_filename: str, notes: dict) -> 
     sim.write_simulation(silent=True)
     success, buff = sim.run_simulation(silent=True, report=True)
     assert success, f"MF6 run of {name} failed:\n" + "\n".join(buff[-20:])
-    lst_text = (ws / "mfsim.lst").read_text()
+    lst_text = (ws / "mfsim.lst").read_text(encoding="utf-8")
     assert "Normal termination of simulation" in lst_text, f"{name}: no normal termination"
     return ModelRun(
         name=name,

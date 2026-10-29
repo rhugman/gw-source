@@ -61,3 +61,13 @@ html_theme_options = {
     "navigation_with_keys": False,
 }
 html_show_sourcelink = False
+
+
+def docstring_as_text(app, what, name, obj, options, lines):
+    """Show docstrings verbatim: they are plain text (formulas, aligned lists), not reStructuredText."""
+    if lines:
+        lines[:] = ["::", ""] + [f"    {line}" for line in lines] + [""]
+
+
+def setup(app):
+    app.connect("autodoc-process-docstring", docstring_as_text)

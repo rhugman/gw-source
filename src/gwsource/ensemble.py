@@ -171,8 +171,8 @@ def trace_realisation(
     ws: Path, groups: GroupSpec, config: EnsembleConfig, trace_config: TraceConfig
 ) -> Realisation:
     """Read, trace and reduce one realisation to the requested per-cell outputs."""
-    reader = open_model(ws, config.model, boundnames=config.boundnames)
-    step = reader.read(config.kstpkper)
+    with open_model(ws, config.model, boundnames=config.boundnames) as reader:
+        step = reader.read(config.kstpkper)
     step_groups = resolve_groups(step, groups)
     trace = backward if config.mode == "backward" else forward
     result = trace(step, step_groups, trace_config)

@@ -222,7 +222,7 @@ def save_cycle_report(path: str | Path, cycles: list[Cycle]) -> Path:
     path = Path(path)
     rows = cycle_table(cycles)
     fields = list(rows[0]) if rows else ["cycle", "n_cells", "circulation", "cells"]
-    with path.open("w", newline="") as f:
+    with path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fields)
         writer.writeheader()
         writer.writerows(rows)
@@ -603,7 +603,7 @@ def save_package_csv(path: str | Path, step: FlowStep, result, points=None) -> P
     for row in rows:
         row["x"], row["y"] = points.get(row["node"], (np.nan, np.nan))
     fields = list(rows[0]) if rows else ["model", "package", "id", "node"]
-    with path.open("w", newline="") as f:
+    with path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fields)
         writer.writeheader()
         writer.writerows(rows)

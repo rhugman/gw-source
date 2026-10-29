@@ -25,7 +25,7 @@ from .metrics import (
     forward_metrics,
     per_cell_by_package,
 )
-from .selectors import Selection
+from .selectors import Selection, _package_mask
 from .solve import (
     Factor,
     dependency_graph,
@@ -45,6 +45,23 @@ def _check_groups(step: FlowStep, groups: dict[str, Selection]) -> None:
         )
 
 
+def strong_sink_cells(step: FlowStep, strong_sinks: str | tuple[str, ...]) -> np.ndarray | None:
+    """Return the mask of cells with a sink term of a strong-sink package (None if none named).
+
+    strong_sinks is TraceConfig.strong_sinks: "all" (every sink term) or package selectors
+    matched as select(package=); each selector must match a package of the step.
+    """
+    if not strong_sinks:
+        return None
+    if strong_sinks == "all":
+        terms = np.ones(step.n_terms, dtype=bool)
+    else:
+        terms = np.any([_package_mask(step, name) for name in strong_sinks], axis=0)
+    strong = np.zeros(step.n_cells, dtype=bool)
+    strong[step.term_cell[terms & (step.term_flow < 0.0)]] = True
+    return strong
+
+
 def backward(
     step: FlowStep, groups: dict[str, Selection], config: TraceConfig | None = None
 ) -> BackwardResult:
@@ -52,10 +69,11 @@ def backward(
     config = TraceConfig() if config is None else config
     _check_groups(step, groups)
     edges = flow_edges(step)
+    strong = strong_sink_cells(step, config.strong_sinks)
     if config.accounting == "net":
-        result = _net_backward(step, groups, edges, config)
+        result = _net_backward(step, groups, edges, config, strong)
     else:
-        result = _gross_backward(step, groups, edges, config)
+        result = _gross_backward(step, groups, edges, config, strong)
     result.cycles = find_cycles(step.n_cells, edges)
     return result
 
@@ -65,6 +83,7 @@ def forward(
 ) -> ForwardResult:
     """Trace forward from each source group: fraction of water in each cell that came from it."""
     config = TraceConfig() if config is None else config
+    assert not config.strong_sinks, "strong_sinks is defined for backward traces only"
     _check_groups(step, groups)
     edges = flow_edges(step)
     if config.accounting == "net":
@@ -87,11 +106,14 @@ def _solve(matrix, rhs: np.ndarray, config: TraceConfig) -> tuple[np.ndarray, Fa
 
 
 def _gross_backward(
-    step: FlowStep, groups: dict, edges: Edges, config: TraceConfig
+    step: FlowStep, groups: dict, edges: Edges, config: TraceConfig, strong: np.ndarray | None
 ) -> BackwardResult:
-    """Gross-accounting backward trace: one solve with a column per group."""
+    """Gross-accounting backward trace: one solve with a column per group.
+
+    Strong-sink cells (strong) are absorbing with F = d / Snk (gwsource.assemble).
+    """
     budget = cell_budget(step, edges)
-    matrix, rhs = gross_backward_system(step, edges, budget, groups)
+    matrix, rhs = gross_backward_system(step, edges, budget, groups, strong)
     fraction, factor, loops = _solve(matrix, rhs, config)
     destination = group_term_flows(step, groups, sign=-1).sum(axis=0)
     by_package = per_cell_by_package(step, sign=+1)
@@ -101,6 +123,8 @@ def _gross_backward(
     result.solver_used = [factor.kind]
     result.closed_loops = loops
     result.factor = factor
+    if strong is not None:
+        result.absorbing = np.repeat(strong[:, None], len(groups), axis=1)
     return result
 
 
@@ -167,30 +191,46 @@ class NetSolution:
     used: list[Edges]
     solvers: list[str]
     loops: list[np.ndarray]
+    absorbing: np.ndarray | None = None
 
 
 def _net_solve(
-    step: FlowStep, groups: dict, edges: Edges, config: TraceConfig, backward: bool
+    step: FlowStep,
+    groups: dict,
+    edges: Edges,
+    config: TraceConfig,
+    backward: bool,
+    strong: np.ndarray | None = None,
 ) -> NetSolution:
-    """Solve net mode group by group, with each group's cells fixed by net_fixed_cells."""
+    """Solve net mode group by group, with each group's cells fixed by net_fixed_cells.
+
+    Strong-sink cells (strong, backward only) outside a group's fixed cells absorb with f = 0.
+    """
     n, n_groups = step.n_cells, len(groups)
     fraction, s_all, t_all = (np.zeros((n, n_groups)) for _ in range(3))
-    fixed_all = np.zeros((n, n_groups), dtype=bool)
+    fixed_all, absorbing_all = (np.zeros((n, n_groups), dtype=bool) for _ in range(2))
     used_all, solvers, closed = [], [], np.zeros(n, dtype=bool)
     sign = -1 if backward else +1
     for g, sel in enumerate(groups.values()):
         fixed = net_fixed_cells(step, sel, sign)
-        used = _net_edges(n, edges, fixed, backward, config.remove_cycles)
+        absorbing = None if strong is None else strong & ~fixed
+        cut = fixed if absorbing is None else fixed | absorbing
+        used = _net_edges(n, edges, cut, backward, config.remove_cycles)
         s, throughflow = net_balance(n, used)
-        matrix, rhs = net_system(n, used, fixed, throughflow, backward)
+        matrix, rhs = net_system(n, used, fixed, throughflow, backward, absorbing)
         fraction[:, g], factor, loops = _solve(matrix, rhs, config)
         s_all[:, g], t_all[:, g], fixed_all[:, g] = s, throughflow, fixed
+        if absorbing is not None:
+            absorbing_all[:, g] = absorbing
         used_all.append(used)
         solvers.append(factor.kind)
         for cells in loops:
             closed[cells] = True
     loops = _loops_from_mask(n, edges, closed)
-    return NetSolution(fraction, s_all, t_all, fixed_all, used_all, solvers, loops)
+    absorbing_all = None if strong is None else absorbing_all
+    return NetSolution(
+        fraction, s_all, t_all, fixed_all, used_all, solvers, loops, absorbing_all
+    )
 
 
 def _net_group_inflow(
@@ -220,17 +260,18 @@ def _loops_from_mask(n: int, edges: Edges, closed: np.ndarray) -> list[np.ndarra
 
 
 def _net_backward(
-    step: FlowStep, groups: dict, edges: Edges, config: TraceConfig
+    step: FlowStep, groups: dict, edges: Edges, config: TraceConfig, strong: np.ndarray | None
 ) -> BackwardResult:
     """Net-mode backward trace (reference method): destination cells absorbing with f = 1.
 
     The destination cells are net_fixed_cells(sign=-1): the group's cells, or for a group
-    selected by term criteria the cells where a selected entry is a sink.
+    selected by term criteria the cells where a selected entry is a sink. Strong-sink cells
+    (strong) outside them absorb with f = 0.
 
     destination_inflow is the destination cells' throughflow sum less the water it counts twice
     (net_double_count); destination_throughflow keeps the throughflow sum.
     """
-    sol = _net_solve(step, groups, edges, config, backward=True)
+    sol = _net_solve(step, groups, edges, config, backward=True, strong=strong)
     inflow, t_sum = _net_group_inflow(sol.used, sol.fixed, sol.fraction, sol.throughflow, True)
     result = backward_metrics(
         step, groups, sol.fraction, sol.throughflow, np.maximum(sol.s, 0.0), {}, inflow, "net"
@@ -238,6 +279,7 @@ def _net_backward(
     result.destination_throughflow = {g: float(v) for g, v in zip(groups, t_sum)}
     result.solver_used = sol.solvers
     result.closed_loops = sol.loops
+    result.absorbing = sol.absorbing
     return result
 
 

@@ -88,13 +88,13 @@ def max_quantile_difference(
 
 
 def capture_summary(step: gs.FlowStep, result, group: str) -> dict[str, float]:
-    """Return the area F > 0.5, the band 0.1 < F < 0.9 [km2] and the river share of one trace."""
+    """Return the area F > 0.5, the band 0.1 < F < 0.9 [km2] and the stream share of one trace."""
     fraction = result.fraction_through[group]
     by_term = {name: float(v.sum()) for name, v in result.volume_from_by_term[group].items()}
     return {
         "area F > 0.5 (km2)": float(step.area[fraction > 0.5].sum()) / 1e6,
         "band 0.1 < F < 0.9 (km2)": float(step.area[(fraction > 0.1) & (fraction < 0.9)].sum()) / 1e6,
-        "river share": by_term.get("RIV", 0.0) / sum(by_term.values()),
+        "stream share": by_term.get("SFR", 0.0) / sum(by_term.values()),
     }
 
 
@@ -128,8 +128,8 @@ def pestpp_exe(bin_dir: Path, name: str = "pestpp-ies") -> Path:
 
 
 def observation_cells(spec, n_obs: int, seed: int) -> list[tuple[int, int]]:
-    """Return n_obs random (row, col) cells, away from the constant heads, river and wells."""
-    blocked = {(r, 0) for r in range(spec.nrow)} | {(r, spec.riv_col) for r in range(spec.nrow)}
+    """Return n_obs random (row, col) cells, away from the constant heads, stream and wells."""
+    blocked = {(r, 0) for r in range(spec.nrow)} | {(r, spec.stream_col) for r in range(spec.nrow)}
     blocked |= {rc for _, rc, _ in spec.wells}
     cells = [(r, c) for r in range(spec.nrow) for c in range(spec.ncol) if (r, c) not in blocked]
     picks = np.random.default_rng(seed).choice(len(cells), size=n_obs, replace=False)
@@ -201,7 +201,7 @@ def run_mf6(ws: str = ".", exe: str = "./mf6") -> None:
     import subprocess
 
     subprocess.run([exe], cwd=ws, check=True, capture_output=True)
-    with open(os.path.join(ws, "mfsim.lst")) as handle:
+    with open(os.path.join(ws, "mfsim.lst"), encoding="utf-8") as handle:
         assert "Normal termination" in handle.read(), "MF6 did not terminate normally"
 
 
@@ -225,7 +225,7 @@ def write_head_observations(ws: str = ".", head_file: str = "quickstart.hds") ->
                        usecols=0, dtype=str, ndmin=1)
     nodes = np.loadtxt(os.path.join(ws, "obs_cells.csv"), delimiter=",", skiprows=1,
                        usecols=1, dtype=int, ndmin=1)
-    with open(os.path.join(ws, "heads.csv"), "w") as handle:
+    with open(os.path.join(ws, "heads.csv"), "w", encoding="utf-8") as handle:
         handle.write("name,head\n")
         for name, node in zip(names, nodes):
             handle.write(f"{name},{heads[node]:.10e}\n")
@@ -243,7 +243,7 @@ def write_forward_run(template_ws: Path, mean_k: float) -> None:
         '    run_mf6(".", "./mf6")\n'
         '    write_head_observations(".", "quickstart.hds")\n'
     )
-    (Path(template_ws) / "forward_run.py").write_text(f"{source}\n\n{main}")
+    (Path(template_ws) / "forward_run.py").write_text(f"{source}\n\n{main}", encoding="utf-8")
 
 
 def par_name(i: int) -> str:
@@ -259,15 +259,15 @@ def obs_name(i: int) -> str:
 def write_pilot_points(ws: Path, values: np.ndarray) -> None:
     """Write pilot_points.dat (name, K) as the PEST template would."""
     lines = [f"{par_name(i)} {v:.10e}" for i, v in enumerate(values)]
-    (Path(ws) / "pilot_points.dat").write_text("\n".join(lines) + "\n")
+    (Path(ws) / "pilot_points.dat").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def write_pest_io_files(template_ws: Path, n_pp: int, n_obs: int) -> None:
     """Write the PEST template (pilot_points.dat.tpl) and instruction (heads.csv.ins) files."""
     tpl = ["ptf ~"] + [f"{par_name(i)} ~ {par_name(i):^14} ~" for i in range(n_pp)]
-    (Path(template_ws) / "pilot_points.dat.tpl").write_text("\n".join(tpl) + "\n")
+    (Path(template_ws) / "pilot_points.dat.tpl").write_text("\n".join(tpl) + "\n", encoding="utf-8")
     ins = ["pif ~", "l1"] + [f"l1 ~,~ !{obs_name(i)}!" for i in range(n_obs)]
-    (Path(template_ws) / "heads.csv.ins").write_text("\n".join(ins) + "\n")
+    (Path(template_ws) / "heads.csv.ins").write_text("\n".join(ins) + "\n", encoding="utf-8")
 
 
 def build_kriged_model(
@@ -303,7 +303,7 @@ def build_pest_template(
     """Build the kriged model and add the PEST files (template, instructions, forward run)."""
     build_kriged_model(template_ws, mf6, spec, weights, mean_k)
     lines = ["name,node"] + [f"{obs_name(i)},{spec.node(rc)}" for i, rc in enumerate(obs_cells)]
-    (template_ws / "obs_cells.csv").write_text("\n".join(lines) + "\n")
+    (template_ws / "obs_cells.csv").write_text("\n".join(lines) + "\n", encoding="utf-8")
     write_pest_io_files(template_ws, len(pp_cells), len(obs_cells))
     write_forward_run(template_ws, mean_k)
     write_head_observations(str(template_ws))
@@ -379,7 +379,7 @@ def run_ies(
         else:
             port = pyemu.os_utils.PortManager(log_level=logging.WARNING).get_available_port()
             log_file = Path(master_ws).parent / "start_workers.log"
-            with open(log_file, "w") as log, redirect_stdout(log):
+            with open(log_file, "w", encoding="utf-8") as log, redirect_stdout(log):
                 pyemu.os_utils.start_workers(
                     str(template_ws), pestpp.name, pst_name, num_workers=n_workers,
                     worker_root=str(Path(master_ws).parent), master_dir=str(master_ws),
@@ -444,19 +444,19 @@ def run_parameter_ensemble(
 def capture_probability_summary(
     ens: gs.EnsembleResult, table: pd.DataFrame, area: np.ndarray, group: str
 ) -> dict[str, float]:
-    """Return the areas of P(F > 0.5) classes [km2] and the spread of the river share."""
+    """Return the areas of P(F > 0.5) classes [km2] and the spread of the stream share."""
     prob = ens.exceedance[0.5]["fraction_through"][group]
-    river = table["share RIV"] if "share RIV" in table else pd.Series(0.0, index=table.index)
+    stream = table["share SFR"] if "share SFR" in table else pd.Series(0.0, index=table.index)
     return {
         "realisations": len(table),
         "area P >= 0.5 (km2)": float(area[prob >= 0.5].sum()) / 1e6,
         "area P >= 0.9 (km2)": float(area[prob >= 0.9].sum()) / 1e6,
         "band 0.1 < P < 0.9 (km2)": float(area[(prob > 0.1) & (prob < 0.9)].sum()) / 1e6,
-        "river share 5 %": river.quantile(0.05),
-        "river share median": river.median(),
-        "river share 95 %": river.quantile(0.95),
-        "river share min": river.min(),
-        "river share max": river.max(),
+        "stream share 5 %": stream.quantile(0.05),
+        "stream share median": stream.median(),
+        "stream share 95 %": stream.quantile(0.95),
+        "stream share min": stream.min(),
+        "stream share max": stream.max(),
     }
 
 
