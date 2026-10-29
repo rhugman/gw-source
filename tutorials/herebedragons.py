@@ -76,7 +76,7 @@ def exe_path(name: str, bin_dir: Path | None = None) -> Path:
     bin_dir = repo_root() / "bin" if bin_dir is None else Path(bin_dir)
     suffix = ".exe" if sys.platform.startswith("win") else ""
     exe = bin_dir / f"{name}{suffix}"
-    assert exe.is_file(), f"{exe} not found; run scripts/setup_env.sh to download it into bin/"
+    assert exe.is_file(), f"{exe} not found; run python scripts/setup_env.py to download it into bin/"
     return exe
 
 
