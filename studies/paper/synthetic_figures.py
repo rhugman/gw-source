@@ -16,16 +16,16 @@ edge, an SFR stream north to south in column 31 and an 800 m3/d supply well in c
 
 The panels reuse the drawing helpers of gallery_figure.py and example_figures.py (viridis F with
 white F = 0.1 dashed and F = 0.5 solid contours, sky-blue stream cells, white well star). Every
-quoted number is in QUOTED and asserted (rounded half up) before plotting. Workspaces go under
-$TMPDIR and are deleted at the end; figures go to output/paper/ in the repository root
+quoted number is in QUOTED and asserted (rounded half up) before plotting. Workspaces go in the
+system temporary folder and are deleted at the end; figures go to output/paper/ in the repository root
 (git-ignored).
 
-    PYTHONPATH=src:tutorials:studies/paper python studies/paper/synthetic_figures.py
+    python studies/paper/synthetic_figures.py
 """
 
-import os
 import shutil
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -33,7 +33,9 @@ import numpy as np
 import pandas as pd
 
 PAPER_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(PAPER_DIR))
+REPO = PAPER_DIR.parents[1]
+IMPORT_DIRS = (PAPER_DIR, REPO / "tutorials", REPO / "src")
+sys.path[:0] = [str(d) for d in IMPORT_DIRS]  # no PYTHONPATH needed, on any OS
 
 import gallery_figure as gf  # noqa: E402
 import example_figures as ef  # noqa: E402
@@ -49,7 +51,7 @@ from matplotlib.colors import Normalize  # noqa: E402
 
 TUTORIAL_DIR = Path(hbd.__file__).resolve().parent
 OUT_DIR = mfig.FIG_DIR
-WORK_DIR = Path(os.environ.get("TMPDIR", "/tmp")) / "synthetic_figures"
+WORK_DIR = Path(tempfile.gettempdir()) / "synthetic_figures"
 WELL = "supply_well"
 SINGLE_WIDTH = 8.25 / 2.54  # in, one column
 YEAR = 365.25  # days

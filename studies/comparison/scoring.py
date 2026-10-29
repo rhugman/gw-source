@@ -92,11 +92,11 @@ def share_errors(shares: dict, ref_shares: dict) -> dict:
 
 def load_references(refs: Path, physical: str, disp_dx: float) -> tuple[dict, dict]:
     """Return {reference name: (fine field, fine dx, shares)} and the R_adv summary."""
-    adv = json.loads((refs / f"adv_{physical}.json").read_text())
+    adv = json.loads((refs / f"adv_{physical}.json").read_text(encoding="utf-8"))
     adv_fields = np.load(refs / f"adv_{physical}.npz")
     out = {"R_adv": (adv_fields["PRT 27 well"], adv["dx"], adv["shares"])}
     name = f"disp_{physical}_dx{disp_dx:g}".replace(".", "p")
-    disp = json.loads((refs / f"{name}.json").read_text())
+    disp = json.loads((refs / f"{name}.json").read_text(encoding="utf-8"))
     disp_fields = np.load(refs / f"{name}.npz")
     for key in disp_fields.files:
         out[key] = (disp_fields[key], disp_dx, disp[key]["shares"])

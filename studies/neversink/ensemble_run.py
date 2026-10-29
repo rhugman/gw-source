@@ -28,8 +28,8 @@ realisation's own priority-well multiplier kept) on N_SUBSET realisations at row
 over the 357 runs with a mask (357: all of them), and compares each with its scenario's masks;
 the base-rate results are also analysed on that subset.
 
-Edit the gates in __main__ to rerun parts. The runs are resumable: a realisation with a summary
-file is skipped. Output goes to studies/neversink/output/ensemble/ and .../scenarios/<qrat>/
+__main__ runs the base rate only, as in the paper; edit its gates to run the scenarios. The
+runs are resumable: a realisation with a summary file is skipped. Output goes to studies/neversink/output/ensemble/ and .../scenarios/<qrat>/
 (git-ignored; main takes other folders, and base_out sends the base-rate tables elsewhere
 without rerunning the base ensemble).
 """
@@ -48,7 +48,9 @@ import numpy as np
 import pandas as pd
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE))
+REPO = HERE.parents[1]
+IMPORT_DIRS = (HERE, REPO / "studies" / "paper", REPO / "tutorials", REPO / "src")
+sys.path[:0] = [str(d) for d in IMPORT_DIRS]  # no PYTHONPATH needed, on any OS
 
 import figures  # noqa: E402
 import pest_rebuild as pr  # noqa: E402
@@ -89,7 +91,7 @@ def read_mask(index: int, qrat: str = "baserat", corrected: bool = True) -> np.n
     """
     with zipfile.ZipFile(str(MASK_ZIP).format(qrat=qrat)) as z:
         with z.open(f"{qrat}/{qrat}_real{index}.dat") as f:
-            raw = np.loadtxt(io.TextIOWrapper(f)) > 0.5
+            raw = np.loadtxt(io.TextIOWrapper(f, encoding="utf-8")) > 0.5
     if not corrected:
         return raw
     assert not raw[:MASK_ROW_OFFSET].any(), f"{qrat} mask {index} has cells in its first rows"
@@ -201,7 +203,7 @@ def run_realisation(
         for label, f_top in maps.items():
             row.update({f"{label}:{k}": v for k, v in compare_one(f_top, mask, starts).items()})
     np.savez_compressed(ens_dir / "fractions" / f"{real}.npz", **maps)
-    (ens_dir / "summary" / f"{real}.json").write_text(json.dumps(row))
+    (ens_dir / "summary" / f"{real}.json").write_text(json.dumps(row), encoding="utf-8")
     shutil.rmtree(ws)
     return row
 
@@ -263,7 +265,7 @@ def run_ensemble(
             try:
                 job.result()
             except Exception as err:  # keep the pool running; the realisation stays pending
-                with log.open("a") as f:
+                with log.open("a", encoding="utf-8") as f:
                     f.write(f"{real}: {type(err).__name__}: {err}\n")
             minutes = (time.perf_counter() - t0) / 60
             print(f"{k}/{len(reals)} done ({real}), {minutes:.1f} min", flush=True)
@@ -271,7 +273,7 @@ def run_ensemble(
 
 def collect_summary(ens_dir: Path = ENS_DIR) -> pd.DataFrame:
     """Return the summary rows of every finished realisation."""
-    rows = [json.loads(p.read_text()) for p in sorted((ens_dir / "summary").glob("*.json"))]
+    rows = [json.loads(p.read_text(encoding="utf-8")) for p in sorted((ens_dir / "summary").glob("*.json"))]
     return pd.DataFrame(rows)
 
 
@@ -479,7 +481,7 @@ def main(
     if run_base:
         run_ensemble(ens_dir)
         if not pending_realisations(ens_dir):
-            (ens_dir / "DONE").write_text("all realisations finished\n")
+            (ens_dir / "DONE").write_text("all realisations finished\n", encoding="utf-8")
     if analyse_base:
         analyse(ens_dir, out_dir=base_out)
         analyse(ens_dir, reals=subset, tag="_subset", out_dir=base_out)
@@ -501,4 +503,6 @@ def main(
 
 
 if __name__ == "__main__":
-    main()
+    # The paper uses the base pumping rate only; set the scenario gates (and make_figures, which
+    # reads the scenario table) to True to also run the other published pumping scenarios.
+    main(run_scenarios=False, analyse_scenarios=False, make_figures=False)

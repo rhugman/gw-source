@@ -99,7 +99,9 @@ import pandas as pd  # noqa: E402
 import scipy.sparse as sp  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE))
+REPO = HERE.parents[1]
+IMPORT_DIRS = (HERE, REPO / "studies" / "paper", REPO / "tutorials", REPO / "src")
+sys.path[:0] = [str(d) for d in IMPORT_DIRS]  # no PYTHONPATH needed, on any OS
 
 import mp7_convention as mp7  # noqa: E402
 import prt_many_particles as pm  # noqa: E402
@@ -108,7 +110,7 @@ import workflow as wf  # noqa: E402
 
 import gwsource as gs  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
-import neversink_figures as nfig  # noqa: E402  (studies/paper on PYTHONPATH)
+import neversink_figures as nfig  # noqa: E402
 from matplotlib.colors import BoundaryNorm, ListedColormap  # noqa: E402
 
 # The study output folder (resolved, so that a linked output/ folder is followed).
@@ -193,7 +195,7 @@ def build_regional(ws: Path, exe: Path) -> float:
 
 def read_array(path: Path, shape: tuple) -> np.ndarray:
     """Return a free-format text array of the given shape."""
-    values = np.array(path.read_text().split(), dtype=float)
+    values = np.array(path.read_text(encoding="utf-8").split(), dtype=float)
     assert values.size == np.prod(shape), f"{path.name}: {values.size} values, not {shape}"
     return values.reshape(shape)
 
@@ -201,7 +203,7 @@ def read_array(path: Path, shape: tuple) -> np.ndarray:
 def sfr_block(sfr_file: Path, block: str) -> list[list[str]]:
     """Return the split lines of one block of an SFR input file."""
     lines, inside = [], False
-    for line in sfr_file.read_text().splitlines():
+    for line in sfr_file.read_text(encoding="utf-8").splitlines():
         words = line.split()
         if not words or words[0].startswith("#"):
             continue
@@ -604,11 +606,11 @@ def write_sfr(ws: Path, sfr: dict) -> None:
     lines += ["END connectiondata", "", "BEGIN period  1"]
     lines += [f"  {s + 1}  inflow  {q:.10g}" for s, q in sfr["inflow"].items()]
     lines += ["END period  1", ""]
-    (ws / f"{MODEL}.sfr").write_text("\n".join(lines))
+    (ws / f"{MODEL}.sfr").write_text("\n".join(lines), encoding="utf-8")
     nam = ws / f"{MODEL}.nam"
-    text = nam.read_text()
+    text = nam.read_text(encoding="utf-8")
     assert "END packages" in text, "no packages block in the name file"
-    nam.write_text(text.replace("END packages", f"  SFR6  {MODEL}.sfr  sfr_0\nEND packages"))
+    nam.write_text(text.replace("END packages", f"  SFR6  {MODEL}.sfr  sfr_0\nEND packages"), encoding="utf-8")
 
 
 # ---------------------------------------------------------------- window model
@@ -694,7 +696,7 @@ def edge_reduction(ws: Path, faces: pd.DataFrame) -> dict:
 
 def list_discrepancy(ws: Path) -> float:
     """Return the volumetric budget's percent discrepancy from the model list file."""
-    lines = [ln for ln in (ws / f"{MODEL}.lst").read_text().splitlines()
+    lines = [ln for ln in (ws / f"{MODEL}.lst").read_text(encoding="utf-8").splitlines()
              if "PERCENT DISCREPANCY" in ln]
     assert lines, "no budget in the list file"
     return float(lines[-1].split("=")[1].split()[0])
@@ -1349,7 +1351,7 @@ def main(run_regional: bool = True, run_check: bool = True,
     out.mkdir(parents=True, exist_ok=True)
     FIG_DIR.mkdir(exist_ok=True)
     log_file = out / "run_log.json"
-    log = json.loads(log_file.read_text()) if log_file.exists() else {}
+    log = json.loads(log_file.read_text(encoding="utf-8")) if log_file.exists() else {}
     reg_ws = out / "regional"
     if run_regional:
         log["regional_mf6_seconds"] = build_regional(reg_ws, exe)
@@ -1358,18 +1360,18 @@ def main(run_regional: bool = True, run_check: bool = True,
     endpoints = wf.read_endpoints()
     if run_regional:
         regional_part(reg_ws, reg, endpoints, exe, out, log)
-        log_file.write_text(json.dumps(log, indent=1))
+        log_file.write_text(json.dumps(log, indent=1), encoding="utf-8")
     win = Window(**{k: log["window"][k] for k in ("r0", "r1", "c0", "c1")})
     published = scored_starts(endpoints, win, reg_shape)
     faces = edge_faces(reg, win)
     faces.to_csv(out / "edge_faces.csv", index=False)
     if run_check:
         check_part(reg_ws, reg, win, faces, published, exe, out, log)
-        log_file.write_text(json.dumps(log, indent=1))
+        log_file.write_text(json.dumps(log, indent=1), encoding="utf-8")
     for n, nz in refine:
         window_run(reg, Spec(win, n, nz, log["boundary"]), faces, published, exe, out,
                    keep_models)
-    log_file.write_text(json.dumps(log, indent=1))
+    log_file.write_text(json.dumps(log, indent=1), encoding="utf-8")
     if analyse:
         analyse_runs(published, win, reg_shape, reg.wells, log["boundary"], out)
     if not keep_models and analyse:

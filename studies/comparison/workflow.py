@@ -3,7 +3,7 @@ and when. Synthetic part of the comparison study.
 
 Run with the project environment (MF6 from <repo>/bin):
 
-    PYTHONPATH=src:tutorials:tests:studies/paper python studies/comparison/workflow.py
+    python studies/comparison/workflow.py
 
 Edit the gates in __main__ to rerun parts. Steps:
 1. references: per physical case (screen x stream) the convergence series and R_adv (runs.py);
@@ -26,7 +26,8 @@ import pandas as pd
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
-sys.path.insert(0, str(HERE))
+IMPORT_DIRS = (HERE, REPO / "studies" / "paper", REPO / "tutorials", REPO / "src")
+sys.path[:0] = [str(d) for d in IMPORT_DIRS]  # no PYTHONPATH needed, on any OS
 
 import figures  # noqa: E402
 import model as m  # noqa: E402
@@ -43,7 +44,7 @@ MAP_WINDOW = (0.0, 1600.0, 200.0, 1000.0)
 def study_config(out: Path = OUT, bin_dir: Path = REPO / "bin") -> runs.StudyConfig:
     """Return the study configuration with the MF6 executable in bin_dir."""
     mf6 = bin_dir / ("mf6.exe" if sys.platform.startswith("win") else "mf6")
-    assert mf6.is_file(), "run scripts/setup_env.sh to fetch mf6"
+    assert mf6.is_file(), f"{mf6} not found; see studies/README.md (Environment)"
     return runs.StudyConfig(out=out, mf6_exe=mf6, design=m.Design())
 
 

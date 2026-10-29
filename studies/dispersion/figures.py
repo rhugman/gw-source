@@ -308,4 +308,4 @@ def write_tables(out: Path, config) -> None:
             transient_summary(curves, config.substeps))),
     ]
     text = "\n\n".join(f"## {title}\n\n{body}" for title, body in sections)
-    (out / "summary.md").write_text("# Dispersion study tables (generated)\n\n" + text + "\n")
+    (out / "summary.md").write_text("# Dispersion study tables (generated)\n\n" + text + "\n", encoding="utf-8")

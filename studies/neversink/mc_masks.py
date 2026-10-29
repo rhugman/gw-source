@@ -33,8 +33,8 @@ with the realisation's own priority-well multiplier kept and replaced; multiplie
 each case's Jaccard index with its paired mask and with the best mask. Kept,
 q = m (q_base + f (q_max - q_base)), is the default of scenarios.scenario_pars.
 
-Run with the project environment; run_multiplier_test needs a process pool (some restricted
-environments forbid one):
+Run with the project environment. __main__ writes the pairing and the offset evidence, as
+used in the paper; edit its gates for the comparisons and run_multiplier_test (which needs a process pool):
 
     python studies/neversink/mc_masks.py
 
@@ -53,10 +53,11 @@ import numpy as np
 import pandas as pd
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE))
+REPO = HERE.parents[1]
+IMPORT_DIRS = (HERE, REPO / "studies" / "paper", REPO / "tutorials", REPO / "src")
+sys.path[:0] = [str(d) for d in IMPORT_DIRS]  # no PYTHONPATH needed, on any OS
 
 import ensemble_run as er  # noqa: E402
-import figures  # noqa: E402
 import growth_mechanisms as gm  # noqa: E402
 import mp7_convention as mp7  # noqa: E402
 import pest_rebuild as pr  # noqa: E402
@@ -354,7 +355,7 @@ def multiplier_case(real: str, qrat: str, keep: bool, run_index: int, out: Path)
     t0 = time.perf_counter()
     np.save(out / "r1" / f"{name}.npy", run_r1(ws, starts, exe))
     row["r1_seconds"] = time.perf_counter() - t0
-    (out / "summary" / f"{name}.json").write_text(json.dumps(row))
+    (out / "summary" / f"{name}.json").write_text(json.dumps(row), encoding="utf-8")
     shutil.rmtree(ws)
     return row
 
@@ -379,7 +380,7 @@ def run_multiplier_test(
             try:
                 job.result()
             except Exception as err:  # keep the pool running; the case stays pending
-                with (out / "failures.log").open("a") as f:
+                with (out / "failures.log").open("a", encoding="utf-8") as f:
                     f.write(f"{jobs[job]}: {type(err).__name__}: {err}\n")
             print(f"{n}/{len(cases)} done {jobs[job]}, {(time.perf_counter() - t0) / 60:.1f} min", flush=True)
 
@@ -387,7 +388,7 @@ def run_multiplier_test(
 def multiplier_table(out: Path, pairing: pd.DataFrame, plan: np.ndarray) -> pd.DataFrame:
     """Return per multiplier case the Jaccard index with its paired mask and the best mask."""
     paired = mask_of_real(pairing)
-    rows = [json.loads(p.read_text()) for p in sorted((out / "summary").glob("*.json"))]
+    rows = [json.loads(p.read_text(encoding="utf-8")) for p in sorted((out / "summary").glob("*.json"))]
     masks = {}
     for row in rows:
         qrat = row["qrat"]
@@ -465,4 +466,6 @@ def main(
 
 
 if __name__ == "__main__":
-    main()
+    # The paper needs the pairing and offset evidence only (published masks and end points);
+    # compare needs growth_mechanisms.py and the ensemble, run_multiplier a process pool.
+    main(compare=False, run_multiplier=False)

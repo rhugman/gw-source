@@ -15,7 +15,7 @@ Reads stored outputs only, from studies/neversink/output (run workflow.py, and p
 plus ensemble_run.py for the ensemble figure); nothing is rerun. Writes to output/paper/ in the
 repository root (git-ignored).
 
-    PYTHONPATH=src:studies/paper python studies/neversink/paper_figures.py
+    python studies/neversink/paper_figures.py
 """
 
 import sys
@@ -26,10 +26,11 @@ import numpy as np
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
-sys.path.insert(0, str(REPO / "studies" / "paper"))
+IMPORT_DIRS = (HERE, REPO / "studies" / "paper", REPO / "tutorials", REPO / "src")
+sys.path[:0] = [str(d) for d in IMPORT_DIRS]  # no PYTHONPATH needed, on any OS
 
 import neversink_figures as nvf  # noqa: E402
-import workflow as wf  # noqa: E402  (on the path through neversink_figures)
+import workflow as wf  # noqa: E402
 
 import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib import patheffects  # noqa: E402

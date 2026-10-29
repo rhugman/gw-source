@@ -243,7 +243,7 @@ def run_reference(cfg: StudyConfig, screen: str, stream: str) -> list[dict]:
         "shares": shares_of(rows, REF_METHOD),
         "closure": series_row(rows, REF_METHOD, REF_DX, REF_NLAY)["closure"],
     }
-    (cfg.refs / f"adv_{name}.json").write_text(json.dumps(summary, indent=2))
+    (cfg.refs / f"adv_{name}.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     return rows
 
 
@@ -284,5 +284,5 @@ def run_disp_reference(cfg: StudyConfig, screen: str, stream: str, dx: float) ->
     cfg.refs.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(cfg.refs / f"{name}.npz",
                         **{k: v.astype(np.float32) for k, v in fields.items()})
-    (cfg.refs / f"{name}.json").write_text(json.dumps(summary, indent=2))
+    (cfg.refs / f"{name}.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     return rows

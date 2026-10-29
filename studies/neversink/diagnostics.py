@@ -53,8 +53,8 @@ from scipy.spatial import cKDTree
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
-sys.path.insert(0, str(HERE))
-sys.path.insert(0, str(REPO / "studies" / "paper"))
+IMPORT_DIRS = (HERE, REPO / "studies" / "paper", REPO / "tutorials", REPO / "src")
+sys.path[:0] = [str(d) for d in IMPORT_DIRS]  # no PYTHONPATH needed, on any OS
 
 import mp7_convention as mc  # noqa: E402
 import neversink_figures as nfig  # noqa: E402

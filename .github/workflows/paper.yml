@@ -1,0 +1,98 @@
+name: paper
+
+# Cross-OS smoke test of the paper's analysis scripts (studies/), in the pinned environment of
+# studies/environment.yml with MODFLOW 6 6.8.1. The long studies are not run here.
+on:
+  push:
+    branches: [paper]
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    name: paper smoke test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash -el {0}
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # avoids API rate limits in get-modflow
+      MPLBACKEND: Agg
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: System libraries for gmsh (vorflow)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libglu1-mesa libxrender1 libxcursor1 libxft2 libxinerama1
+
+      - name: Set up the pinned paper environment
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: studies/environment.yml
+          environment-name: gw-source-paper
+          cache-environment: true
+          init-shell: bash
+
+      - name: Generate FloPy MF6 classes from the MF6 6.8.1 DFNs
+        run: python -m flopy.mf6.utils.generate_classes --ref 6.8.1
+
+      - name: Download MODFLOW 6 6.8.1
+        run: |
+          mkdir -p bin
+          get-modflow --repo modflow6 --release-id 6.8.1 --downloads-dir "${RUNNER_TEMP}" bin
+
+      - name: Record versions
+        run: |
+          python -c "import flopy, numpy, scipy, pandas, matplotlib, vorflow, gmsh; print('FloPy', flopy.__version__, '| NumPy', numpy.__version__, '| SciPy', scipy.__version__, '| pandas', pandas.__version__, '| Matplotlib', matplotlib.__version__, '| gmsh', gmsh.__version__)"
+          bin/mf6 --version
+
+      - name: Import every module under studies/
+        run: |
+          python - <<'EOF'
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          repo = Path.cwd()
+          failed = []
+          for path in sorted(repo.glob("studies/*/*.py")):
+              dirs = [path.parent, repo / "studies" / "paper", repo / "tutorials", repo / "src"]
+              code = f"import sys; sys.path[:0] = {[str(d) for d in dirs]!r}; import {path.stem}"
+              proc = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+              print("ok  " if proc.returncode == 0 else "FAIL", path.relative_to(repo).as_posix())
+              if proc.returncode:
+                  print(proc.stderr[-2000:])
+                  failed.append(path)
+          assert not failed, f"{len(failed)} modules failed to import"
+          EOF
+
+      - name: Dispersion study test
+        run: python -m pytest -v tests/test_dispersion_study.py
+
+      - name: Method figure (Fig. 1)
+        run: python studies/paper/gallery_figure.py
+
+      - name: Time-step figure (SI Fig. 3)
+        run: python -c "import sys; sys.path.insert(0, 'studies/paper'); import si_convergence_figure as s; print(s.main(cell_size=False))"
+
+      # The figures need the SFR stream of the shared model (tutorials/herebedragons.py add_sfr,
+      # from branch tutorials/sfr-stream); skipped until main brings it.
+      - name: Synthetic example figures (Figs 2 to 5)
+        run: |
+          if grep -q "^def add_sfr(" tutorials/herebedragons.py; then
+              python studies/paper/synthetic_figures.py
+          else
+              echo "tutorials/herebedragons.py has no SFR stream (add_sfr) yet: skipped"
+          fi
+
+      - name: Upload the figures
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: paper-figures-${{ matrix.os }}
+          path: output/paper
+          if-no-files-found: warn

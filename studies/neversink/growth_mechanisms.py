@@ -66,7 +66,9 @@ import numpy as np
 import pandas as pd
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE))
+REPO = HERE.parents[1]
+IMPORT_DIRS = (HERE, REPO / "studies" / "paper", REPO / "tutorials", REPO / "src")
+sys.path[:0] = [str(d) for d in IMPORT_DIRS]  # no PYTHONPATH needed, on any OS
 
 import ensemble_run as er  # noqa: E402
 import figures  # noqa: E402
@@ -351,7 +353,7 @@ def run_case(real: str, qrat: str, out: Path) -> dict:
     row["area:network"] = float(np.nan_to_num(network).sum())
     np.savez_compressed(out / "reaches" / f"{name}.npz", **reach_flows(step, result))
     np.savez_compressed(out / "starts" / f"{name}.npz", **per_start)
-    (out / "summary" / f"{name}.json").write_text(json.dumps(row))
+    (out / "summary" / f"{name}.json").write_text(json.dumps(row), encoding="utf-8")
     shutil.rmtree(ws)
     return row
 
@@ -379,7 +381,7 @@ def run_cases(
             try:
                 job.result()
             except Exception as err:  # keep the pool running; the case stays pending
-                with (out / "failures.log").open("a") as f:
+                with (out / "failures.log").open("a", encoding="utf-8") as f:
                     f.write(f"{case_name(*jobs[job])}: {type(err).__name__}: {err}\n")
             minutes = (time.perf_counter() - t0) / 60
             print(f"{k}/{len(cases)} done ({case_name(*jobs[job])}), {minutes:.1f} min", flush=True)
@@ -390,7 +392,7 @@ def run_cases(
 
 def collect(out: Path) -> pd.DataFrame:
     """Return the summary rows of every finished case."""
-    rows = [json.loads(p.read_text()) for p in sorted((out / "summary").glob("*.json"))]
+    rows = [json.loads(p.read_text(encoding="utf-8")) for p in sorted((out / "summary").glob("*.json"))]
     table = pd.DataFrame(rows)
     table["stream_share"] = table["cells:SFR_0"] / table["inflow"]
     return table

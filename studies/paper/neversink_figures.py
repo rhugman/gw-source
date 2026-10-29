@@ -115,7 +115,7 @@ def sfr_reaches(packagedata: Path) -> pd.DataFrame:
 def sfr_downstream(sfr_file: Path) -> list[tuple[int, int]]:
     """Return (reach, downstream reach) pairs of CONNECTIONDATA (negative = downstream)."""
     pairs, inside = [], False
-    for line in sfr_file.read_text().splitlines():
+    for line in sfr_file.read_text(encoding="utf-8").splitlines():
         word = line.strip().upper()
         if word.startswith("BEGIN CONNECTIONDATA"):
             inside = True

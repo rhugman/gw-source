@@ -20,7 +20,7 @@ triangles, solid), full mixing with every sink strong aqua.
 Each figure reads its data only when it is drawn, so the synthetic figure needs no Neversink
 run. Run from the repository root; figures go to output/paper/ (git-ignored):
 
-    PYTHONPATH=src:tutorials python studies/comparison/paper_figures.py
+    python studies/comparison/paper_figures.py
 """
 
 import importlib.util
@@ -39,13 +39,14 @@ from matplotlib.colors import BoundaryNorm, ListedColormap  # noqa: E402
 from matplotlib.lines import Line2D  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE))
+REPO = HERE.parents[1]
+IMPORT_DIRS = (HERE, REPO / "studies" / "paper", REPO / "tutorials", REPO / "src")
+sys.path[:0] = [str(d) for d in IMPORT_DIRS]  # no PYTHONPATH needed, on any OS
 
 import model as m  # noqa: E402
 import runs  # noqa: E402
 import scoring  # noqa: E402
 
-REPO = HERE.parents[1]
 SYN_OUT = HERE / "output"
 NEV_DIR = REPO / "studies" / "neversink"
 NEV_OUT = NEV_DIR / "output" / "window"
@@ -318,7 +319,7 @@ def neversink_workflow():
 def regional_shape(dis_file: Path) -> tuple[int, int, int]:
     """Return (nlay, nrow, ncol) from the DIMENSIONS block of a DIS file."""
     dims = {}
-    for line in dis_file.read_text().splitlines():
+    for line in dis_file.read_text(encoding="utf-8").splitlines():
         words = line.split()
         if len(words) == 2 and words[0].upper() in ("NLAY", "NROW", "NCOL"):
             dims[words[0].upper()] = int(words[1])
@@ -456,7 +457,7 @@ def fig_neversink(path: Path, out: Path = NEV_OUT) -> None:
     run."""
     nw = neversink_workflow()
     shape = regional_shape(nw.MODEL_SRC / f"{nw.MODEL}.dis")
-    window = json.loads((out / "run_log.json").read_text())["window"]
+    window = json.loads((out / "run_log.json").read_text(encoding="utf-8"))["window"]
     published = published_starts(nw, window, shape)
     cells = pd.read_csv(out / "start_cells.csv.gz")
     refinement = pd.read_csv(out / "refinement.csv")

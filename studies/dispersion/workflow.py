@@ -27,7 +27,8 @@ import pandas as pd
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
-sys.path.insert(0, str(HERE))
+IMPORT_DIRS = (HERE, REPO / "studies" / "paper", REPO / "tutorials", REPO / "src")
+sys.path[:0] = [str(d) for d in IMPORT_DIRS]  # no PYTHONPATH needed, on any OS
 
 import figures  # noqa: E402
 import runs  # noqa: E402
@@ -41,7 +42,7 @@ def study_config(out: Path = OUT, bin_dir: Path = BIN) -> runs.StudyConfig:
     """Return the study configuration with the executables in bin_dir."""
     suffix = ".exe" if sys.platform.startswith("win") else ""
     mf6 = bin_dir / f"mf6{suffix}"
-    assert mf6.is_file(), "run scripts/setup_env.sh to fetch mf6"
+    assert mf6.is_file(), f"{mf6} not found; see studies/README.md (Environment)"
     return runs.StudyConfig(out=out, mf6_exe=mf6)
 
 
@@ -105,7 +106,7 @@ def main(
     config = study_config()
     OUT.mkdir(parents=True, exist_ok=True)
     timing_file = OUT / "timing.json"
-    timing = json.loads(timing_file.read_text()) if timing_file.is_file() else {}
+    timing = json.loads(timing_file.read_text(encoding="utf-8")) if timing_file.is_file() else {}
     if rerun_disv_a:
         t0 = time.perf_counter()
         rerun_analytic_disv(config)
@@ -136,7 +137,7 @@ def main(
         figures.make_all(OUT, FIG_DIR, config)
         figures.write_tables(OUT, config)
         timing["figures"] = time.perf_counter() - t0
-    timing_file.write_text(json.dumps(timing, indent=2))
+    timing_file.write_text(json.dumps(timing, indent=2), encoding="utf-8")
     print(pd.Series(timing).round(1).to_string())
 
 

@@ -46,6 +46,7 @@ Edit the gates in __main__ to rerun parts. Output goes to studies/neversink/outp
 import json
 import re
 import shutil
+import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -53,11 +54,14 @@ from pathlib import Path
 import flopy
 import numpy as np
 import pandas as pd
-from scipy.spatial import cKDTree
-
-import workflow as wf
 
 HERE = Path(__file__).resolve().parent
+REPO = HERE.parents[1]
+IMPORT_DIRS = (HERE, REPO / "studies" / "paper", REPO / "tutorials", REPO / "src")
+sys.path[:0] = [str(d) for d in IMPORT_DIRS]  # no PYTHONPATH needed, on any OS
+
+import workflow as wf  # noqa: E402
+
 SOURCE = HERE / "external" / "neversink_workflow"
 BASE_MODEL = SOURCE / "neversink_mf6"
 OPTIMAL_MODEL = SOURCE / "neversink_optimal"
@@ -132,7 +136,7 @@ def load_k_zones(idm: np.ndarray, processed: Path = PROCESSED) -> np.ndarray:
 
 def cell_centres(model_dir: Path = BASE_MODEL) -> tuple[np.ndarray, np.ndarray]:
     """Return x and y of the cell centres (nrow, ncol) from the modflow-setup grid file."""
-    grid = json.loads((model_dir / f"{MODEL}_grid.json").read_text())
+    grid = json.loads((model_dir / f"{MODEL}_grid.json").read_text(encoding="utf-8"))
     assert grid["angrot"] == 0.0, "rotated grids not handled"
     delr, delc = np.asarray(grid["delr"]), np.asarray(grid["delc"])
     x = grid["xul"] + np.cumsum(delr) - 0.5 * delr
@@ -256,7 +260,7 @@ def build_interface(
     for layer, (cells, nbrs, weights) in factors.items():
         np.savez_compressed(pest_dir / f"pp_factors_{layer}.npz", cells=cells, nbrs=nbrs, weights=weights)
     rch_ub = RCH_ULT_UB_FACTOR * float(np.loadtxt(model_dir / "rch_000.dat").max())
-    (pest_dir / "ult_bounds.json").write_text(json.dumps({**K_ULT_UB, "rch": rch_ub}, indent=1))
+    (pest_dir / "ult_bounds.json").write_text(json.dumps({**K_ULT_UB, "rch": rch_ub}, indent=1), encoding="utf-8")
     write_land_surface_indices(pest_dir / "land_surf_obs-indices.csv", model_dir)
     return counts
 
@@ -268,7 +272,7 @@ def load_interface(pest_dir: Path = PEST_DIR) -> Interface:
     for layer in range(NLAY):
         f = np.load(pest_dir / f"pp_factors_{layer}.npz")
         factors[layer] = (f["cells"], f["nbrs"], f["weights"])
-    bounds = json.loads((pest_dir / "ult_bounds.json").read_text())
+    bounds = json.loads((pest_dir / "ult_bounds.json").read_text(encoding="utf-8"))
     return Interface(
         pp=pd.read_csv(pest_dir / "pilot_points.csv"),
         factors=factors,
@@ -410,7 +414,7 @@ def apply_rch_pars(ws: Path, pars: pd.Series, iface: Interface, model_dir: Path 
 def apply_list_pars(ws: Path, pars: pd.Series, tag: str, model_dir: Path = BASE_MODEL) -> None:
     """Write wel_000.dat or chd_000.dat with column 4 multiplied per cell."""
     fname = f"{tag}_000.dat"
-    lines = (model_dir / fname).read_text().splitlines()
+    lines = (model_dir / fname).read_text(encoding="utf-8").splitlines()
     header = [line for line in lines if line.startswith("#")]
     rows = [line.split() for line in lines if line.strip() and not line.startswith("#")]
     mult = {}
@@ -424,13 +428,13 @@ def apply_list_pars(ws: Path, pars: pd.Series, tag: str, model_dir: Path = BASE_
         assert cell in mult, f"no {tag} multiplier for cell {cell}"
         row[3] = repr(float(row[3]) * mult[cell])
         out.append(" ".join(row))
-    (ws / fname).write_text("\n".join(header + out) + "\n")
+    (ws / fname).write_text("\n".join(header + out) + "\n", encoding="utf-8")
 
 
 def apply_sfr_pars(ws: Path, pars: pd.Series, model_dir: Path = BASE_MODEL) -> None:
     """Write the SFR packagedata with rhk set to the line_id parameter (the notebook template)."""
     fname = f"{MODEL}_packagedata.dat"
-    lines = (model_dir / fname).read_text().splitlines()
+    lines = (model_dir / fname).read_text(encoding="utf-8").splitlines()
     header = [line.strip() for line in lines if "#" in line]
     out = []
     for line in lines:
@@ -439,7 +443,7 @@ def apply_sfr_pars(ws: Path, pars: pd.Series, model_dir: Path = BASE_MODEL) -> N
         words = line.split()
         words[-6] = repr(float(pars[f"sfrk_{words[-1]}"]))
         out.append(" ".join(words))
-    (ws / fname).write_text("\n".join(header + out) + "\n")
+    (ws / fname).write_text("\n".join(header + out) + "\n", encoding="utf-8")
 
 
 def copy_base_model(ws: Path, model_dir: Path = BASE_MODEL) -> None:
@@ -476,7 +480,7 @@ def write_realisation(
     wf.update_ims(ws / "mfsim.ims", dvclose)
     for option in npf_options:
         wf.add_npf_option(ws / f"{MODEL}.npf", option)
-    (ws / "realisation.txt").write_text(f"{real_name}\n")
+    (ws / "realisation.txt").write_text(f"{real_name}\n", encoding="utf-8")
     return ws
 
 
@@ -515,7 +519,7 @@ def transmissivities(heads: np.ndarray, hk: np.ndarray, top: np.ndarray, botm: n
 
 def read_head_obs_meta(obs_file: Path) -> pd.DataFrame:
     """Return name, layer, row, col (0-based) of the continuous head observations."""
-    lines = [line.strip().lower() for line in obs_file.read_text().splitlines()]
+    lines = [line.strip().lower() for line in obs_file.read_text(encoding="utf-8").splitlines()]
     start = next(n for n, v in enumerate(lines) if "begin continuous" in v)
     end = next(n for n, v in enumerate(lines) if "end continuous" in v)
     rows = [line.split() for line in lines[start + 1 : end] if line]

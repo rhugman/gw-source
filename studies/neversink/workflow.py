@@ -30,10 +30,13 @@ import flopy
 import numpy as np
 import pandas as pd
 
-import gwsource as gs
-
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
+IMPORT_DIRS = (HERE, REPO / "studies" / "paper", REPO / "tutorials", REPO / "src")
+sys.path[:0] = [str(d) for d in IMPORT_DIRS]  # no PYTHONPATH needed, on any OS
+
+import gwsource as gs  # noqa: E402
+
 SOURCE = HERE / "external" / "neversink_workflow"
 MODEL_SRC = SOURCE / "neversink_optimal"
 REF_OUT = SOURCE / "output" / "neversink_mf6_optimal_output"
@@ -73,7 +76,7 @@ PRT_DIAGNOSIS_Z = (1.0, 0.5, None)
 def mf6_exe(bin_dir: Path = BIN) -> Path:
     """Return the MF6 executable in bin_dir."""
     exe = bin_dir / ("mf6.exe" if sys.platform.startswith("win") else "mf6")
-    assert exe.is_file(), "run scripts/setup_env.sh to fetch mf6"
+    assert exe.is_file(), f"{exe} not found; see studies/README.md (Environment)"
     return exe
 
 
@@ -93,11 +96,11 @@ def prepare_model(ws: Path, src: Path = MODEL_SRC, dvclose: tuple | None = None)
 
 def add_npf_option(npf_file: Path, option: str) -> None:
     """Add an option to the NPF OPTIONS block (PRT needs specific discharge and saturation)."""
-    text = npf_file.read_text()
+    text = npf_file.read_text(encoding="utf-8")
     assert "BEGIN options" in text, f"no options block in {npf_file}"
     if option not in text.upper():
         text = text.replace("BEGIN options", f"BEGIN options\n  {option}", 1)
-    npf_file.write_text(text)
+    npf_file.write_text(text, encoding="utf-8")
 
 
 def update_ims(ims_file: Path, dvclose: tuple | None = None) -> None:
@@ -110,7 +113,7 @@ def update_ims(ims_file: Path, dvclose: tuple | None = None) -> None:
     renamed = {"OUTER_HCLOSE": "OUTER_DVCLOSE", "INNER_HCLOSE": "INNER_DVCLOSE"}
     values = dict(zip(renamed.values(), dvclose)) if dvclose is not None else {}
     lines = []
-    for line in ims_file.read_text().splitlines():
+    for line in ims_file.read_text(encoding="utf-8").splitlines():
         words = line.split()
         key = words[0].upper() if words else ""
         if key == "OUTER_RCLOSEBND":
@@ -120,7 +123,7 @@ def update_ims(ims_file: Path, dvclose: tuple | None = None) -> None:
             value = f"{values[new_key]:g}" if new_key in values else words[1]
             line = f"  {new_key}  {value}"
         lines.append(line)
-    ims_file.write_text("\n".join(lines) + "\n")
+    ims_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def run_mf6(ws: Path, exe: Path) -> float:
@@ -754,12 +757,10 @@ def main(
             ]
         pd.DataFrame(rows).to_csv(out / "prt_diagnosis.csv", index=False)
     if reproduce_mp7:
-        sys.path.insert(0, str(HERE))
         import mp7_convention
 
         mp7_convention.reproduce(out, exe, ws)
     if make_figures:
-        sys.path.insert(0, str(HERE))
         import figures
 
         fig_dir.mkdir(parents=True, exist_ok=True)

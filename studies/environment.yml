@@ -1,0 +1,32 @@
+# Pinned environment for the paper's analysis (branch paper): the versions the paper's results
+# were made with. Set-up commands, including MODFLOW 6, are in studies/README.md.
+# Every conda pin exists on conda-forge for linux-64, osx-arm64, osx-64 and win-64.
+name: gw-source-paper
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.12.14
+  - numpy=2.5.3
+  - scipy=1.18.1
+  - pandas=3.0.6
+  - matplotlib-base=3.11.2
+  - contourpy=1.4.0
+  - shapely=2.1.2
+  - geopandas=1.2.0
+  - pyogrio=0.13.0
+  - pyproj=3.8.0
+  - pytest=9.1.1
+  # FloPy's class generator (flopy[codegen])
+  - jinja2=3.1.6
+  - boltons=26.2.0
+  - modflow-devtools=1.9.2
+  - tomli=2.4.1
+  - tomli-w=1.2.0
+  - pip=26.2.1
+  - pip:
+      # FloPy develop as of 2026-10-09 (3.12.0.dev0)
+      - flopy @ git+https://github.com/modflowpy/flopy.git@f29652c46a3c0d69c591f7dcacb500fd1efb8082
+      # Voronoi grids of the dispersion study; gmsh from PyPI as vorflow installs it
+      - vorflow==0.3.0
+      - gmsh==4.15.2

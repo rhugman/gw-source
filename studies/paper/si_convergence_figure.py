@@ -20,15 +20,15 @@ and 64 transport sub-steps per flow step; the share of new recharge in the well'
 step over the first three years.
 
 The cell-size figure is redrawn from studies/dispersion/output (nothing rerun); the time-step figure builds and runs the
-model under $TMPDIR and deletes it. Run from the repository root; figures go to output/paper/
-(git-ignored):
+model in the system temporary folder and deletes it. Figures go to output/paper/ (git-ignored).
+Set cell_size=False in __main__ to draw only the time-step figure, which needs no dispersion run:
 
-    PYTHONPATH=src:tutorials python studies/paper/si_convergence_figure.py
+    python studies/paper/si_convergence_figure.py
 """
 
-import os
 import shutil
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -36,7 +36,9 @@ import numpy as np
 import pandas as pd
 
 PAPER_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(PAPER_DIR))
+REPO = PAPER_DIR.parents[1]
+IMPORT_DIRS = (PAPER_DIR, REPO / "tutorials", REPO / "src")
+sys.path[:0] = [str(d) for d in IMPORT_DIRS]  # no PYTHONPATH needed, on any OS
 
 import method_figures as mfig  # noqa: E402  (style, palette, save)
 
@@ -55,7 +57,7 @@ FULL_WIDTH = 17.15 / 2.54  # in, full page width
 COLUMN_WIDTH = 8.5 / 2.54  # in, one column
 OUT_DIR = mfig.FIG_DIR
 DISPERSION_OUT = mfig.DISPERSION_DIR / "output"
-WORK_DIR = Path(os.environ.get("TMPDIR", "/tmp")) / "si_convergence_figure"
+WORK_DIR = Path(tempfile.gettempdir()) / "si_convergence_figure"
 F_CMAP = "viridis"  # as the main-text F maps
 MAP_ANGLE = 30.0  # degrees, flow direction of the maps (the harder case)
 MAP_SIZES = (50.0, 25.0, 12.5)
@@ -277,12 +279,16 @@ def make_time_step_figure(out_dir: Path, shares: pd.DataFrame, edges: np.ndarray
 # ---------------------------------------------------------------- numbers and driver
 
 
-def print_numbers(table: pd.DataFrame, steps: pd.DataFrame, edges: np.ndarray) -> None:
-    """Print the summary numbers of both figures."""
+def print_cell_size_numbers(table: pd.DataFrame) -> None:
+    """Print the summary numbers of the cell-size figure."""
     out = table[table.method == "mixing"].copy()
     out["area_err_0.5"] *= 100.0
     columns = ["kind", "angle", "h", "mean_h", "n_cells", "band_width", "area_err_0.5"]
     print(out[columns].round(2).to_string(index=False))
+
+
+def print_time_step_numbers(steps: pd.DataFrame, edges: np.ndarray) -> None:
+    """Print the summary numbers of the time-step figure."""
     lengths = np.diff(edges)[1:] * YEAR
     print(f"mean flow step {lengths.mean():.2f} d")
     print(steps.iloc[1:5].round(4).set_axis([f"step {n}" for n in range(1, 5)]))
@@ -291,18 +297,23 @@ def print_numbers(table: pd.DataFrame, steps: pd.DataFrame, edges: np.ndarray) -
            for m in steps.columns[:2]})
 
 
-def main(out_dir: Path = OUT_DIR, dispersion_out: Path = DISPERSION_OUT,
-         work: Path = WORK_DIR) -> list[Path]:
-    """Track new recharge, print the numbers and draw Figs S2 and S3; delete the workspace."""
-    maps = dict(np.load(dispersion_out / "a_maps.npz"))
-    table = pd.read_csv(dispersion_out / "a_metrics.csv")
-    shutil.rmtree(work, ignore_errors=True)
-    work.mkdir(parents=True)
-    steps, edges = track_new_recharge(work, mfig.find_mf6())
-    shutil.rmtree(work, ignore_errors=True)
-    print_numbers(table, steps, edges)
-    return (make_cell_size_figure(out_dir, maps, dispersion_out / "models", table)
-            + make_time_step_figure(out_dir, steps, edges))
+def main(cell_size: bool = True, time_steps: bool = True, out_dir: Path = OUT_DIR,
+         dispersion_out: Path = DISPERSION_OUT, work: Path = WORK_DIR) -> list[Path]:
+    """Print the numbers and draw SI Figs 2 (cell_size) and 3 (time_steps); delete the workspace."""
+    paths = []
+    if cell_size:
+        maps = dict(np.load(dispersion_out / "a_maps.npz"))
+        table = pd.read_csv(dispersion_out / "a_metrics.csv")
+        print_cell_size_numbers(table)
+        paths += make_cell_size_figure(out_dir, maps, dispersion_out / "models", table)
+    if time_steps:
+        shutil.rmtree(work, ignore_errors=True)
+        work.mkdir(parents=True)
+        steps, edges = track_new_recharge(work, mfig.find_mf6())
+        shutil.rmtree(work, ignore_errors=True)
+        print_time_step_numbers(steps, edges)
+        paths += make_time_step_figure(out_dir, steps, edges)
+    return paths
 
 
 if __name__ == "__main__":

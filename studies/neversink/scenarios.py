@@ -61,15 +61,20 @@ the base realisation in every scenario and write the evidence:
     python studies/neversink/scenarios.py
 """
 
+import sys
 from functools import partial
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-import pest_rebuild as pr
-
 HERE = Path(__file__).resolve().parent
+REPO = HERE.parents[1]
+IMPORT_DIRS = (HERE, REPO / "studies" / "paper", REPO / "tutorials", REPO / "src")
+sys.path[:0] = [str(d) for d in IMPORT_DIRS]  # no PYTHONPATH needed, on any OS
+
+import pest_rebuild as pr  # noqa: E402
+
 PUMPING_CSV = HERE / "external" / "neversink_workflow" / "processed_data" / "2009-2016_ave_pumping.csv"
 WEL_FILE = pr.BASE_MODEL / "wel_000.dat"
 

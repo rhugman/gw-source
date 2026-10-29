@@ -13,30 +13,54 @@ they draw with `assert` statements, so a figure is only written if the results m
 
 ## Environment
 
-Set up the `gw-source` environment once from the repository root:
+The paper's results were made with the pinned environment of `studies/environment.yml` (env
+`gw-source-paper`) and MODFLOW 6 6.8.1. The repository's own `environment.yml` follows FloPy
+and MODFLOW 6 development builds, so use the pinned one to reproduce the paper.
 
-```bash
-scripts/setup_env.sh
-conda activate gw-source        # or prefix each command with: mamba run -n gw-source
+Set it up once, from the repository root. The commands are the same in bash, zsh, PowerShell and
+cmd (with conda, write `conda` for `micromamba`):
+
+```
+micromamba create -f studies/environment.yml
+micromamba activate gw-source-paper
+python -m flopy.mf6.utils.generate_classes --ref 6.8.1
+get-modflow --repo modflow6 --release-id 6.8.1 bin
 ```
 
-This installs `gwsource` (editable), FloPy, pyemu and vorflow, and puts MODFLOW 6 (`mf6`) and
-PEST++ into `bin/`. The scripts take `mf6` from `bin/`.
+The third line makes FloPy's MODFLOW 6 classes from the input definitions of MODFLOW 6 6.8.1.
+The last line puts `mf6` (`mf6.exe` on Windows) into `bin/`, where the scripts look for it.
+On Linux, Gmsh (used by vorflow for the Voronoi grids of the dispersion study) also needs a few
+system libraries, for example on Ubuntu:
 
-Run every command below from the repository root, with this search path:
-
-```bash
-export PYTHONPATH=src:tutorials:tests:studies/paper
+```
+sudo apt-get install libglu1-mesa libxrender1 libxcursor1 libxft2 libxinerama1
 ```
 
-`tutorials` provides the shared synthetic model (`tutorials/herebedragons.py`). `studies/paper`
-provides the plotting helpers that several studies import.
+Pinned versions:
 
-One extra need:
+- Python 3.12.14, NumPy 2.5.3, SciPy 1.18.1, pandas 3.0.6, Matplotlib 3.11.2, Shapely 2.1.2,
+  GeoPandas 1.2.0 (conda-forge).
+- FloPy 3.12.0.dev0, commit `f29652c46a3c0d69c591f7dcacb500fd1efb8082` of the develop branch.
+- vorflow 0.3.0 and Gmsh 4.15.2 (PyPI).
+- MODFLOW 6 6.8.1. The results were made with the development build of 23 September 2026
+  (`6.9.0.dev0+67116fb`). Release 6.8.1 is that commit plus two commits that change only the
+  version string, so it computes the same. Development builds are deleted after a few weeks,
+  which is why the release is pinned. Release 6.8.1 has builds for Linux, macOS on Apple silicon
+  and Windows, but not for macOS on Intel.
 
-- **Neversink data.** See the Neversink study below.
+The studies need neither PEST++ nor triangle, and `gwsource` need not be installed: each script
+puts `src/`, `tutorials/`, `studies/paper/` and its own folder on the Python path itself.
+`tutorials` provides the shared synthetic model (`tutorials/herebedragons.py`), `studies/paper`
+the plotting helpers that several studies import.
 
-The Voronoi grids of the dispersion study come from `vorflow` (from PyPI, in `environment.yml`), which meshes with Gmsh.
+Run every command below from the repository root, with the environment active. Each command is
+`python` and a script path, so it works in any shell.
+
+The Neversink study also needs the published model and results; see the Neversink study below.
+
+The GitHub Actions workflow `.github/workflows/paper.yml` checks the set-up on Linux, macOS and
+Windows: it imports every module here, runs the dispersion test, and draws Fig. 1, SI Fig. 3
+and, once the shared synthetic model has its SFR stream, Figs 2 to 5.
 
 ## Where outputs go
 
@@ -86,8 +110,8 @@ python studies/paper/gallery_figure.py
 
 Figs 2 to 5 come from one script. It builds the shared synthetic model (40 × 40 cells of 50 m,
 one layer, an SFR stream and a supply well) and its variants: forward and travel-time traces,
-two drains with the water mover, and a 30-year transient run. Workspaces go under `$TMPDIR` and
-are deleted at the end.
+two drains with the water mover, and a 30-year transient run. Workspaces go in the system
+temporary folder and are deleted at the end.
 
 ```bash
 python studies/paper/synthetic_figures.py
@@ -114,6 +138,9 @@ transient model of example D and tracks new recharge with 1, 4, 16 and 64 sub-st
 python studies/paper/si_convergence_figure.py
 ```
 
+To draw SI Fig. 3 alone, without the dispersion study, set `cell_size=False` in the call to
+`main` in `__main__`.
+
 ## 3. Neversink study
 
 ### Data
@@ -124,19 +151,14 @@ PEST++ ensemble files are in the USGS repository `usgs/neversink_workflow`. The 
 sparse checkout of it in `studies/neversink/external/neversink_workflow/` (git-ignored). Make it
 once, without the large folders the study does not use:
 
-```bash
-git clone --filter=blob:none --no-checkout https://github.com/usgs/neversink_workflow.git \
-    studies/neversink/external/neversink_workflow
-cd studies/neversink/external/neversink_workflow
-git sparse-checkout set --no-cone '/*' '!/*/' /neversink_optimal/ /neversink_mf6/ \
-    /processed_data/ /output/neversink_mf6_optimal_output/ /output/neversink_mp7_optimal_output/ \
-    /output/modpath_mc/ /output/parallel/ /scripts/ /notebooks_workflow_complete/ \
-    /supplementary_tables/ /python_packages_static/
-git checkout 6e4a5fb4c87f54d875675906380d0a0029fadd6c
-cd -
+```
+git clone --filter=blob:none --no-checkout https://github.com/usgs/neversink_workflow.git studies/neversink/external/neversink_workflow
+git -C studies/neversink/external/neversink_workflow sparse-checkout set --cone neversink_optimal neversink_mf6 processed_data output/neversink_mf6_optimal_output output/neversink_mp7_optimal_output output/modpath_mc output/parallel scripts notebooks_workflow_complete supplementary_tables python_packages_static
+git -C studies/neversink/external/neversink_workflow checkout 6e4a5fb4c87f54d875675906380d0a0029fadd6c
 ```
 
-The study was run on that commit. The checkout takes about 1 GB.
+Each command is one line, so they run unchanged in bash, PowerShell and cmd. The study was run on
+that commit. The checkout takes about 1 GB.
 
 ### Steps
 
@@ -152,30 +174,19 @@ results go to `studies/neversink/output/`.
 | e | `python studies/neversink/diagnostics.py` | Where and why full mixing and the published particles differ | `diagnostics/` |
 | f | `python studies/neversink/window.py` | Refined window around the cluster U wells: MF6, gwsource and PRT on 50, 25 and 12.5 m cells with 4 to 32 layers | `window/` (`refinement.csv`, `metrics.csv`, `runs.csv`, `start_cells.csv.gz`) |
 | g | `python studies/neversink/pest_rebuild.py` | Rebuilds the PEST interface and the 358-member parameter ensemble, and checks it against the published files | `pest/` (`modpath_par_ens.csv`, `mask_index.csv`) |
-| h | see below | Runs and traces every realisation of the ensemble | `ensemble/` (`probability_maps.npz`, `probability_comparison.csv`, `summary.csv`) |
-| i | see below | Checks the row offset and pairing of the published per-realisation masks | `mc_masks/` (`mask_offsets.csv`, `calibrated_offsets.csv`) |
+| h | `python studies/neversink/ensemble_run.py` | Runs and traces every realisation of the ensemble | `ensemble/` (`probability_maps.npz`, `probability_comparison.csv`, `summary.csv`) |
+| i | `python studies/neversink/mc_masks.py` | Checks the row offset and pairing of the published per-realisation masks | `mc_masks/` (`mask_offsets.csv`, `calibrated_offsets.csv`) |
 
 Steps b to f need only step a. Steps c to f need `TraceConfig(strong_sinks=...)`, which is in
 `gwsource`. Step f takes about 40 minutes of model, PRT and scoring time. Steps d and e give
 supporting results only. No figure reads them.
 
-Step h runs only the base pumping rate. The other pumping scenarios of `ensemble_run.py` are not
-used in the paper:
-
-```bash
-PYTHONPATH=studies/neversink:$PYTHONPATH python -c "import ensemble_run as e; \
-e.main(run_scenarios=False, analyse_scenarios=False)"
-```
-
-It runs six processes (`N_WORKERS`) and took about 75 minutes. It can be resumed: a realisation
+Step h runs only the base pumping rate, as set in `__main__` of `ensemble_run.py`. The other
+pumping scenarios of that script are not used in the paper. It runs six processes (`N_WORKERS`) and took about 75 minutes. It can be resumed: a realisation
 that already has a summary file is skipped.
 
-Step i needs only the published masks and end points, not the runs of step h:
-
-```bash
-PYTHONPATH=studies/neversink:$PYTHONPATH python -c "import mc_masks as m; \
-m.main(compare=False, run_multiplier=False)"
-```
+Step i needs only the published masks and end points, not the runs of step h. `__main__` of
+`mc_masks.py` runs only this part.
 
 ### Figures
 
@@ -210,9 +221,9 @@ study:
 
 ```bash
 python studies/comparison/paper_figures.py
-PYTHONPATH=studies/comparison:$PYTHONPATH python -c "import paper_figures as p; \
-p.main(neversink=False)"    # Fig. 6 only
 ```
+
+To draw Fig. 6 alone, set `neversink=False` in the call to `main` in `__main__`.
 
 ## Helper modules
 

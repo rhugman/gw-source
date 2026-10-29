@@ -116,21 +116,22 @@ def add_aux_option(text: str, name: str, block: str = "options") -> str:
 
 def add_rcha_iflowface(rcha_file: Path, value: int = IFLOWFACE_TOP) -> None:
     """Assign all recharge of a READASARRAYS RCH file (one period block) to one face."""
-    text = add_aux_option(rcha_file.read_text(), "IFLOWFACE")
+    text = add_aux_option(rcha_file.read_text(encoding="utf-8"), "IFLOWFACE")
     assert text.upper().count("BEGIN PERIOD") == 1, "expected one period block"
     head, tail = text.split("END period", 1)
-    rcha_file.write_text(f"{head}  IFLOWFACE\n    CONSTANT  {value:d}\nEND period{tail}")
+    rcha_file.write_text(f"{head}  IFLOWFACE\n    CONSTANT  {value:d}\nEND period{tail}", encoding="utf-8")
 
 
 def add_sfr_iflowface(sfr_file: Path, packagedata_file: Path, faces: np.ndarray) -> None:
     """Append an IFLOWFACE aux value per reach to the SFR packagedata (after the existing aux)."""
-    sfr_file.write_text(add_aux_option(sfr_file.read_text(), "IFLOWFACE"))
-    lines = packagedata_file.read_text().splitlines()
+    sfr_file.write_text(add_aux_option(sfr_file.read_text(encoding="utf-8"), "IFLOWFACE"),
+                        encoding="utf-8")
+    lines = packagedata_file.read_text(encoding="utf-8").splitlines()
     data = [i for i, ln in enumerate(lines) if ln.strip() and not ln.lstrip().startswith("#")]
     assert len(data) == len(faces), "one IFLOWFACE value per reach"
     for i, face in zip(data, faces):
         lines[i] = f"{lines[i]} {int(face):d}"
-    packagedata_file.write_text("\n".join(lines) + "\n")
+    packagedata_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def prepare_iflowface_model(ws: Path, src: Path = wf.MODEL_SRC) -> dict:

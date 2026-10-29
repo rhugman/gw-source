@@ -9,7 +9,7 @@ transient tracking, which carries the stored water from one step into the next
 The map helpers draw a per-cell value on the 2 km x 2 km example model with sky-blue stream
 cells and a white well star, in model metres with km ticks.
 
-    PYTHONPATH=src:tutorials:studies/paper python studies/paper/gallery_figure.py
+    python studies/paper/gallery_figure.py
 
 Output: output/paper/ in the repository root (git-ignored).
 """
@@ -20,7 +20,9 @@ from pathlib import Path
 import numpy as np
 
 PAPER_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(PAPER_DIR))
+REPO = PAPER_DIR.parents[1]
+IMPORT_DIRS = (PAPER_DIR, REPO / "tutorials", REPO / "src")
+sys.path[:0] = [str(d) for d in IMPORT_DIRS]  # no PYTHONPATH needed, on any OS
 
 import example_figures as ef  # noqa: E402
 import method_figures as mfig  # noqa: E402

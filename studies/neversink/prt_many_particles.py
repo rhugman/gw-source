@@ -37,7 +37,9 @@ import pandas as pd
 from scipy.spatial import cKDTree
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE))
+REPO = HERE.parents[1]
+IMPORT_DIRS = (HERE, REPO / "studies" / "paper", REPO / "tutorials", REPO / "src")
+sys.path[:0] = [str(d) for d in IMPORT_DIRS]  # no PYTHONPATH needed, on any OS
 
 import mp7_convention as mp7  # noqa: E402
 import strong_sinks as ss  # noqa: E402
@@ -145,7 +147,7 @@ def run_side_by_side(folders: list[Path], exe: Path) -> dict[str, float]:
     for folder, proc in zip(folders, procs):
         assert proc.wait() == 0, f"PRT failed in {folder}"
         seconds[folder.name] = time.perf_counter() - t0
-    assert all("Normal termination" in (f / "mfsim.lst").read_text()[-3000:] for f in folders)
+    assert all("Normal termination" in (f / "mfsim.lst").read_text(encoding="utf-8")[-3000:] for f in folders)
     return {"wall": time.perf_counter() - t0, **seconds}
 
 
@@ -186,7 +188,7 @@ def run_particles(out: Path = OUT_DIR, exe: Path | None = None) -> None:
     log.update({"starts": len(starts), "tracked_starts": int(keep.sum()),
                 "particles": int(keep.sum()) * N_SPLIT**3, "dry_starts_draped":
                 int(np.sum(starts["node0"] != starts["node_release"]))})
-    (run_dir / "run_log.json").write_text(json.dumps(log, indent=1))
+    (run_dir / "run_log.json").write_text(json.dumps(log, indent=1), encoding="utf-8")
     for folder in folders:
         shutil.rmtree(folder)
     shutil.rmtree(gwf_ws)

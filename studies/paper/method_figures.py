@@ -285,5 +285,5 @@ def plain_log_ticks(ax, ticks: tuple[float, ...]) -> None:
 def find_mf6(bin_dir: Path = REPO / "bin") -> Path:
     """Return the mf6 executable in bin_dir."""
     exe = bin_dir / ("mf6.exe" if sys.platform.startswith("win") else "mf6")
-    assert exe.is_file(), f"{exe} not found; run scripts/setup_env.sh"
+    assert exe.is_file(), f"{exe} not found; see studies/README.md (Environment)"
     return exe
