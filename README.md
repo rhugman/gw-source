@@ -37,6 +37,17 @@ The pytest header records the FloPy commit and MF6 version used. The tests build
 
 `python benchmarks/bench_solver.py` times the solver on synthetic grids up to 1M cells; `python benchmarks/bench_mf6.py` builds a 250,000-cell MF6 model (in `benchmarks/large_ws`) and times I/O, assembly and solve per time step.
 
+## Reproducing the paper
+
+The `paper` branch is `main` plus the scripts behind the paper, in `studies/`. They run the
+studies (synthetic examples, numerical dispersion, particle-tracking comparison, the USGS
+Neversink/Rondout model) and draw every figure. Use the `gw-source` environment from
+`scripts/setup_env.sh` and run from the repository root with
+`PYTHONPATH=src:tutorials:tests:studies/paper`. Results go to git-ignored `output/` folders, and
+figures to `output/paper/`. The Neversink study also needs a sparse checkout of
+`usgs/neversink_workflow`. The run order, the figure-to-script map and the data steps are in
+[`studies/README.md`](studies/README.md).
+
 ## Licence
 
 MIT; see [`LICENSE`](LICENSE).
