@@ -1,15 +1,21 @@
-"""Paper Fig. 4 and SI Fig. S4: the Neversink/Rondout case study, at Groundwater double-column
-width.
+"""Neversink/Rondout figures: F maps with the published contributing area, and the ensemble
+mean F.
 
-Fig. 4, four map panels: (a) the whole model with the three cluster windows, (b) to (d) the
-windows of cluster U, the north SV wells and the south SV well. Each shows F of the uppermost
-active cell of the calibrated model (gross accounting, stream reaches as cells; viridis classes,
-grey below 0.01), the F = 0.1 and F = 0.5 contours and the published MODPATH 7 area.
+neversink_maps, four map panels: (a) the whole model with the three cluster windows, (b) to (d)
+the windows of cluster U, the north SV wells and the south SV well. Each shows F of the
+uppermost active cell of the calibrated model (gross accounting, stream reaches as cells;
+viridis classes, grey below 0.01), the F = 0.1 and F = 0.5 contours and the published MODPATH 7
+area.
 
-Fig. S4, the windows of Fig. 4b-d: mean F over the realisations of the ensemble (stream reaches
-as cells) with the cells of published probability of contribution 0.5 or more outlined (the
-published masks moved back onto their cells, ensemble_run.read_mask). Reads stored outputs only
-(studies/paper/neversink_figures.py loaders); nothing is rerun.
+neversink_ensemble, the three cluster windows: mean F over the realisations of the ensemble
+(stream reaches as cells) with the cells of published probability of contribution 0.5 or more
+outlined (the published masks moved back onto their cells, ensemble_run.read_mask).
+
+Reads stored outputs only, from studies/neversink/output (run workflow.py, and pest_rebuild.py
+plus ensemble_run.py for the ensemble figure); nothing is rerun. Writes to output/paper/ in the
+repository root (git-ignored).
+
+    PYTHONPATH=src:studies/paper python studies/neversink/paper_figures.py
 """
 
 import sys
@@ -29,10 +35,8 @@ import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib import patheffects  # noqa: E402
 from matplotlib.collections import LineCollection  # noqa: E402
 
-OVERLEAF = Path("/Users/ruihugman/GitHub/gw-source") / "docs" / "paper" / "overleaf"
-FIG_DIR = OVERLEAF / "figures_2026-10-28"
-SI_DIR = OVERLEAF / "si_2026-10-28" / "fig" / "si"
-TEXT_WIDTH = 17.15 / 2.54  # SI text width (in)
+OUT_DIR = REPO / "output" / "paper"
+TEXT_WIDTH = 17.15 / 2.54  # in, full page width
 F_LEVELS = (0.1, 0.5)  # contoured values of F
 F_STYLES = {0.1: "--", 0.5: "-"}
 F_LINE = "#ffffff"
@@ -41,9 +45,9 @@ WINDOW_TITLES = {"U": "wells of cluster U", "SV_W": "north SV wells", "SV_S": "s
 TIGHT_PAD = 12  # cells kept around the areas in the cropped windows
 CROPPED = ("SV_W", "SV_S")  # windows cropped to their areas
 PUBLISHED_CELLS = 980  # published contributing cells of the calibrated model
-N_REALISATIONS = 358  # realisations of the base ensemble behind the mean F of Fig. S4
-PROBABILITY = 0.5  # outlined published probability of contribution (Fig. S4)
-S4_BAR_KM = {"U": 2.0, "SV_W": 1.0, "SV_S": 1.0}  # scale bars; 1 km labels touch in (a)
+N_REALISATIONS = 358  # realisations of the base ensemble behind the mean F
+PROBABILITY = 0.5  # outlined published probability of contribution
+ENSEMBLE_BAR_KM = {"U": 2.0, "SV_W": 1.0, "SV_S": 1.0}  # scale bars; 1 km labels touch in (a)
 
 
 def f_colormap() -> tuple:
@@ -108,7 +112,7 @@ def map_panel(
     segments: np.ndarray,
     scale: float,
 ) -> plt.cm.ScalarMappable:
-    """Draw a Fig. 4 panel: the F classes with their contours, the published area, SFR reaches
+    """Draw a map panel: the F classes with their contours, the published area, SFR reaches
     and wells inside window."""
     r0, r1, c0, c1 = window
     image = field_panel(ax, f, window, wells_ij, segments, scale)
@@ -207,7 +211,7 @@ def neversink_maps(
     fig_dir: Path, idomain: np.ndarray, f: np.ndarray, published: np.ndarray, windows: dict,
     segments: np.ndarray,
 ) -> Path:
-    """Draw paper Fig. 4, the whole model and three cluster windows in a 2 by 2 grid."""
+    """Draw the whole model and three cluster windows in a 2 by 2 grid."""
     nvf.paper_style()
     nrow, ncol = idomain.shape[1:]
     wells_ij = list(nvf.well_ij(wf.PRIORITY_WELLS, (nrow, ncol)).values())
@@ -234,7 +238,7 @@ def ensemble_panel(
     wells_ij: list,
     segments: np.ndarray,
 ) -> plt.cm.ScalarMappable:
-    """Draw a Fig. S4 panel: the mean F classes, the outline of the cells of high published
+    """Draw an ensemble panel: the mean F classes, the outline of the cells of high published
     probability (black, white halo), SFR reaches and wells inside window."""
     r0, r1, c0, c1 = window
     image = field_panel(ax, mean_f, window, wells_ij, segments, scale=1.0)
@@ -248,7 +252,7 @@ def ensemble_panel(
 
 
 def ensemble_legend(fig: plt.Figure, image: plt.cm.ScalarMappable) -> None:
-    """Draw the colour bar of mean F and the line key of Fig. S4 below the panels."""
+    """Draw the colour bar of mean F and the line key of the ensemble figure below the panels."""
     cax = fig.add_axes((0.06, 0.15, 0.38, 0.045))
     bar = fig.colorbar(image, cax=cax, orientation="horizontal", extend="min")
     bar.set_ticks(nvf.F_EDGES, labels=[f"{edge:g}" for edge in nvf.F_EDGES])
@@ -268,9 +272,9 @@ def ensemble_legend(fig: plt.Figure, image: plt.cm.ScalarMappable) -> None:
 
 def neversink_ensemble(
     fig_dir: Path, idomain: np.ndarray, mean_f: np.ndarray, probable: np.ndarray, windows: dict,
-    segments: np.ndarray, width: float = TEXT_WIDTH, bar_km: dict = S4_BAR_KM,
+    segments: np.ndarray, width: float = TEXT_WIDTH, bar_km: dict = ENSEMBLE_BAR_KM,
 ) -> Path:
-    """Draw SI Fig. S4, ensemble mean F in the three cluster windows of Fig. 4b-d."""
+    """Draw the ensemble mean F in the three cluster windows of the map figure."""
     nvf.paper_style()
     nrow, ncol = idomain.shape[1:]
     wells_ij = list(nvf.well_ij(wf.PRIORITY_WELLS, (nrow, ncol)).values())
@@ -284,9 +288,9 @@ def neversink_ensemble(
     return nvf.save(fig, fig_dir, "figS1_neversink_ensemble")
 
 
-def fig4_windows(idomain: np.ndarray, f: np.ndarray, published: np.ndarray, out: Path) -> dict:
-    """Return the cluster windows of Fig. 4b-d (U, SV_W, SV_S); the SV windows cropped to F of
-    the calibrated model and the published area."""
+def cluster_windows(idomain: np.ndarray, f: np.ndarray, published: np.ndarray, out: Path) -> dict:
+    """Return the cluster windows (U, SV_W, SV_S); the SV windows cropped to F of the calibrated
+    model and the published area."""
     windows = nvf.capture_windows(idomain, wf.PRIORITY_WELLS, published, out)
     for name in CROPPED:
         windows[name] = tight_window(f, published, windows[name])
@@ -301,27 +305,27 @@ def ensemble_fields(idomain: np.ndarray, maps_file: Path) -> tuple[np.ndarray, n
     return np.where(active, maps["cells:mean_F"], np.nan), maps["mp7"] >= PROBABILITY
 
 
-def main(fig4: bool = True, figS4: bool = True, fig_dir: Path = FIG_DIR, si_dir: Path = SI_DIR
-         ) -> list[Path]:
-    """Make Fig. 4 and SI Fig. S4 from the stored outputs of the Neversink study; return the PNG
-    paths."""
-    out = nvf.find_data_dir() / "output"
-    model_dir = out / "optimal"
+def main(maps: bool = True, ensemble: bool = True, out_dir: Path = OUT_DIR,
+         data_dir: Path = nvf.OUT) -> list[Path]:
+    """Draw the map and ensemble figures from the stored outputs of the Neversink study; return
+    the PNG paths."""
+    model_dir = data_dir / "optimal"
     idomain = wf.grid_idomain(model_dir)
     shape = idomain.shape[1:]
-    published = nvf.published_mask(shape, out)
+    published = nvf.published_mask(shape, data_dir)
     assert int(published.sum()) == PUBLISHED_CELLS, f"published cells: {published.sum()}"
-    f = nvf.capture_fields(idomain, out)["streams as cells"]
-    windows = fig4_windows(idomain, f, published, out)
+    f = nvf.capture_fields(idomain, data_dir)["streams as cells"]
+    windows = cluster_windows(idomain, f, published, data_dir)
     segments = nvf.model_segments(model_dir, shape[0])
     paths = []
-    if fig4:
-        paths.append(neversink_maps(fig_dir, idomain, f, published, windows, segments))
-    if figS4:
-        n = len(list((out / "ensemble" / "fractions").glob("*.npz")))
+    if maps:
+        paths.append(neversink_maps(out_dir, idomain, f, published, windows, segments))
+    if ensemble:
+        n = len(list((data_dir / "ensemble" / "fractions").glob("*.npz")))
         assert n == N_REALISATIONS, f"ensemble realisations: {n}"
-        mean_f, probable = ensemble_fields(idomain, out / "ensemble" / "probability_maps.npz")
-        paths.append(neversink_ensemble(si_dir, idomain, mean_f, probable, windows, segments))
+        mean_f, probable = ensemble_fields(idomain,
+                                           data_dir / "ensemble" / "probability_maps.npz")
+        paths.append(neversink_ensemble(out_dir, idomain, mean_f, probable, windows, segments))
     return paths
 
 

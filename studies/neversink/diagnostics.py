@@ -38,7 +38,7 @@ Needs TraceConfig.strong_sinks (gwsource, branch feature/strong-sinks). Run afte
 
     python studies/neversink/diagnostics.py
 
-Tables and figures (PNG, 300 dpi) go to output/diagnostics of the main checkout.
+Tables and figures (PNG, 300 dpi) go to studies/neversink/output/diagnostics.
 """
 
 import re
@@ -68,7 +68,7 @@ from matplotlib.colors import ListedColormap  # noqa: E402
 from matplotlib.patches import Patch, Rectangle  # noqa: E402
 
 OUT = wf.OUT
-# output/ of a worktree links the main checkout's folders child by child: write next to them
+# output/ may hold linked folders: write next to them
 DIAG_DIR = (OUT / "optimal").resolve().parent / "diagnostics"
 RUN_DIR = DIAG_DIR / "runs"
 TRACK_FILE = DIAG_DIR / "pathlines_disputed.csv.gz"
@@ -885,7 +885,7 @@ def cell_label(node: int, f: np.ndarray, p: np.ndarray | None) -> str:
 
 
 def f_color(value: float):
-    """Return the Fig. S6 class colour of an F value (grey below 0.01)."""
+    """Return the class colour of an F value (neversink_figures.f_classes; grey below 0.01)."""
     cmap, norm = nfig.f_classes()
     return cmap(norm(value)) if value >= nfig.F_EDGES[0] else ACTIVE_FILL
 

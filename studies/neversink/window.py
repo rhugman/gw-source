@@ -6,7 +6,7 @@ a contributing area (share P > 0.5) about twice the full-mixing F > 0.5 area, an
 diagnostics.py puts the gap at a few bottleneck cells next to the wells, where the capture zone
 is narrower than a cell. Neither method on that grid is the truth. As the grid is refined, the
 mixing inside cells shrinks, so F and P should approach one advective answer: the advective
-reference of the window (docs/paper/overleaf/particle_vs_tracing_plan.md, R_adv).
+reference of the window (R_adv).
 
 Regional run. The calibrated model rerun with the tight head criteria of
 workflow.TIGHT_DVCLOSE, and with RCH and SFR on the open top face (mp7_convention.add_iflowface;
@@ -72,7 +72,7 @@ against the reference area, RMSE over cells where either value exceeds 0.01, and
 and size ratio against the published U area. Two references, both on the finest grid: P, and F
 gross with every sink strong.
 
-Outputs in the main checkout's studies/neversink/output/window/: check_regional.csv (1x window
+Outputs in studies/neversink/output/window/: check_regional.csv (1x window
 against the regional run), runs.csv (per run: cells, package flows, edge-flow cuts, run
 times), metrics.csv, refinement.csv (the summary table), adjoint_cells.csv, start_cells.csv.gz (per start cell and run), run_log.json and figures/. The model and PRT
 workspaces are deleted once read (keep_models=True keeps them).
@@ -111,7 +111,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 import neversink_figures as nfig  # noqa: E402  (studies/paper on PYTHONPATH)
 from matplotlib.colors import BoundaryNorm, ListedColormap  # noqa: E402
 
-# The output folder of the main checkout (the worktree's output holds links into it).
+# The study output folder (resolved, so that a linked output/ folder is followed).
 OUT_DIR = (wf.OUT / "optimal").resolve().parent / "window"
 FIG_DIR = OUT_DIR / "figures"
 MODEL = wf.MODEL
@@ -1138,7 +1138,7 @@ def plot_maps(cells: pd.DataFrame, published: pd.Series, runs: list[str], win: W
               reg_shape: tuple, wells: pd.DataFrame, path: Path) -> None:
     """Map F (gross) and P per start cell for each run, with the published U area outlined.
 
-    Colour classes as the paper's F maps (Fig. S6: viridis, edges 0.01 to 1); grey below 0.01.
+    Colour classes as the F maps of neversink_figures (viridis, edges 0.01 to 1); grey below 0.01.
     """
     rows = (("F_gross", "F, gross"), ("P", "P, 27 particles"))
     edges = np.array(nfig.F_EDGES)

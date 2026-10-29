@@ -1,5 +1,5 @@
-"""Figures of Section 3 (synthetic examples): one figure per example, on the model with the
-SFR stream (tutorials/herebedragons.py of branch tutorials/sfr-stream).
+"""Figures of the synthetic examples A to D: one figure per example, on the tutorial model with
+the SFR stream (tutorials/herebedragons.py).
 
 The example model: one unconfined layer of 40 x 40 cells of 50 m, recharge, a constant-head west
 edge, an SFR stream north to south in column 31 and an 800 m3/d supply well in column 29.
@@ -16,11 +16,11 @@ edge, an SFR stream north to south in column 31 and an 800 m3/d supply well in c
 
 The panels reuse the drawing helpers of gallery_figure.py and example_figures.py (viridis F with
 white F = 0.1 dashed and F = 0.5 solid contours, sky-blue stream cells, white well star). Every
-caption number is in QUOTED and asserted (rounded half up) before plotting. Workspaces go under
-$TMPDIR and are deleted at the end.
+quoted number is in QUOTED and asserted (rounded half up) before plotting. Workspaces go under
+$TMPDIR and are deleted at the end; figures go to output/paper/ in the repository root
+(git-ignored).
 
-    PYTHONPATH=<sfr worktree>/src:<sfr worktree>/tutorials:studies/paper \
-        python studies/paper/synthetic_figures.py
+    PYTHONPATH=src:tutorials:studies/paper python studies/paper/synthetic_figures.py
 """
 
 import os
@@ -41,26 +41,24 @@ import example_figures_b as efb  # noqa: E402
 import method_figures as mfig  # noqa: E402
 
 import gwsource as gs  # noqa: E402
-import herebedragons as hbd  # noqa: E402  (the SFR version: tutorials of the sfr worktree first)
+import herebedragons as hbd  # noqa: E402
 import flopy  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 from flopy.mf6.utils.postprocessing import get_structured_faceflows  # noqa: E402
 from matplotlib.colors import Normalize  # noqa: E402
 
 TUTORIAL_DIR = Path(hbd.__file__).resolve().parent
-OUT_DIR = mfig.REPO.parents[2] / "docs" / "paper" / "overleaf" / "synthetic_2026-10-28"
+OUT_DIR = mfig.FIG_DIR
 WORK_DIR = Path(os.environ.get("TMPDIR", "/tmp")) / "synthetic_figures"
 WELL = "supply_well"
 SINGLE_WIDTH = 8.25 / 2.54  # in, one column
 YEAR = 365.25  # days
 EXTENT = 2000.0  # m
-FULL_WIDTH = 6.75  # in
 POROSITY = 0.3
 N_YEARS = 30
 SUBSTEPS = 4
 TRACK_SOURCES = {"recharge": {"package": "RCH"}, "stream": {"package": "SFR"},
                  "west edge": {"package": "CHD"}}
-FORWARD_SOURCES = {"stream": "SFR", "west edge": "CHD", "recharge": "RCH"}
 PACKAGE_NAMES = {"RCH": "recharge", "CHD": "west edge", "SFR": "stream"}
 CUMULATIVE_YEARS = (1, 10, 30)
 OKABE_ITO = mfig.OKABE_ITO
@@ -72,9 +70,9 @@ DRAIN_MARK = dict(marker="s", s=42, facecolor="none", linewidths=1.6)
 EXAMPLE_C_DRAINS = (  # (boundname, (row, col), elevation [m], conductance [m2/d]); in this order the
     ("drain_b", (22, 14), 6.0, 50.0), ("drain_a", (32, 14), 3.0, 200.0))  # mover passes 80 % and 100 %
 FLOW_ARROW = dict(color=OKABE_ITO["orange"], width=0.005, scale=30, pivot="middle", zorder=3)
-NETWORK_COLOUR = "#d7191c"  # red drains of Fig. C, apart from the orange flow arrows
+NETWORK_COLOUR = "#d7191c"  # red drains of Example C, apart from the orange flow arrows
 
-# Caption numbers: {name: (value, decimals)}; the computed value must round half up to the value.
+# Quoted numbers: {name: (value, decimals)}; the computed value must round half up to the value.
 QUOTED = {
     # model and budget (m3/d)
     "recharge in (m3/d)": (1950.0, 1), "west edge in (m3/d)": (338.0, 1),
@@ -417,7 +415,7 @@ def f_panel(ax, layer: dict):
 
 
 def make_example_a(data: dict, out_dir: Path, height: float = 2.6) -> list[Path]:
-    """Fig. A: F of the supply well, one column wide."""
+    """Example A: F of the supply well, one column wide."""
     size = (SINGLE_WIDTH, height)
     bottom, top, left = 0.4, 0.1, 0.4
     side = height - bottom - top
@@ -433,7 +431,7 @@ def make_example_a(data: dict, out_dir: Path, height: float = 2.6) -> list[Path]
 
 
 def draw_origin(ax, transient: dict) -> None:
-    """Fig. D (b): the well's water by origin through 30 years."""
+    """Example D (b): the well's water by origin through 30 years."""
     origin = transient["origin"]
     labels = {"initial": "initial water", "recharge": "recharge", "stream": "stream",
               "west edge": "west boundary"}
@@ -449,7 +447,7 @@ def draw_origin(ax, transient: dict) -> None:
 
 
 def make_example_d(transient: dict, out_dir: Path, height: float = 5.0) -> list[Path]:
-    """Fig. B, one column wide: w within 30 years (a) above the well's water by origin (b)."""
+    """Example D, one column wide: w within 30 years (a) above the well's water by origin (b)."""
     size = (SINGLE_WIDTH, height)
     left, side = 0.5, 2.05
     assert left + side + 0.65 <= SINGLE_WIDTH, "no room for the colour bar"
@@ -471,7 +469,7 @@ def make_example_d(transient: dict, out_dir: Path, height: float = 5.0) -> list[
 
 
 def make_example_b(travel: dict, fate: dict, out_dir: Path, height: float = 5.3) -> list[Path]:
-    """Fig. B, one column wide: mean travel time inside F > 0.5 (a) above G of the field (b)."""
+    """Example B, one column wide: mean travel time inside F > 0.5 (a) above G of the field (b)."""
     size = (SINGLE_WIDTH, height)
     left, side, gap, bottom, bar = 0.42, 2.2, 0.3, 0.38, 0.08
     assert left + side + 0.08 + bar + 0.45 <= SINGLE_WIDTH, "no room for the colour bars"
@@ -480,9 +478,7 @@ def make_example_b(travel: dict, fate: dict, out_dir: Path, height: float = 5.3)
     fig = plt.figure(figsize=size)
     ax_a = axes_in(fig, size, (left, bottom_a, side, side))
     ax_b = axes_in(fig, size, (left, bottom, side, side))
-    images = (gf.draw_travel_time(fig, ax_a, travel, label_xy=ZONE_LABEL_XY, note_xy={},
-                                  inset=False),
-              gf.draw_fate(fig, ax_b, fate, inset=False))
+    images = (gf.draw_travel_time(ax_a, travel, ZONE_LABEL_XY), gf.draw_fate(ax_b, fate))
     bars = (("travel time (years)", (0.1, 1.0, 10.0, 100.0), ("0.1", "1", "10", "100")),
             ("G (-)", (1e-3, 1e-2, 1e-1, 1.0), ("0.001", "0.01", "0.1", "1")))
     titles = ("mean travel time to the well", "where the field's recharge goes")
@@ -504,13 +500,13 @@ def cell_xy(node: int, ncol: int = 40, delr: float = 50.0, extent: float = EXTEN
 
 
 def draw_network(ax, drains: dict, colour: str) -> None:
-    """Fig. C: drains (open squares)."""
+    """Example C: drains (open squares)."""
     xy = np.array([cell_xy(n) for n in drains["drain_nodes"].values()])
     ax.scatter(xy[:, 0], xy[:, 1], zorder=4, edgecolor=colour, **DRAIN_MARK)
 
 
 def draw_flow_arrows(ax, drains: dict, every: int = 3, ncol: int = 40, delr: float = 50.0) -> None:
-    """Fig. C: groundwater flow direction (arrows of one length) on every few cells."""
+    """Example C: groundwater flow direction (arrows of one length) on every few cells."""
     qx, qy = drains["qx"], drains["qy"]
     rows = cols = slice(every // 2, ncol, every)
     centres = (np.arange(ncol) + 0.5) * delr
@@ -521,7 +517,7 @@ def draw_flow_arrows(ax, drains: dict, every: int = 3, ncol: int = 40, delr: flo
 
 
 def make_example_c(drains: dict, out_dir: Path, height: float = 5.5) -> list[Path]:
-    """Fig. C, one column wide: F with the stream as a plain source (a) and routed (b)."""
+    """Example C, one column wide: F with the stream as a plain source (a) and routed (b)."""
     size = (SINGLE_WIDTH, height)
     left, side, gap, bottom, bar = 0.42, 2.3, 0.3, 0.38, 0.08
     assert left + side + 0.08 + bar + 0.35 <= SINGLE_WIDTH, "no room for the colour bars"
@@ -546,7 +542,7 @@ def make_example_c(drains: dict, out_dir: Path, height: float = 5.5) -> list[Pat
 
 
 def main(out_dir: Path = OUT_DIR, work: Path = WORK_DIR, keep_work: bool = False) -> None:
-    """Build and trace every model, assert the caption numbers and draw the figures of Examples A to D."""
+    """Build and trace every model, assert the quoted numbers and draw the figures of Examples A to D."""
     mfig.paper_style()
     start = time.perf_counter()
     mf6 = mfig.find_mf6()

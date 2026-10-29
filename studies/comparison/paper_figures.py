@@ -2,13 +2,13 @@
 
 Two figures at Groundwater sizes (7 in wide, 300 dpi PNG), drawn from stored results only:
 
-- fig_comparison_synthetic.png, the synthetic 3D study (this folder, output/tables, fields and
-  references): (a)-(e) capture-probability maps of one case (lower-half screen, stream near,
+- fig_comparison_synthetic.png, the synthetic 3D study (studies/comparison/output: tables,
+  fields and references, from workflow.py): (a)-(e) capture-probability maps of one case (lower-half screen, stream near,
   25 m cells, 4 layers), (f) RMSE against the advective reference vs dx / W, (g) RMSE against
   the dispersive reference vs dx / sqrt(alpha_T L), (h) closure of the far-stream cases by
   layer count.
-- fig_neversink_window.png, the Neversink window study (main checkout's
-  studies/neversink/output/window): (a)-(d) maps of F and P at 50 m with 4 layers and at 12.5 m
+- fig_neversink_window.png, the Neversink window study (studies/neversink/output/window, from
+  studies/neversink/window.py): (a)-(d) maps of F and P at 50 m with 4 layers and at 12.5 m
   with 16 layers, with the published U area outlined; (e) start cells above 0.5 per run;
   (f) overlap of the F > 0.5 and P > 0.5 areas in the same run.
 
@@ -17,9 +17,10 @@ Capture probability uses one map in both figures: viridis in the classes of the 
 palette: full mixing blue, particles orange (stopped at weak sinks: squares, dashed; passing:
 triangles, solid), full mixing with every sink strong aqua.
 
-Run with the project environment from the repository root of this checkout:
+Each figure reads its data only when it is drawn, so the synthetic figure needs no Neversink
+run. Run from the repository root; figures go to output/paper/ (git-ignored):
 
-    PYTHONPATH=src python studies/comparison/paper_figures.py
+    PYTHONPATH=src:tutorials python studies/comparison/paper_figures.py
 """
 
 import importlib.util
@@ -45,22 +46,10 @@ import runs  # noqa: E402
 import scoring  # noqa: E402
 
 REPO = HERE.parents[1]
-
-
-def main_checkout(repo: Path = REPO, probe: str = "studies/neversink/output/window") -> Path:
-    """Return the checkout that holds the untracked outputs: this one, or the main checkout
-    that holds this worktree (.claude/worktrees/<name>)."""
-    for root in (repo, *repo.parents):
-        if (root / probe).is_dir():
-            return root
-    raise FileNotFoundError(f"no checkout above {repo} holds {probe}")
-
-
-MAIN_REPO = main_checkout()
 SYN_OUT = HERE / "output"
 NEV_DIR = REPO / "studies" / "neversink"
-NEV_OUT = MAIN_REPO / "studies" / "neversink" / "output" / "window"
-FIG_OUT = MAIN_REPO / "docs" / "paper" / "overleaf" / "figures_2026-10-27"
+NEV_OUT = NEV_DIR / "output" / "window"
+FIG_OUT = REPO / "output" / "paper"
 
 WIDTH = 7.0  # in, Groundwater full width
 DPI = 300
@@ -97,7 +86,6 @@ NEV_MAP_RUNS = ("n1z1_chd", "n4z4_chd")
 NEV_GROUPS = (("n1z1_chd", "n2z1_chd", "n4z1_chd"), ("n2z2_chd", "n2z4_chd", "n2z8_chd"),
               ("n4z2_chd", "n4z4_chd"))
 NEV_MAP_PAD = 12  # regional cells around the published area on the maps
-AREA_T = 0.5
 
 
 def style() -> None:
@@ -275,7 +263,7 @@ def panel_closure(ax: plt.Axes, coarse: pd.DataFrame, stream: str = CLOSURE_STRE
 
 
 def fig_synthetic(path: Path, out: Path = SYN_OUT) -> None:
-    """Figure A: maps of one case, the two error panels and the closure panel."""
+    """Synthetic study: maps of one case, the two error panels and the closure panel."""
     scores = pd.read_csv(out / "tables" / "scores.csv")
     coarse = pd.read_csv(out / "tables" / "coarse_runs.csv")
     panels, adv = synthetic_maps(out=out)
@@ -464,7 +452,8 @@ def panel_agreement(ax: plt.Axes, refinement: pd.DataFrame) -> None:
 
 
 def fig_neversink(path: Path, out: Path = NEV_OUT) -> None:
-    """Figure B: maps of F and P at two resolutions, cells above 0.5 and F-P overlap by run."""
+    """Neversink window: maps of F and P at two resolutions, cells above 0.5 and F-P overlap by
+    run."""
     nw = neversink_workflow()
     shape = regional_shape(nw.MODEL_SRC / f"{nw.MODEL}.dis")
     window = json.loads((out / "run_log.json").read_text())["window"]

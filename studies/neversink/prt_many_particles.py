@@ -45,7 +45,7 @@ import workflow as wf  # noqa: E402
 
 import gwsource as gs  # noqa: E402
 
-# The output folder of the main checkout (the worktree's output holds links into it).
+# The study output folder (resolved, so that a linked output/ folder is followed).
 OUT_DIR = (wf.OUT / "optimal").resolve().parent
 RUN_DIR = "prt_many_particles"
 FIG_DIR = OUT_DIR / "diagnostics"

@@ -1,10 +1,7 @@
-"""Supporting-information figures S2 and S3: full mixing converges on the advective answer.
+"""Supporting-information convergence figures: full mixing approaches the advective answer as
+the cells and the transport time steps get smaller.
 
-One Discussion sentence rests on them: as the cells and time steps get smaller, the numerical
-dispersion shrinks, and full mixing approaches the advective answer. Fig. S2 refines the cells,
-Fig. S3 the transport time steps.
-
-SI Figure 2 (si_fig2_cell_size), cell size:
+Cell-size figure (si_fig2_cell_size):
 
 - (a-f) Problem A of the dispersion study (studies/dispersion/problems.py, AnalyticSpec: uniform
   regional flow to a pumping well in a confined aquifer, flow at 30 degrees to the grid rows),
@@ -15,19 +12,18 @@ SI Figure 2 (si_fig2_cell_size), cell size:
 - (g, h) Against the mean cell size h, from the study's metric table: the width of the band
   where 0.1 < F < 0.9 and the relative difference of the F > 0.5 area from the exact zone, on
   DIS and DISV, with flow along the grid rows (solid) and at 30 degrees to them (dotted). The
-  axis starts at 100 m; the 200 m grids, 10 cells across the 2 km domain, miss the zone by
-  38 to 47 %.
+  axis starts at 100 m; the 200 m grids, 10 cells across the 2 km domain, are left off.
 
-SI Figure 3 (si_fig3_time_steps), one panel: the seasonal transient model of main-text Example D (30
+Time-step figure (si_fig3_time_steps), one panel: the seasonal transient model of synthetic example D (30
 years, one flow step per season), new recharge tracked forward to the supply well with 1, 4, 16
 and 64 transport sub-steps per flow step; the share of new recharge in the well's water per flow
 step over the first three years.
 
-Fig. S2 is redrawn from studies/dispersion/output (nothing rerun); Fig. S3 builds and runs the
-model under $TMPDIR and deletes it. Run from the repository root with the tutorials of the SFR stream
-model (as studies/paper/synthetic_figures.py):
+The cell-size figure is redrawn from studies/dispersion/output (nothing rerun); the time-step figure builds and runs the
+model under $TMPDIR and deletes it. Run from the repository root; figures go to output/paper/
+(git-ignored):
 
-    PYTHONPATH=src:<sfr worktree>/tutorials python studies/paper/si_convergence_figure.py
+    PYTHONPATH=src:tutorials python studies/paper/si_convergence_figure.py
 """
 
 import os
@@ -57,7 +53,7 @@ CELL_FIG_NAME = "si_fig2_cell_size"
 STEP_FIG_NAME = "si_fig3_time_steps"
 FULL_WIDTH = 17.15 / 2.54  # in, full page width
 COLUMN_WIDTH = 8.5 / 2.54  # in, one column
-OUT_DIR = mfig.REPO.parents[2] / "docs" / "paper" / "overleaf" / "si_2026-10-29" / "fig" / "si"
+OUT_DIR = mfig.FIG_DIR
 DISPERSION_OUT = mfig.DISPERSION_DIR / "output"
 WORK_DIR = Path(os.environ.get("TMPDIR", "/tmp")) / "si_convergence_figure"
 F_CMAP = "viridis"  # as the main-text F maps
@@ -71,7 +67,7 @@ GRIDS = {  # kind: (colour, marker, label)
 ANGLES = ((0.0, "-", "flow along rows"), (30.0, ":", "flow at 30° to rows"))
 CELL_EDGE = dict(colors="#808080", linewidths=0.2, alpha=0.5)
 DASH = (0, (3, 1.5))
-AREA_LIM = 14.0  # %, y range of panel (h): DISV at 100 m and 30 degrees is -12.8 %
+AREA_LIM = 14.0  # %, y range of panel (h): every grid of 100 m or finer fits
 WELL = "supply_well"
 POROSITY = 0.3
 N_YEARS = 30
@@ -81,7 +77,7 @@ T_MAX_YR = 3.0
 YEAR = 365.25  # d
 
 
-# ---------------------------------------------------------------- Fig. S3 model run
+# ---------------------------------------------------------------- time-step model run
 
 
 def track_new_recharge(work: Path, mf6: Path, substeps: tuple = SUBSTEPS,
@@ -227,7 +223,7 @@ def draw_area(ax: plt.Axes, table: pd.DataFrame, lim: float = AREA_LIM) -> None:
 
 def draw_steps(ax: plt.Axes, shares: pd.DataFrame, edges: np.ndarray,
                colours: tuple = SUBSTEP_COLOURS, t_max: float = T_MAX_YR) -> None:
-    """Fig. S3: share of new recharge in the well's water per flow step."""
+    """Time-step figure: share of new recharge in the well's water per flow step."""
     for colour, m in zip(colours, shares.columns):
         ax.stairs(shares[m].to_numpy(), edges, color=colour, lw=1.4, label=f"{m}")
     in_window = edges[1:] <= t_max + 1e-9
@@ -253,7 +249,7 @@ def legend_handles(grids: dict = GRIDS, angles: tuple = ANGLES) -> list:
 
 def make_cell_size_figure(out_dir: Path, maps: dict, models_dir: Path,
                           table: pd.DataFrame) -> list[Path]:
-    """Draw Fig. S2 (maps and metrics against cell size) and save PNG and PDF."""
+    """Draw the cell-size figure (maps and metrics against cell size) and save PNG and PDF."""
     mfig.paper_style()
     fig = plt.figure(figsize=(FULL_WIDTH, 7.6), layout="constrained")
     top, bottom = fig.subfigures(2, 1, height_ratios=(1.9, 1.15), hspace=0.03)
@@ -271,7 +267,7 @@ def make_cell_size_figure(out_dir: Path, maps: dict, models_dir: Path,
 
 def make_time_step_figure(out_dir: Path, shares: pd.DataFrame, edges: np.ndarray,
                           width: float = COLUMN_WIDTH) -> list[Path]:
-    """Draw Fig. S3 (one panel, time steps) and save PNG and PDF."""
+    """Draw the time-step figure (one panel, time steps) and save PNG and PDF."""
     mfig.paper_style()
     fig, ax = plt.subplots(figsize=(width, 2.6), layout="constrained")
     draw_steps(ax, shares, edges)
@@ -282,7 +278,7 @@ def make_time_step_figure(out_dir: Path, shares: pd.DataFrame, edges: np.ndarray
 
 
 def print_numbers(table: pd.DataFrame, steps: pd.DataFrame, edges: np.ndarray) -> None:
-    """Print every number the caption or text could quote."""
+    """Print the summary numbers of both figures."""
     out = table[table.method == "mixing"].copy()
     out["area_err_0.5"] *= 100.0
     columns = ["kind", "angle", "h", "mean_h", "n_cells", "band_width", "area_err_0.5"]
