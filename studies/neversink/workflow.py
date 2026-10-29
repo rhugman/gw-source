@@ -4,7 +4,7 @@
 The model is the USGS Neversink/Rondout MODFLOW 6 model (Fienen and others 2021; Corson-Dosch and
 others 2021), public domain, from https://github.com/usgs/neversink_workflow. Its calibrated
 ("optimal") input and the MODPATH 7 endpoint files of that model are in the repository; a sparse
-checkout of it goes in studies/neversink/external/ (git-ignored).
+checkout of it goes in studies/neversink/external/ (git-ignored; python studies/setup_tools.py).
 
 The published areas contributing recharge come from forward MODPATH 7 runs: one particle per
 cell of the uppermost active layer in three regions (NE, S and W) around the well clusters, weak
@@ -76,7 +76,7 @@ PRT_DIAGNOSIS_Z = (1.0, 0.5, None)
 def mf6_exe(bin_dir: Path = BIN) -> Path:
     """Return the MF6 executable in bin_dir."""
     exe = bin_dir / ("mf6.exe" if sys.platform.startswith("win") else "mf6")
-    assert exe.is_file(), f"{exe} not found; see studies/README.md (Environment)"
+    assert exe.is_file(), f"{exe} not found; run python studies/setup_tools.py"
     return exe
 
 

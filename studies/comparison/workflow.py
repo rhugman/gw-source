@@ -44,7 +44,7 @@ MAP_WINDOW = (0.0, 1600.0, 200.0, 1000.0)
 def study_config(out: Path = OUT, bin_dir: Path = REPO / "bin") -> runs.StudyConfig:
     """Return the study configuration with the MF6 executable in bin_dir."""
     mf6 = bin_dir / ("mf6.exe" if sys.platform.startswith("win") else "mf6")
-    assert mf6.is_file(), f"{mf6} not found; see studies/README.md (Environment)"
+    assert mf6.is_file(), f"{mf6} not found; run python studies/setup_tools.py"
     return runs.StudyConfig(out=out, mf6_exe=mf6, design=m.Design())
 
 

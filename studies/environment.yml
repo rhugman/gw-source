@@ -1,5 +1,5 @@
 # Pinned environment for the paper's analysis (branch paper): the versions the paper's results
-# were made with. Set-up commands, including MODFLOW 6, are in studies/README.md.
+# were made with. MODFLOW 6 and the data come from studies/setup_tools.py (see studies/README.md).
 # Every conda pin exists on conda-forge for linux-64, osx-arm64, osx-64 and win-64.
 name: gw-source-paper
 channels:

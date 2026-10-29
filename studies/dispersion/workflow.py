@@ -42,7 +42,7 @@ def study_config(out: Path = OUT, bin_dir: Path = BIN) -> runs.StudyConfig:
     """Return the study configuration with the executables in bin_dir."""
     suffix = ".exe" if sys.platform.startswith("win") else ""
     mf6 = bin_dir / f"mf6{suffix}"
-    assert mf6.is_file(), f"{mf6} not found; see studies/README.md (Environment)"
+    assert mf6.is_file(), f"{mf6} not found; run python studies/setup_tools.py"
     return runs.StudyConfig(out=out, mf6_exe=mf6)
 
 

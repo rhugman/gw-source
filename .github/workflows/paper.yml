@@ -1,7 +1,8 @@
 name: paper
 
 # Cross-OS smoke test of the paper's analysis scripts (studies/), in the pinned environment of
-# studies/environment.yml with MODFLOW 6 6.8.1. The long studies are not run here.
+# studies/environment.yml with MODFLOW 6 6.8.1 (studies/setup_tools.py). The long studies are
+# not run here.
 on:
   push:
     branches: [paper]
@@ -37,13 +38,8 @@ jobs:
           cache-environment: true
           init-shell: bash
 
-      - name: Generate FloPy MF6 classes from the MF6 6.8.1 DFNs
-        run: python -m flopy.mf6.utils.generate_classes --ref 6.8.1
-
-      - name: Download MODFLOW 6 6.8.1
-        run: |
-          mkdir -p bin
-          get-modflow --repo modflow6 --release-id 6.8.1 --downloads-dir "${RUNNER_TEMP}" bin
+      - name: MODFLOW 6 6.8.1 and FloPy classes (no Neversink data)
+        run: python studies/setup_tools.py --no-neversink
 
       - name: Record versions
         run: |
@@ -59,7 +55,7 @@ jobs:
 
           repo = Path.cwd()
           failed = []
-          for path in sorted(repo.glob("studies/*/*.py")):
+          for path in sorted(repo.glob("studies/*.py")) + sorted(repo.glob("studies/*/*.py")):
               dirs = [path.parent, repo / "studies" / "paper", repo / "tutorials", repo / "src"]
               code = f"import sys; sys.path[:0] = {[str(d) for d in dirs]!r}; import {path.stem}"
               proc = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
@@ -73,21 +69,10 @@ jobs:
       - name: Dispersion study test
         run: python -m pytest -v tests/test_dispersion_study.py
 
-      - name: Method figure (Fig. 1)
-        run: python studies/paper/gallery_figure.py
-
-      - name: Time-step figure (SI Fig. 3)
-        run: python -c "import sys; sys.path.insert(0, 'studies/paper'); import si_convergence_figure as s; print(s.main(cell_size=False))"
-
-      # The figures need the SFR stream of the shared model (tutorials/herebedragons.py add_sfr,
-      # from branch tutorials/sfr-stream); skipped until main brings it.
-      - name: Synthetic example figures (Figs 2 to 5)
-        run: |
-          if grep -q "^def add_sfr(" tutorials/herebedragons.py; then
-              python studies/paper/synthetic_figures.py
-          else
-              echo "tutorials/herebedragons.py has no SFR stream (add_sfr) yet: skipped"
-          fi
+      # Figs 1 to 5 and SI Fig. 3; Figs 2 to 5 are skipped with a message while the shared
+      # synthetic model has no SFR stream (add_sfr in tutorials/herebedragons.py).
+      - name: Quick figures
+        run: python studies/reproduce.py --quick
 
       - name: Upload the figures
         if: ${{ !cancelled() }}

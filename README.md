@@ -39,13 +39,10 @@ The pytest header records the FloPy commit and MF6 version used. The tests build
 
 ## Reproducing the paper
 
-The `paper` branch is `main` plus the scripts behind the paper, in `studies/`. They run the
-studies (synthetic examples, numerical dispersion, particle-tracking comparison, the USGS
-Neversink/Rondout model) and draw every figure. They run on Linux, macOS and Windows. Use the
-pinned environment of `studies/environment.yml` with MODFLOW 6 6.8.1, and run each script from
-the repository root as `python studies/<study>/<script>.py` (no `PYTHONPATH` needed). Results go
-to git-ignored `output/` folders, and figures to `output/paper/`. The Neversink study also needs a
-sparse checkout of `usgs/neversink_workflow`. The run order, the figure-to-script map and the data steps are in
+The `paper` branch is `main` plus the scripts in `studies/` that rerun the paper's studies and
+draw every figure, on Linux, macOS or Windows. Create the pinned environment of
+`studies/environment.yml`, then run `python studies/setup_tools.py` and
+`python studies/reproduce.py`. Details, runtimes and the figure-to-script table are in
 [`studies/README.md`](studies/README.md).
 
 ## Licence
