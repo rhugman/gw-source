@@ -13,9 +13,10 @@ plotting, so a figure stops if they drift.
   alone; (b) F with the stream reaches and the mover traced; (c) F of each reach. A multi-aquifer
   well (MAW) in a three-layer model, section through the MAW's row: (d) F on the aquifer cells
   alone; (e) F with the MAW borehole traced as a node.
-- Fig. 10 (Section 4.9), history matching with PEST++ IES. Prior and posterior probability of
-  contribution (the share of realisations with F > 0.5) with the true F > 0.5 outline, and the
-  river share of each realisation. PEST++ runs serially here (N_WORKERS = 0 in the notebook):
+- Fig. 10 (Supporting Information Fig. S3, file figS3_ensembles), history matching with PEST++
+  IES on the model with the SFR stream. Prior and posterior probability of contribution (the share
+  of realisations with F > 0.5) with the true F > 0.5 outline, and the stream share of each
+  realisation. PEST++ runs serially here (N_WORKERS = 0 in the notebook):
   its local TCP workers need ports. The posterior does not
   depend on the number of workers, so the serial run gives the notebook's numbers.
 - Fig. 11 (Section 4.10), the unit-concentration example of Bedekar et al. (2024). (a) Tracked
@@ -177,23 +178,23 @@ QUOTED_FIG8 = {
     "F MAW cell layer 1, cells only": (0.06, 5e-3),
     "F MAW cell layer 1, borehole traced": (0.53, 5e-3),
 }
-QUOTED_FIG10 = {  # tutorial 09 sections 9.1 to 9.4 (eight PEST++ workers)
-    "truth area F > 0.5 (km2)": (1.025, 5e-4),
-    "truth river share": (0.094, 5e-4),
-    "prior area P >= 0.9 (km2)": (0.558, 5e-4),
-    "posterior area P >= 0.9 (km2)": (0.978, 5e-4),
-    "prior band 0.1 < P < 0.9 (km2)": (1.098, 5e-4),
-    "posterior band 0.1 < P < 0.9 (km2)": (0.350, 5e-4),
-    "prior river share 5 %": (0.000, 5e-4),
-    "prior river share 95 %": (0.330, 5e-4),
-    "posterior river share 5 %": (0.047, 5e-4),
-    "posterior river share 95 %": (0.134, 5e-4),
-    "prior true zone with P >= 0.5 (%)": (79.3, 0.05),
-    "posterior true zone with P >= 0.5 (%)": (93.4, 0.05),
-    "prior mean phi": (3492.0, 0.5),
-    "posterior mean phi": (55.5, 0.05),
-    "prior P >= 0.9 inside the true zone (%)": (86.1, 0.05),
-    "posterior P >= 0.9 inside the true zone (%)": (87.5, 0.05),
+QUOTED_FIG10 = {  # tutorial 09 sections 9.1 to 9.4, model with the SFR stream (serial PEST++)
+    "truth area F > 0.5 (km2)": (0.998, 5e-4),
+    "truth stream share": (0.092, 5e-4),
+    "prior area P >= 0.9 (km2)": (0.560, 5e-4),
+    "posterior area P >= 0.9 (km2)": (0.965, 5e-4),
+    "prior band 0.1 < P < 0.9 (km2)": (1.083, 5e-4),
+    "posterior band 0.1 < P < 0.9 (km2)": (0.360, 5e-4),
+    "prior stream share 5 %": (0.000, 5e-4),
+    "prior stream share 95 %": (0.326, 5e-4),
+    "posterior stream share 5 %": (0.044, 5e-4),
+    "posterior stream share 95 %": (0.133, 5e-4),
+    "prior true zone with P >= 0.5 (%)": (78.4, 0.05),
+    "posterior true zone with P >= 0.5 (%)": (94.0, 0.05),
+    "prior mean phi": (3673.5, 0.5),
+    "posterior mean phi": (55.8, 0.05),
+    "prior P >= 0.9 inside the true zone (%)": (85.3, 0.05),
+    "posterior P >= 0.9 inside the true zone (%)": (87.6, 0.05),
 }
 QUOTED_FIG11 = {
     "lateral inflow at 25 yr": (0.482, 5e-4),
@@ -668,13 +669,13 @@ def setup_history_match(ws: Path, mf6: Path, h09, hbd) -> dict:
 
 
 def compute_fig10(work: Path, mf6: Path, pestpp: Path, run_ies: bool = True,
-                  n_workers: int = N_WORKERS) -> dict:
+                  n_workers: int = N_WORKERS, tutorial_dir: Path = TUTORIAL_DIR) -> dict:
     """Run tutorial 09's history match (or reuse its PEST++ output) and trace prior and posterior.
 
     The prior is the drawn pilot-point ensemble itself, as in section 1 of the notebook. PEST++ IES
     starts from it (prior.csv); its iteration-0 file holds the same values to six digits.
     """
-    hbd, h09 = tutorial_modules("09_ensembles")
+    hbd, h09 = tutorial_modules("09_ensembles", tutorial_dir)
     ws = work / "fig10"
     data = setup_history_match(ws, mf6, h09, hbd)
     master = ws / "master"
@@ -711,28 +712,28 @@ def compute_fig10(work: Path, mf6: Path, pestpp: Path, run_ies: bool = True,
 def fig10_values(data: dict) -> dict:
     """Return the numbers Section 4.9 quotes, from the Fig. 10 data."""
     out = {"truth area F > 0.5 (km2)": data["truth"]["area F > 0.5 (km2)"],
-           "truth river share": data["truth"]["river share"],
+           "truth stream share": data["truth"]["stream share"],
            "prior mean phi": float(data["phi"]["mean"].iloc[0]),
            "posterior mean phi": float(data["phi"]["mean"].iloc[-1])}
     for label, item in data["ensembles"].items():
         summary = item["summary"]
         out[f"{label} area P >= 0.9 (km2)"] = summary["area P >= 0.9 (km2)"]
         out[f"{label} band 0.1 < P < 0.9 (km2)"] = summary["band 0.1 < P < 0.9 (km2)"]
-        out[f"{label} river share 5 %"] = summary["river share 5 %"]
-        out[f"{label} river share 95 %"] = summary["river share 95 %"]
+        out[f"{label} stream share 5 %"] = summary["stream share 5 %"]
+        out[f"{label} stream share 95 %"] = summary["stream share 95 %"]
         out[f"{label} true zone with P >= 0.5 (%)"] = summary["true zone with P >= 0.5 (%)"]
         out[f"{label} P >= 0.9 inside the true zone (%)"] = summary[
             "area P >= 0.9 inside the true zone (%)"]
     return out
 
 
-def river_shares(table: pd.DataFrame) -> pd.Series:
-    """Return the river share of each realisation (0 where the river gives no water)."""
-    return table["share RIV"] if "share RIV" in table else pd.Series(0.0, index=table.index)
+def stream_shares(table: pd.DataFrame) -> pd.Series:
+    """Return the stream share of each realisation (0 where the stream gives no water)."""
+    return table["share SFR"] if "share SFR" in table else pd.Series(0.0, index=table.index)
 
 
 def draw_share_spread(ax, shares: dict, truth: float) -> None:
-    """Box plot (25 to 75 %, whiskers 5 to 95 %) and jittered dots of the river share."""
+    """Box plot (25 to 75 %, whiskers 5 to 95 %) and jittered dots of the stream share."""
     labels = list(shares)
     stats = []
     for label in labels:  # whiskers at the 5 and 95 % quantiles themselves, as the text quotes
@@ -756,12 +757,12 @@ def draw_share_spread(ax, shares: dict, truth: float) -> None:
 
 def make_fig10(out_dir: Path, data: dict) -> list[Path]:
     """Fig. 10: prior and posterior probability of contribution (share of realisations with
-    F > 0.5) with the true zone, and the river-share spread."""
+    F > 0.5) with the true zone, and the stream-share spread."""
     spec, step = data["spec"], data["base_step"]
     truth_grid = gs.export.to_grid(step, data["truth_res"].fraction_through[WELL])[0]
     fig, axes = plt.subplots(1, 3, figsize=(mfig.FULL_WIDTH, 2.75), layout="constrained",
                              gridspec_kw={"width_ratios": [1.0, 1.0, 0.55]})
-    titles = {"prior": "(a) Prior", "posterior": "(b) Posterior"}
+    titles = {"prior": "(a) prior", "posterior": "(b) posterior"}
     obs_rows, obs_cols = np.array(data["obs_cells"]).T
     x, y = cell_centres_km(spec)
     for i, (ax, (label, text)) in enumerate(zip(axes[:2], titles.items())):
@@ -774,7 +775,8 @@ def make_fig10(out_dir: Path, data: dict) -> list[Path]:
                       linewidth=1.1)
         ax.plot(x[obs_cols], y[obs_rows], "o", ms=2.6, mfc="white", mec=mfig.INK, mew=0.4,
                 ls="none", zorder=5)
-        fill_cells(ax, spec, np.arange(spec.nrow), np.full(spec.nrow, spec.riv_col))
+        fill_cells(ax, spec, np.arange(spec.nrow), np.full(spec.nrow, spec.stream_col),
+                   colour=mfig.STREAM_COLOUR)
         mark_cell(ax, spec, spec.wells[0][1], WELL_STYLE)
         map_axes(ax, spec, (0, 1, 2), ylabel=i == 0)
         title(ax, text)
@@ -783,12 +785,12 @@ def make_fig10(out_dir: Path, data: dict) -> list[Path]:
                shrink=0.9, pad=0.02)
 
     ax = axes[2]
-    shares = {label: river_shares(data["ensembles"][label]["table"]).to_numpy() for label in titles}
-    draw_share_spread(ax, shares, data["truth"]["river share"])
-    ax.set_ylabel("river share of the pumped water (-)")
+    shares = {label: stream_shares(data["ensembles"][label]["table"]).to_numpy() for label in titles}
+    draw_share_spread(ax, shares, data["truth"]["stream share"])
+    ax.set_ylabel("stream share of the pumped water (-)")
     ax.legend(loc="upper right")
-    title(ax, "(c) River share")
-    return mfig.save(fig, out_dir, "fig10_ensembles")
+    title(ax, "(c) stream share")
+    return mfig.save(fig, out_dir, "figS3_ensembles")
 
 
 # ---------------------------------------------------------------- Fig. 11: unit concentration
@@ -922,10 +924,12 @@ def main(
     fig10: bool = True,
     fig11: bool = True,
     run_ies: bool = True,
+    tutorial_dir: Path = TUTORIAL_DIR,
+    bin_dir: Path = mfig.REPO / "bin",
 ) -> None:
     """Make Figs 7, 8, 10 and 11; each gate can be switched off. run_ies=False reuses PEST++ output."""
     mfig.paper_style()
-    mf6 = mfig.find_mf6()
+    mf6 = mfig.find_mf6(bin_dir)
     start = time.perf_counter()
     gates = (
         (fig7, compute_fig7, fig7_values, QUOTED_FIG7, make_fig7, "Fig. 7"),
@@ -941,7 +945,7 @@ def main(
             print("wrote", make(out_dir, data))
     if fig10:
         pestpp = mf6.parent / "pestpp-ies"
-        data = compute_fig10(work, mf6, pestpp, run_ies=run_ies)
+        data = compute_fig10(work, mf6, pestpp, run_ies=run_ies, tutorial_dir=tutorial_dir)
         computed = fig10_values(data)
         report(computed)
         check_quoted(computed, QUOTED_FIG10, "Fig. 10")

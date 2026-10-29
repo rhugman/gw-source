@@ -57,6 +57,7 @@ OKABE_ITO = {
     "black": "#000000", "orange": "#E69F00", "sky": "#56B4E9", "green": "#009E73",
     "yellow": "#F0E442", "blue": "#0072B2", "vermillion": "#D55E00", "purple": "#CC79A7",
 }
+STREAM_COLOUR = OKABE_ITO["sky"]  # stream cells on maps (Figs S1, S3)
 F_CMAP = LinearSegmentedColormap.from_list(
     "f_blues", ["#ffffff", "#d6e6f4", "#8fbfe0", "#4a90c8", "#0072B2", "#08306b"]
 )

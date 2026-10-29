@@ -14,8 +14,10 @@ Problem B also has a transient variant with the steady flows held for many time 
 storage), for the time-stepping part of the study.
 
 Coordinates: model x, y with the origin at the lower-left corner of the domain (DIS rows count
-from the top). Grids are built by cell size h: DIS with h x h cells, DISV with a Voronoi grid
-whose Triangle maximum area is h^2 (its mean cell size is reported, not assumed).
+from the top). Grids are built by cell size h: DIS with h x h cells, DISV with a smooth,
+quasi-uniform Voronoi grid from vorflow (CGAL refinement and Lloyd relaxation) whose mean cell
+size is brought to h (it is reported, not assumed). Voronoi seeds on the domain edge give half
+cells there, as in any bounded Voronoi grid.
 """
 
 from dataclasses import dataclass, field
@@ -23,13 +25,15 @@ from pathlib import Path
 
 import flopy
 import numpy as np
+import vorflow.vorflowpp as vfp
 from flopy.utils.gridintersect import GridIntersect
-from flopy.utils.triangle import Triangle
-from flopy.utils.voronoi import VoronoiGrid
 from shapely.geometry import LineString, Point
 
 GRID_KINDS = ("DIS", "DISV")
 EDGE_TOL = 1e-6
+VORONOI_ITERS = 30  # Lloyd relaxation iterations of vorflow
+VORONOI_GRADATION = 1.2  # vorflow size gradation (uniform target size: no effect)
+VORONOI_SIZE_RATIO = 0.6  # first guess of mean cell size over vorflow's background size
 
 
 @dataclass
@@ -110,14 +114,52 @@ class GridModel:
 # ---------------------------------------------------------------- grids
 
 
-def voronoi_gridprops(ws: Path, triangle_exe: Path, lx: float, ly: float, h: float) -> dict:
-    """Return DISV grid properties of a Voronoi grid over [0, lx] x [0, ly] (Triangle area h^2)."""
-    tri_ws = ws / "triangle"
-    tri_ws.mkdir(parents=True, exist_ok=True)
-    tri = Triangle(model_ws=str(tri_ws), exe_name=str(triangle_exe), maximum_area=h * h, angle=30.0)
-    tri.add_polygon([(0.0, 0.0), (lx, 0.0), (lx, ly), (0.0, ly)])
-    tri.build(verbose=False)
-    return VoronoiGrid(tri).get_disv_gridprops()
+def vorflow_cells(lx: float, ly: float, size: float, iters: int = VORONOI_ITERS,
+                  gradation: float = VORONOI_GRADATION) -> list:
+    """Return vorflow's (seed, polygon) Voronoi cells over [0, lx] x [0, ly] for one size."""
+    mesher = vfp.HydroMesher()
+    mesher.add_domain([(0.0, 0.0), (lx, 0.0), (lx, ly), (0.0, ly)], edge_resolution=size)
+    mesher.generate(size, gradation, iters, method=vfp.GenerationMethod.CGAL_DEFAULT)
+    return mesher.get_voronoi_cells()
+
+
+def polygon_area(xy: np.ndarray) -> float:
+    """Return the signed area of a polygon (positive counter-clockwise)."""
+    x, y = xy[:, 0], xy[:, 1]
+    return 0.5 * float(np.dot(x, np.roll(y, -1)) - np.dot(y, np.roll(x, -1)))
+
+
+def voronoi_cells(lx: float, ly: float, h: float, ratio: float = VORONOI_SIZE_RATIO) -> list:
+    """Return Voronoi cells over the domain whose mean cell size is close to h.
+
+    vorflow's background size is the target edge length of its triangles, so the first guess
+    is h / ratio; one rescaling by the mean cell size reached then brings it to h.
+    """
+    size = h / ratio
+    cells = vorflow_cells(lx, ly, size)
+    mean_h = np.sqrt(lx * ly / len(cells))
+    cells = vorflow_cells(lx, ly, size * h / mean_h)
+    areas = [abs(polygon_area(np.asarray(poly))) for _, poly in cells]
+    assert abs(sum(areas) / (lx * ly) - 1.0) < 1e-9, "the Voronoi cells must tile the domain"
+    return cells
+
+
+def voronoi_gridprops(lx: float, ly: float, h: float, digits: int = 6) -> dict:
+    """Return DISV grid properties of a vorflow Voronoi grid of mean cell size about h.
+
+    The cell centres are the Voronoi seeds; shared vertices are merged after rounding to digits
+    decimals, and every cell is written clockwise as MF6 requires.
+    """
+    vertex_ids, cell2d = {}, []
+    for icell, (seed, poly) in enumerate(voronoi_cells(lx, ly, h)):
+        xy = np.round(np.asarray(poly, dtype=float), digits) + 0.0  # + 0.0 drops -0.0
+        if polygon_area(xy) > 0:
+            xy = xy[::-1]
+        ids = [vertex_ids.setdefault((x, y), len(vertex_ids)) for x, y in map(tuple, xy)]
+        ids = [v for n, v in enumerate(ids) if v != ids[n - 1]]  # drop repeated vertices
+        cell2d.append([icell, float(seed[0]), float(seed[1]), len(ids), *ids])
+    vertices = [[i, x, y] for (x, y), i in vertex_ids.items()]
+    return {"ncpl": len(cell2d), "nvert": len(vertices), "vertices": vertices, "cell2d": cell2d}
 
 
 def cell_areas(modelgrid) -> np.ndarray:
@@ -157,9 +199,7 @@ def cell_centres(modelgrid) -> tuple[np.ndarray, np.ndarray]:
     return np.ravel(modelgrid.xcellcenters), np.ravel(modelgrid.ycellcenters)
 
 
-def add_discretisation(
-    gwf, ws: Path, triangle_exe: Path, kind: str, h: float, lx: float, ly: float, top, botm
-) -> str:
+def add_discretisation(gwf, kind: str, h: float, lx: float, ly: float, top, botm) -> str:
     """Add DIS (h x h cells) or a Voronoi DISV and return the discretisation file name."""
     assert kind in GRID_KINDS, f"grid kind must be one of {GRID_KINDS}"
     name = gwf.name
@@ -171,7 +211,7 @@ def add_discretisation(
             filename=f"{name}.dis",
         )
         return f"{name}.dis"
-    props = voronoi_gridprops(ws, triangle_exe, lx, ly, h)
+    props = voronoi_gridprops(lx, ly, h)
     flopy.mf6.ModflowGwfdisv(gwf, nlay=1, top=top, botm=botm, filename=f"{name}.disv", **props)
     return f"{name}.disv"
 
@@ -213,6 +253,7 @@ def cell_at(modelgrid, x: float, y: float) -> int:
         row, col = modelgrid.intersect(x, y)
         return int(row * modelgrid.ncol + col)
     hits = GridIntersect(modelgrid).intersects(Point(x, y), dataframe=False).cellids
+    assert len(hits) == 1, f"({x}, {y}) is on a cell edge"
     return int(hits[0])
 
 
@@ -229,14 +270,12 @@ def analytic_head(x, y, spec: AnalyticSpec):
     return spec.h0 - spec.gradient * along + well
 
 
-def build_analytic(
-    ws: Path, exe: Path, triangle_exe: Path, spec: AnalyticSpec, kind: str, h: float
-) -> GridModel:
+def build_analytic(ws: Path, exe: Path, spec: AnalyticSpec, kind: str, h: float) -> GridModel:
     """Build and run problem A on one grid."""
     name = "a_" + kind.lower()
     ws.mkdir(parents=True, exist_ok=True)
     sim, gwf = make_sim(name, ws, exe, [(1.0, 1, 1.0)])
-    add_discretisation(gwf, ws, triangle_exe, kind, h, spec.lx, spec.ly, spec.thickness, 0.0)
+    add_discretisation(gwf, kind, h, spec.lx, spec.ly, spec.thickness, 0.0)
     grid = gwf.modelgrid
     add_npf_ic_oc(gwf, spec.k, 0, spec.h0)
     perimeter = boundary_cells(grid, spec.lx, spec.ly)
@@ -260,9 +299,14 @@ def river_cells(modelgrid, spec: Model1Spec) -> list[tuple[int, float]]:
     """Return (cell, river length in the cell) along the line x = riv_x."""
     line = LineString([(spec.riv_x, 0.0), (spec.riv_x, spec.ly)])
     result = GridIntersect(modelgrid).intersect(line, geo_dataframe=False)
+    assert abs(sum(result["lengths"]) - spec.ly) < EDGE_TOL, "the river must not run on cell edges"
+    # FloPy >= 3.10 gives node numbers in "cellid"; older versions only "cellids", (row, col)
+    # tuples on a structured grid
+    cells = result["cellid"] if "cellid" in result.dtype.names else result["cellids"]
+    nodes = [c[0] * modelgrid.ncol + c[1] if isinstance(c, tuple) else c for c in cells]
     return [
         (int(cell), float(length))
-        for cell, length in zip(result["cellid"], result["lengths"])
+        for cell, length in zip(nodes, result["lengths"])
         if length > EDGE_TOL
     ]
 
@@ -300,7 +344,6 @@ def add_model1_stresses(gwf, spec: Model1Spec) -> dict:
 def build_model1(
     ws: Path,
     exe: Path,
-    triangle_exe: Path,
     spec: Model1Spec,
     kind: str,
     h: float,
@@ -310,7 +353,7 @@ def build_model1(
     name = "b_" + kind.lower()
     ws.mkdir(parents=True, exist_ok=True)
     sim, gwf = make_sim(name, ws, exe, perioddata or [(1.0, 1, 1.0)])
-    add_discretisation(gwf, ws, triangle_exe, kind, h, spec.lx, spec.ly, spec.top, spec.botm)
+    add_discretisation(gwf, kind, h, spec.lx, spec.ly, spec.top, spec.botm)
     add_npf_ic_oc(gwf, spec.k, 1, spec.strt)
     cells = add_model1_stresses(gwf, spec)
     run(sim)

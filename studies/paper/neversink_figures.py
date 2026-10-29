@@ -13,8 +13,6 @@ of the main checkout when this checkout has no output folder.
   map of the whole model with the window (in place of Fig. S5).
 - Reduced draft Fig. 3 (gate fig_single), one column of 8.25 cm: panels (a) and (b) of Fig. 12
   side by side in the same window, with the same checks.
-- Reduced draft SI figure (gate fig_si_cd): panels (c) and (d) of Fig. 12 in the same window,
-  with the locator map, for the SI of the reduced draft, whose main-text Fig. 3 holds (a, b).
 - Fig. S5, location map: active model area, SFR reaches as a network, the three MODPATH 7
   regions (start cells of the published runs), the published contributing cells of the
   calibrated model and the eight priority wells by cluster. Coordinates are km from the grid
@@ -1027,74 +1025,6 @@ def neversink_single(
     return save(fig, fig_dir, "fig_neversink_single")
 
 
-# ---------------------------------------------------------------- reduced draft: SI figure
-
-SI_CD_TITLES = ("(a) F > 0.1, particles P > 0.5", "(b) ensemble mean F")
-SI_CD_OVERLAP_LABELS = ("in both", "particles only", "F > 0.1 only")  # codes 1 to 3
-
-
-def si_cd_legend(
-    ax: plt.Axes, colors: tuple = OVERLAP_COLORS, labels: tuple = SI_CD_OVERLAP_LABELS
-) -> None:
-    """Draw the legend of the reduced draft's SI figure: the overlap classes of (a), then the
-    wells, the SFR reaches, the outline of (b) and the regions of the inset."""
-    ax.axis("off")
-    handles = [Patch(facecolor=colors[k], edgecolor="none", label=labels[k - 1]) for k in (1, 2, 3)]
-    handles += [
-        plt.Line2D(
-            [], [], ls="", marker="o", ms=4, mfc=COLORS["prt"], mec=INK, mew=0.7, label="wells"
-        ),
-        plt.Line2D([], [], color=STREAM, lw=1, label="SFR reaches"),
-        plt.Line2D([], [], color=INK, lw=0.8, label="published probability 0.5 (b)"),
-        plt.Line2D([], [], color=MUTED, lw=0.8, ls="--", label="MODPATH 7 regions (c)"),
-    ]
-    ax.legend(
-        handles=handles, loc="center", ncol=2, handlelength=1.6, frameon=False, columnspacing=1.2
-    )
-
-
-def neversink_si_cd(
-    fig_dir: Path,
-    idomain: np.ndarray,
-    wells: dict,
-    maps: dict,
-    window: tuple,
-    segments: np.ndarray,
-    regions: dict,
-    titles: tuple = SI_CD_TITLES,
-    bar_km: float = F6_BAR_KM,
-) -> Path:
-    """SI figure of the reduced draft: panels (c) and (d) of Fig. 12 in the U-cluster window,
-    (a) the F > 0.1 area against the P > 0.5 area of the weight-losing PRT particles and (b)
-    ensemble mean F with the published probability 0.5 outlined, and the locator map (c)."""
-    paper_style()
-    nrow, ncol = idomain.shape[1:]
-    wells_ij = list(well_ij(wells, (nrow, ncol)).values())
-    fig = plt.figure(figsize=(DOUBLE * 0.8, 2.75), layout="constrained")
-    top, bottom = fig.subfigures(2, 1, height_ratios=(1.0, 0.42))
-    ax_p, ax_mean, ax_loc = top.subplots(1, 3, width_ratios=(1.0, 1.0, 0.8))
-    overlap_panel(ax_p, maps["codes P"], window, wells_ij, segments, titles[0])
-    image = class_panel(
-        ax_mean,
-        maps["mean F"],
-        maps["probability 0.5"],
-        wells_ij,
-        window,
-        segments,
-        f_classes(),
-        titles[1],
-    )
-    x0, _, y0, _ = window_extent(window, nrow)
-    scale_bar(ax_p, x0 + 0.4, y0 + 0.4, bar_km)
-    locator_panel(ax_loc, idomain, regions, wells_ij, segments, window)
-    ax_loc.set_xlabel("")
-    ax_loc.set_title("(c) whole model", loc="left")
-    ax_key, ax_legend = bottom.subplots(1, 2, width_ratios=(1.0, 1.7))
-    single_key(ax_key, image, title="mean F (b), grey below 0.01")
-    si_cd_legend(ax_legend)
-    return save(fig, fig_dir, "figS22_neversink_cd")
-
-
 # ---------------------------------------------------------------- Fig. S9: area growth
 
 
@@ -1323,7 +1253,6 @@ def published_mask(shape: tuple, out: Path = OUT) -> np.ndarray:
 def main(
     fig12: bool = True,
     fig_single: bool = False,
-    fig_si_cd: bool = False,
     figS5: bool = False,
     figS6: bool = False,
     figS7: bool = False,
@@ -1347,12 +1276,12 @@ def main(
     idomain = wf.grid_idomain(model_dir)
     shape = idomain.shape[1:]
     wells = wf.PRIORITY_WELLS
-    maps_needed = fig12 or fig_single or fig_si_cd or figS5 or figS6 or figS7 or figS8
+    maps_needed = fig12 or fig_single or figS5 or figS6 or figS7 or figS8
     if maps_needed:
         mask = published_mask(shape, out)
         windows = capture_windows(idomain, wells, mask, out)
         segments = model_segments(model_dir, shape[0])
-    if fig12 or fig_si_cd or figS5:
+    if fig12 or figS5:
         regions = region_grids(wf.read_endpoints(mp_dir, columns=("node0",)), shape)
     if fig12:
         window = equal_windows(windows, shape)[FIG12_WINDOW]
@@ -1364,11 +1293,6 @@ def main(
         maps = row_maps(idomain, mask, out, ens_dir / "probability_maps.npz")
         check_window(maps, window)
         paths.append(neversink_single(fig_dir, idomain, wells, maps, window, segments))
-    if fig_si_cd:
-        window = equal_windows(windows, shape)[FIG12_WINDOW]
-        maps = row_maps(idomain, mask, out, ens_dir / "probability_maps.npz")
-        check_window(maps, window)
-        paths.append(neversink_si_cd(fig_dir, idomain, wells, maps, window, segments, regions))
     if figS5:
         x0, y0 = read_dis_origin(model_dir / "neversink.dis")
         north = true_north_angle(x0 + shape[1] * 25.0, y0 + shape[0] * 25.0)

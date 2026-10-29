@@ -1,4 +1,4 @@
-"""Transient-tracking figure of the paper (Fig. 9, file fig9_transient_tracking): tutorial 08's
+"""Transient-tracking figure of the paper (Fig. S1, file figS1_transient_tracking): tutorial 08's
 seasonal model, snapshots against transient tracking through storage. Outline: docs/paper/outline.md §5.4 and §6; wording: docs/paper/terms.md.
 
 The model is tutorial 08's (tutorials/herebedragons.py::build_transient): the tutorial aquifer
@@ -10,12 +10,12 @@ simulation, not before pumping. The tables are tutorial 08's own helpers
 
 - (a) Snapshots: each step traced backward on its own flows, storage release a source term;
   the well's water by source term.
-- (b) Transient tracking forward with recharge, river leakage, west-edge inflow and the initial
+- (b) Transient tracking forward with recharge, stream leakage (SFR), west-edge inflow and the initial
   water tagged: the well's water by origin, and the initial water's share of all water pumped
   so far.
 - (c-f) The steady F of the first step (no time limit); then, from backward tracking in time,
   for the water in each cell at the start, the fraction that reaches the well within 30 years,
-  leaves through the river, or is still stored at the end.
+  leaves through the stream, or is still stored at the end.
 
 Every panel uses the default "flow" volumes and four transport sub-steps per flow step (about
 23 days; one step per 91-day flow step nearly doubles early arrivals, tutorial 08 §9). Forward
@@ -27,7 +27,7 @@ MF6 GWT unit-tracer run on the same flows (tutorial 08 §8), and "flow" volumes 
 The caption numbers are in QUOTED and asserted against the computed values before plotting.
 Sizes follow studies/paper/method_figures.py: double column 7 in, fonts 7 to 8 pt, PNG at
 300 dpi and PDF, Okabe-Ito colours. The maps follow studies/paper/example_figures.py:
-viridis from 0 to 1 with white contours (dashed 0.1, solid 0.5), river cells in sky blue and the
+viridis from 0 to 1 with white contours (dashed 0.1, solid 0.5), stream cells in sky blue and the
 well as a white star. Run from the repository root (model workspaces in
 studies/paper/output, git-ignored):
 
@@ -51,8 +51,8 @@ import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.colors import ListedColormap  # noqa: E402
 
 TUTORIAL_DIR = mfig.TUTORIAL_DIR
-TUTORIAL08_DIR = TUTORIAL_DIR / "08_transient_tracking"
-FIG_NAME = "fig9_transient_tracking"
+BIN_DIR = mfig.REPO / "bin"
+FIG_NAME = "figS1_transient_tracking"
 WELL = "supply_well"
 N_YEARS = 30
 POROSITY = 0.3
@@ -60,7 +60,7 @@ SUBSTEPS = 4  # transport sub-steps per flow step in every panel
 SUBSTEPS_FINE = 16  # sensitivity of the year-1 shares to the transport step
 SOURCES = {  # tutorial 08's tagged source groups
     "recharge": {"package": "RCH"},
-    "river": {"package": "RIV"},
+    "stream": {"package": "SFR"},
     "west edge": {"package": "CHD"},
 }
 DESTINATIONS = {WELL: {"boundnames": [WELL]}}
@@ -68,7 +68,7 @@ CUMULATIVE_YEARS = (1, 10, 30)
 OKABE_ITO = mfig.OKABE_ITO
 COLOURS = {
     "recharge": OKABE_ITO["blue"],
-    "river": OKABE_ITO["sky"],
+    "stream": OKABE_ITO["sky"],
     "west edge": OKABE_ITO["green"],
     "storage": OKABE_ITO["orange"],
     "initial": "#c8c8c8",
@@ -76,12 +76,11 @@ COLOURS = {
 F_CMAP = "viridis"  # maps, as studies/paper/example_figures.py
 F_CONTOUR = "white"
 THRESHOLDS = (0.1, 0.5)  # map contours: dashed, solid
-RIVER_COLOUR = OKABE_ITO["sky"]
 STAR_COLOUR = "white"  # the well on maps
 STAR_SIZE = 70.0
 LABELS = {
     "recharge": "recharge",
-    "river": "river leakage",
+    "stream": "stream leakage",
     "west edge": "west-edge inflow (CHD)",
     "storage": "storage release, (a) only",
     "initial": "initial water, (b) only",
@@ -94,25 +93,25 @@ QUOTED = {
     "recharge factor, dry": 0.1,
     "pumping factor, dry": 1.4,
     "pumping, dry (m3/d)": 1120,
-    "snapshot recharge, mean": 0.60,
+    "snapshot recharge, mean": 0.59,
     "snapshot west edge, mean": 0.12,
     "snapshot storage, mean": 0.15,
     "snapshot storage, max": 0.50,
     "year 1 initial": 0.95,
-    "year 1 river": 0.03,
+    "year 1 stream": 0.03,
     "year 30 initial": 0.52,
     "year 30 recharge": 0.33,
-    "year 30 river": 0.16,
+    "year 30 stream": 0.15,
     "cumulative initial, year 1": 0.98,
     "cumulative initial, year 10": 0.81,
     "cumulative initial, year 30": 0.68,
     "pumping, 30 years (m3)": 8_766_800,
     "volume recharge (million m3)": 1.62,
-    "volume river (million m3)": 1.21,
-    "volume initial (million m3)": 5.94,
-    "share initial, backward": 0.677,
+    "volume stream (million m3)": 1.20,
+    "volume initial (million m3)": 5.95,
+    "share initial, backward": 0.678,
     "substep sensitivity, year 1 (pp)": 0.2,
-    "gwt agreement": "9.8e-14",
+    "gwt agreement": "8.9e-14",
 }
 BELOW = {  # upper bounds the caption states in words
     "year 1 recharge": 0.02,  # "under 2 % recharge"
@@ -121,15 +120,14 @@ BELOW = {  # upper bounds the caption states in words
     "volume options": 2e-4,  # "the two options differ by less than 2 x 10^-4"
     "duality": 1e-12,  # forward-backward check, relative (tutorial 08 §6 asserts 1e-10)
     "closure": 1e-12,
-    "fractions sum": 1e-9,  # w + to the river + still stored = 1 (reached: 2.5e-11)
+    "fractions sum": 1e-9,  # w + to the stream + still stored = 1 (reached: 2.5e-11)
 }
 STEADY_F_AT_WEST_EDGE = 0.5  # "the steady zone (c) reaches the west edge": F above this there
 
 
-def import_tutorial_helpers(tutorial_dir: Path = TUTORIAL_DIR,
-                            tutorial08_dir: Path = TUTORIAL08_DIR):
+def import_tutorial_helpers(tutorial_dir: Path = TUTORIAL_DIR):
     """Import the shared tutorial builders and tutorial 08's helpers; return both modules."""
-    for path in (tutorial_dir, tutorial08_dir):
+    for path in (tutorial_dir, tutorial_dir / "08_transient_tracking"):
         if str(path) not in sys.path:
             sys.path.insert(0, str(path))
     import helpers
@@ -143,7 +141,7 @@ def import_tutorial_helpers(tutorial_dir: Path = TUTORIAL_DIR,
 
 def snapshot_shares(summary: pd.DataFrame) -> pd.DataFrame:
     """Return the snapshot shares of the well's water by source term, indexed by time (years)."""
-    columns = {"snapshot RCH": "recharge", "snapshot RIV": "river", "snapshot CHD": "west edge",
+    columns = {"snapshot RCH": "recharge", "snapshot SFR": "stream", "snapshot CHD": "west edge",
                "snapshot storage": "storage"}
     return summary.set_index("time (yr)")[list(columns)].rename(columns=columns)
 
@@ -242,9 +240,10 @@ def compute(
     destinations: dict = DESTINATIONS,
     well: str = WELL,
     years: tuple[int, ...] = CUMULATIVE_YEARS,
+    tutorial_dir: Path = TUTORIAL_DIR,
 ) -> dict:
     """Build and run tutorial 08's model, track it forward and backward; return what is plotted."""
-    hbd, helpers = import_tutorial_helpers()
+    hbd, helpers = import_tutorial_helpers(tutorial_dir)
     run = hbd.build_transient(work / "tutorial08_transient", mf6_exe, n_years=n_years,
                               steps_per_season=1)
     reader = gs.open_model(run.ws, boundnames=True)
@@ -258,12 +257,12 @@ def compute(
     fwd_flow1 = track(reader, sources, destinations, porosity, 1)
     steady = gs.backward(first, {well: gs.select(first, boundnames=[well])})
     snapshot = snapshot_shares(summary)
-    origin = helpers.origin_shares(fwd, well)[["initial", "recharge", "river", "west edge"]]
+    origin = helpers.origin_shares(fwd, well)[["initial", "recharge", "stream", "west edge"]]
     return {
         "first": first,
         "spec": run.spec,
         "well_node": run.info["well_nodes"][well],
-        "river_cells": hbd.feature_cells(first, "RIV"),
+        "stream_cells": hbd.feature_cells(first, "SFR"),
         "n_steps": len(fwd.steps),
         "factors": seasonal_factors(run.info),
         "pumping_max": float(summary["well rate (m3/d)"].max()),
@@ -275,7 +274,7 @@ def compute(
         "maps": {
             "steady": steady.fraction_through[well],
             "well": bwd.fraction_through[well][0],
-            "river": bwd.fraction_to_other_sinks(well)[0],
+            "stream": bwd.fraction_to_other_sinks(well)[0],
             "stored": bwd.fraction_in_storage_at_end[0],
         },
         "closure": closure_split(bwd, well),
@@ -303,15 +302,15 @@ def computed_values(data: dict, years: tuple[int, ...] = CUMULATIVE_YEARS) -> di
         "snapshot storage, mean": mean["storage"],
         "snapshot storage, max": float(data["snapshot"]["storage"].max()),
         "year 1 initial": origin["initial"].iloc[at[1]],
-        "year 1 river": origin["river"].iloc[at[1]],
+        "year 1 stream": origin["stream"].iloc[at[1]],
         "year 30 initial": origin["initial"].iloc[at[30]],
         "year 30 recharge": origin["recharge"].iloc[at[30]],
-        "year 30 river": origin["river"].iloc[at[30]],
+        "year 30 stream": origin["stream"].iloc[at[30]],
         **{f"cumulative initial, year {y}": data["cumulative_initial"].iloc[at[y]]
            for y in years},
         "pumping, 30 years (m3)": closure["outflow"],
         "volume recharge (million m3)": closure["RCH"] / 1e6,
-        "volume river (million m3)": closure["RIV"] / 1e6,
+        "volume stream (million m3)": closure["SFR"] / 1e6,
         "volume initial (million m3)": closure["initial"] / 1e6,
         "share initial, backward": closure["initial"] / closure["outflow"],
         "substep sensitivity, year 1 (pp)": 100.0 * data["substep_sensitivity"],
@@ -350,8 +349,8 @@ def check_quoted(data: dict, quoted: dict = QUOTED, below: dict = BELOW,
     initial_backward = closure["initial"] / closure["outflow"]
     assert abs(initial_forward - initial_backward) < below["duality"]
     assert data["volume_mode_diff"] < below["volume options"]
-    assert data["sink_packages"] == {"WEL", "RIV"}, "caption: the river is the only other sink"
-    total = maps["well"] + maps["river"] + maps["stored"]
+    assert data["sink_packages"] == {"WEL", "SFR"}, "caption: the stream is the only other sink"
+    total = maps["well"] + maps["stream"] + maps["stored"]
     assert np.abs(total[first.active] - 1.0).max() < below["fractions sum"]
     west = gs.export.to_grid(first, maps["steady"])[0][:, 0]
     assert west.max() > steady_f_at_west_edge, "caption: the steady zone reaches the west edge"
@@ -419,25 +418,25 @@ def draw_contours(ax, grid: np.ndarray, spec, levels: tuple = THRESHOLDS,
                linestyles=["--", "-"], linewidths=1.0)
 
 
-def draw_river(ax, first: gs.FlowStep, river_cells: np.ndarray, spec,
-               colour: str = RIVER_COLOUR) -> None:
-    """Fill the river cells with one colour."""
+def draw_stream(ax, first: gs.FlowStep, stream_cells: np.ndarray, spec,
+                colour: str = mfig.STREAM_COLOUR) -> None:
+    """Fill the stream cells with one colour."""
     values = np.full(first.n_cells, np.nan)
-    values[river_cells] = 1.0
+    values[stream_cells] = 1.0
     grid = np.ma.masked_invalid(gs.export.to_grid(first, values)[0])
     ax.imshow(grid, cmap=ListedColormap([colour]), vmin=0.0, vmax=2.0, extent=map_extent(spec),
               origin="upper", interpolation="nearest")
 
 
 def draw_map(ax, first: gs.FlowStep, values: np.ndarray, spec, well_node: int,
-             river_cells: np.ndarray, star_colour: str = STAR_COLOUR,
+             stream_cells: np.ndarray, star_colour: str = STAR_COLOUR,
              star_size: float = STAR_SIZE):
-    """Map one per-cell fraction (viridis, 0 to 1) with contours, the river and the well."""
+    """Map one per-cell fraction (viridis, 0 to 1) with contours, the stream and the well."""
     grid = gs.export.to_grid(first, values)[0]
     image = ax.imshow(grid, cmap=F_CMAP, vmin=0.0, vmax=1.0, extent=map_extent(spec),
                       origin="upper", interpolation="nearest")
     draw_contours(ax, grid, spec)
-    draw_river(ax, first, river_cells, spec)
+    draw_stream(ax, first, stream_cells, spec)
     x_well, y_well = spec.xy(divmod(well_node, spec.ncol))
     ax.scatter(x_well / 1000.0, y_well / 1000.0, marker="*", s=star_size, color=star_colour,
                edgecolor="black", linewidth=0.6, zorder=6)
@@ -453,20 +452,20 @@ def series_legend(fig, anchor: tuple[float, float], colours: dict = COLOURS,
                   labels: dict = LABELS) -> None:
     """Legend of the two series panels, right of them."""
     handles = [plt.Rectangle((0, 0), 1, 1, color=colours[k], label=labels[k])
-               for k in ("initial", "recharge", "river", "west edge", "storage")]
+               for k in ("initial", "recharge", "stream", "west edge", "storage")]
     fig.legend(handles=handles, loc="center left", bbox_to_anchor=anchor, handlelength=1.4,
                labelspacing=0.6)
 
 
 def make_figure(out_dir: Path, data: dict, fig_name: str = FIG_NAME) -> list[Path]:
-    """Fig. 9: snapshot and tracked shares of the well's water, and four backward maps."""
+    """Fig. S1: snapshot and tracked shares of the well's water, and four backward maps."""
     fig = plt.figure(figsize=(mfig.FULL_WIDTH, 5.0))
     top = fig.add_gridspec(2, 1, left=0.085, right=0.75, top=0.955, bottom=0.53, hspace=0.32)
     ax_snap = fig.add_subplot(top[0])
     ax_track = fig.add_subplot(top[1], sharex=ax_snap)
-    stacked_shares(ax_snap, data["snapshot"], ["recharge", "river", "west edge", "storage"],
+    stacked_shares(ax_snap, data["snapshot"], ["recharge", "stream", "west edge", "storage"],
                    edgecolor="none")
-    stacked_shares(ax_track, data["origin"], ["initial", "recharge", "river", "west edge"])
+    stacked_shares(ax_track, data["origin"], ["initial", "recharge", "stream", "west edge"])
     draw_cumulative(ax_track, data["cumulative_initial"], data["year_steps"])
     plt.setp(ax_snap.get_xticklabels(), visible=False)
     ax_track.set_xlabel("time since the start of the simulation (years)")
@@ -478,13 +477,13 @@ def make_figure(out_dir: Path, data: dict, fig_name: str = FIG_NAME) -> list[Pat
     titles = {
         "steady": "(c) steady F, first step\n(no time limit)",
         "well": "(d) to the well\nwithin 30 years",
-        "river": "(e) to the river\nwithin 30 years",
+        "stream": "(e) to the stream\nwithin 30 years",
         "stored": "(f) still stored\nafter 30 years",
     }
     axes = [fig.add_subplot(bottom[0, i]) for i in range(4)]
     for ax, (key, title) in zip(axes, titles.items()):
         image = draw_map(ax, data["first"], data["maps"][key], data["spec"], data["well_node"],
-                         data["river_cells"])
+                         data["stream_cells"])
         ax.set_title(title, loc="left", fontweight="bold")
         ax.set_xlabel("x (km)")
     axes[0].set_ylabel("y (km)")
@@ -500,11 +499,12 @@ def make_figure(out_dir: Path, data: dict, fig_name: str = FIG_NAME) -> list[Pat
 # ---------------------------------------------------------------- driver
 
 
-def main(out_dir: Path = mfig.FIG_DIR, work: Path = mfig.WORK_DIR) -> dict[str, float]:
-    """Build tutorial 08's model, check the caption numbers and write Fig. 9."""
+def main(out_dir: Path = mfig.FIG_DIR, work: Path = mfig.WORK_DIR,
+         tutorial_dir: Path = TUTORIAL_DIR, bin_dir: Path = BIN_DIR) -> dict[str, float]:
+    """Build tutorial 08's model, check the caption numbers and write Fig. S1."""
     mfig.paper_style()
     start = time.perf_counter()
-    data = compute(work, mfig.find_mf6())
+    data = compute(work, mfig.find_mf6(bin_dir), tutorial_dir=tutorial_dir)
     computed = check_quoted(data)
     for key, value in computed.items():
         print(f"{key}: {value}")

@@ -325,18 +325,20 @@ def draw_sources(ax, data: dict, colours: dict = ef.SOURCE_COLOURS) -> None:
     ax.axis("off")
 
 
-def draw_fate(fig, ax, layer: dict, levels: tuple = G_LEVELS) -> None:
+def draw_fate(fig, ax, layer: dict, levels: tuple = G_LEVELS, inset: bool = True):
     """(c) G of the recharge on a field (log scale), the field outlined."""
     norm = LogNorm(*levels)
     image = draw_layer(ax, layer, ef.G_CMAP, norm, np.maximum(layer["values"], levels[0]))
     ef.field_rectangle(ax, layer["spec"])
-    inset_bar(fig, ax, image, "G (-)", (1e-3, 1e-2, 1e-1, 1.0), ("≤0.001", "", "0.1", "1"),
-              bounds=(0.13, 0.9, 0.36, 0.045))
+    if inset:
+        inset_bar(fig, ax, image, "G (-)", (1e-3, 1e-2, 1e-1, 1.0), ("≤0.001", "", "0.1", "1"),
+                  bounds=(0.13, 0.9, 0.36, 0.045))
+    return image
 
 
 def draw_travel_time(fig, ax, layer: dict, norm: tuple = TRAVEL_NORM,
                      zone_years: tuple = ZONE_YEARS, label_xy: dict = ZONE_LABEL_XY,
-                     note_xy: dict = ZONE_NOTE_XY) -> None:
+                     note_xy: dict = ZONE_NOTE_XY, inset: bool = True):
     """(d) Mean travel time inside F > 0.5 (log, magma_r) with the 5- and 25-year contours.
 
     The 25-year contour is labelled inline; the 5-year zone is too small, so its label sits
@@ -353,8 +355,10 @@ def draw_travel_time(fig, ax, layer: dict, norm: tuple = TRAVEL_NORM,
         ax.annotate(f"{years} yr", point, text, color=ZONE_COLOUR, fontsize=7, ha="center",
                     va="top", arrowprops={"arrowstyle": "-", "color": ZONE_COLOUR, "lw": 0.8,
                                           "shrinkA": 1, "shrinkB": 0})
-    inset_bar(fig, ax, image, "years", (0.1, 1.0, 10.0, 100.0), ("0.1", "1", "10", "100"),
-              bounds=(0.08, 0.9, 0.42, 0.045))
+    if inset:
+        inset_bar(fig, ax, image, "years", (0.1, 1.0, 10.0, 100.0), ("0.1", "1", "10", "100"),
+                  bounds=(0.08, 0.9, 0.42, 0.045))
+    return image
 
 
 def draw_seasons(ax, layer: dict, colours: tuple = ef.ZONE_COLOURS,

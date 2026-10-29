@@ -36,7 +36,6 @@ class StudyConfig:
 
     out: Path
     mf6_exe: Path
-    triangle_exe: Path
     sizes_a: tuple[float, ...] = (200.0, 100.0, 50.0, 25.0, 12.5)
     angles: tuple[float, ...] = (0.0, 30.0)
     sizes_b: tuple[float, ...] = (100.0, 50.0, 25.0, 12.5)
@@ -47,7 +46,7 @@ class StudyConfig:
     margin_b: float = 25.0
     river_gap: float = 50.0
     prt_subdivisions: int = 2
-    map_sizes: tuple[float, ...] = (50.0, 25.0)
+    map_sizes: tuple[float, ...] = (50.0, 25.0, 12.5)
     transient_sizes: tuple[float, ...] = (50.0, 12.5)
     transient_period: tuple[float, int, float] = (60000.0, 30, 1.0)
     substeps: tuple[int, ...] = (1, 4, 16, 64)
@@ -69,6 +68,13 @@ def _routing(model: pb.GridModel, step: gs.FlowStep) -> fr.FaceRoutingResult:
     return fr.route_backward(step, _wel_group(step), delr, delc)
 
 
+def closure(step: gs.FlowStep, result, group: str = "wel", tol: float = 1e-10) -> float:
+    """Return the relative closure error of a backward trace, asserting it is round-off."""
+    error = gs.diagnostics.backward_closure(step, result, group).relative_error
+    assert error < tol, f"backward closure error {error:.1e}"
+    return error
+
+
 def _row(base: dict, method: str, metrics: dict) -> dict:
     """Return one metrics table row."""
     return {**base, "method": method, **metrics}
@@ -79,7 +85,9 @@ def _row(base: dict, method: str, metrics: dict) -> dict:
 
 def analytic_fields(model: pb.GridModel, step, index, ref_raster) -> dict[str, np.ndarray]:
     """Return per-cell fields: full mixing, face routing (DIS) and the cell-averaged zone."""
-    fields = {"mixing": gs.backward(step, _wel_group(step)).fraction_through["wel"]}
+    mixed = gs.backward(step, _wel_group(step))
+    model.notes["closure"] = closure(step, mixed)
+    fields = {"mixing": mixed.fraction_through["wel"]}
     if model.kind == "DIS":
         fields["routing"] = _routing(model, step).fraction_through["wel"]
     fields["cell_average"] = an.cell_average(index, ref_raster, model.n_cells)
@@ -102,7 +110,7 @@ def run_analytic(config: StudyConfig) -> tuple[pd.DataFrame, dict]:
             for h in config.sizes_a:
                 ws = config.out / "models" / f"a{angle:g}_{kind}_{h:g}"
                 t0 = time.perf_counter()
-                model = pb.build_analytic(ws, config.mf6_exe, config.triangle_exe, spec, kind, h)
+                model = pb.build_analytic(ws, config.mf6_exe, spec, kind, h)
                 step = gs.read_step(model.ws)
                 index = an.raster_cells(model.modelgrid, xr, yr, config.raster)
                 fields = analytic_fields(model, step, index, ref)
@@ -114,7 +122,8 @@ def run_analytic(config: StudyConfig) -> tuple[pd.DataFrame, dict]:
                     rows.append(_row(base, method, m))
                     if h in config.map_sizes:
                         maps[f"{angle:g}_{kind}_{h:g}_{method}"] = f[index][::2, ::2]
-                print(f"A angle {angle:g} {kind} h={h:g}: {model.n_cells} cells")
+                print(f"A angle {angle:g} {kind} h={h:g}: {model.n_cells} cells, mean size "
+                      f"{model.mean_cell_size:.2f} m, closure {model.notes['closure']:.1e}")
     return pd.DataFrame(rows), maps
 
 
@@ -156,9 +165,10 @@ def prt_shares(prt) -> dict[str, float]:
 def model1_on_grid(config: StudyConfig, spec: pb.Model1Spec, kind: str, h: float) -> Model1Run:
     """Run problem B on one grid with every method that applies to it."""
     ws = config.out / "models" / f"b_{kind}_{h:g}"
-    model = pb.build_model1(ws, config.mf6_exe, config.triangle_exe, spec, kind, h)
+    model = pb.build_model1(ws, config.mf6_exe, spec, kind, h)
     step = gs.read_step(model.ws)
     mixed = gs.backward(step, _wel_group(step))
+    model.notes["closure"] = closure(step, mixed)
     q = mixed.destination_inflow["wel"]
     tt = gs.travel_time(step, mixed, config.porosity)
     volume = gs.water_volume(step, config.porosity)
@@ -206,7 +216,9 @@ def run_model1(config: StudyConfig) -> tuple[pd.DataFrame, pd.DataFrame, dict, d
             t0 = time.perf_counter()
             runs[(kind, h)] = model1_on_grid(config, spec, kind, h)
             runs[(kind, h)].model.notes["seconds"] = time.perf_counter() - t0
-            print(f"B {kind} h={h:g}: {runs[(kind, h)].model.n_cells} cells")
+            model = runs[(kind, h)].model
+            print(f"B {kind} h={h:g}: {model.n_cells} cells, mean size "
+                  f"{model.mean_cell_size:.2f} m, closure {model.notes['closure']:.1e}")
     reference = runs[("DIS", config.reference_h)]
     ref_index = an.raster_cells(reference.model.modelgrid, xr, yr, config.raster)
     ref = reference.fields["particles"][ref_index]
@@ -253,9 +265,7 @@ def run_transient(config: StudyConfig, arrivals: dict) -> pd.DataFrame:
     rows = []
     for h in config.transient_sizes:
         ws = config.out / "models" / f"t_DIS_{h:g}"
-        model = pb.build_model1(
-            ws, config.mf6_exe, config.triangle_exe, spec, "DIS", h, [config.transient_period]
-        )
+        model = pb.build_model1(ws, config.mf6_exe, spec, "DIS", h, [config.transient_period])
         reader = gs.open_model(model.ws)
         ends = np.cumsum([reader.step_length(k) for k in reader.steps])
         delt = np.diff(np.concatenate([[0.0], ends]))
