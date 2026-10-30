@@ -26,6 +26,8 @@ extensions = [
 # The notebooks are committed with their outputs and need MODFLOW 6 to run, so they are shown
 # as they are, not executed. They live in tutorials/ and are copied here at build time.
 nb_execution_mode = "off"
+# The notebooks write maths as $...$ and $$...$$; MathJax renders it.
+myst_enable_extensions = ["dollarmath", "amsmath"]
 TUTORIALS_SRC = REPO_DIR / "tutorials"
 TUTORIALS_DST = DOCS_DIR / "tutorials"
 shutil.rmtree(TUTORIALS_DST, ignore_errors=True)
