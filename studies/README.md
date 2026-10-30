@@ -42,6 +42,7 @@ GB of study output. Model workspaces are mostly deleted once their results are r
 | --- | --- | --- | --- |
 | Fig. 1 | Method sketch | `paper/gallery_figure.py` | `method` |
 | Figs 2 to 5 | Synthetic examples A to D | `paper/synthetic_figures.py` | `synthetic` |
+| Graphical abstract | Contributing area, mean travel time, sources of water and seasonal contribution of the example well | `paper/graphical_abstract.py` | `graphical_abstract` |
 | Fig. 6 | Full mixing against particles, synthetic aquifer | `comparison/paper_figures.py` | `comparison_figures` |
 | Fig. 7 | Neversink: F and the published contributing area | `neversink/paper_figures.py` | `neversink_figures` |
 | Fig. 8 | Neversink: full mixing against particles, refined window | `comparison/paper_figures.py` | `comparison_figures` |

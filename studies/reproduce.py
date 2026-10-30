@@ -29,7 +29,7 @@ REPO = Path(__file__).resolve().parents[1]
 FIG_DIR = REPO / "output" / "paper"
 NEVERSINK = "studies/neversink/output"
 NEVERSINK_DATA = REPO / "studies" / "neversink" / "external" / "neversink_workflow"
-QUICK = ("method", "synthetic", "si_time_steps")
+QUICK = ("method", "synthetic", "graphical_abstract", "si_time_steps")
 # Imports a script as a module in a fresh process and calls its main with JSON keyword arguments.
 RUNNER = (
     "import importlib, json, sys; from pathlib import Path; path = Path(sys.argv[1]); "
@@ -64,6 +64,9 @@ STEPS = (
     Step("synthetic", "studies/paper/synthetic_figures.py", "Figs 2-5, synthetic examples A-D",
          "few min", figures("fig_example_a", "fig_example_b", "fig_example_c", "fig_example_d"),
          sfr=True),
+    Step("graphical_abstract", "studies/paper/graphical_abstract.py",
+         "graphical abstract (Table of Contents image)", "< 1 min",
+         figures("graphical_abstract"), sfr=True),
     Step("si_time_steps", "studies/paper/si_convergence_figure.py",
          "SI Fig. 3, transport sub-steps", "< 1 min", figures("si_fig3_time_steps"),
          kwargs={"cell_size": False}),
