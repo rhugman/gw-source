@@ -287,7 +287,7 @@ def build_kriged_model(
     np.save(model_ws / "kriging_weights.npy", weights)
     write_pilot_points(model_ws, np.full(weights.shape[-1], mean_k))
     write_k_array(str(model_ws), mean_k)
-    run_mf6(str(model_ws), f"./{mf6.name}")
+    run_mf6(str(model_ws), str(model_ws / mf6.name))
     return model_ws
 
 
