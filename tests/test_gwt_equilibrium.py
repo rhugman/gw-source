@@ -25,8 +25,9 @@ Agreement reached (GWT outer/inner DVCLOSE 1e-12/1e-13, RCLOSE 1e-9): max |C - G
 models 1 and 2 (1e-3, 1e-5, 1e-8 after 1e5, 2e5, 4e5 days for model 1 recharge), about 1e-8 on
 model 7 with the test model's flow solver settings. On model 7 the limit is the flow solve: the
 reach budgets close only to the flow solver tolerance, and SFT reads the SFR budget's side of
-the aquifer exchange while the network takes the GWF side; with the flow model solved 100 times
-tighter, max |C - G| falls to 3e-11. Net accounting is the control that fails: at model 2's
+the aquifer exchange while the network takes the GWF side; with the flow model solved 1000 times
+tighter (DVCLOSE), max |C - G| falls to about 1e-11. With only 100 times tighter, it was 4e-11 on
+macOS but 1.3e-10 on Linux and Windows with the MF6 build of 2026-11-24. Net accounting is the control that fails: at model 2's
 weak well it is 14 times the transport result.
 """
 
@@ -55,7 +56,7 @@ NETWORK_ATOL = 1e-7  # model 7 with the test model's flow solver settings (see m
 # The accuracy comes from the inner DVCLOSE of 1e-13: RCLOSE 1e-6 or 1e-4 gives the same
 # max |C - G| (2.9e-12 on model 1 recharge, 1.1e-11 on model 2 CHD).
 EQUILIBRIUM_IMS = {**GWT_IMS, "outer_dvclose": 1e-12, "inner_dvclose": 1e-13, "rcloserecord": 1e-9}
-TIGHT_FLOW_IMS = {"outer_dvclose": 1e-11, "inner_dvclose": 1e-12, "rcloserecord": 1e-10}
+TIGHT_FLOW_IMS = {"outer_dvclose": 1e-12, "inner_dvclose": 1e-13, "rcloserecord": 1e-10}
 
 CELL_CASES = {  # name: (model, GWF pname tagged in GWT, gwsource selection of the same source)
     "m1_rch": ("m1_dis", "rch", {"package": "RCH"}),
@@ -207,7 +208,7 @@ def network_errors(
 
 @pytest.fixture(scope="module")
 def m7_tight(tmp_path_factory, mf6_exe):
-    """Model 7 with its flow model solved about 100 times tighter than the test default."""
+    """Model 7 with its flow model solved about 1000 times tighter than the test default."""
     return build_mover_dis(tmp_path_factory.mktemp("m7_tight"), mf6_exe, ims_kwargs=TIGHT_FLOW_IMS)
 
 
